@@ -33,12 +33,14 @@ run bash -c "cd '$ROOT/web' && python3 build.py"
 cp "$ROOT/web/dist/Subtitle_QC_Player.html" "$APP/Contents/Resources/index.html"
 
 # 2. The native shell, once per CPU type, then joined into one universal binary
+#    ARCHS / EXTRA_SWIFT_FLAGS are only used by the self-test build (see .github/workflows/selftest.yml).
 SDK="$(xcrun --show-sdk-path --sdk macosx)"
-for ARCH in arm64 x86_64; do
-  run xcrun swiftc -O -swift-version 5 -module-name SubtitleQC -target "$ARCH-apple-macos13.0" -sdk "$SDK" \
+ARCHS="${ARCHS:-arm64 x86_64}"
+for ARCH in $ARCHS; do
+  run xcrun swiftc -O -swift-version 5 -module-name SubtitleQC -target "$ARCH-apple-macos13.0" -sdk "$SDK" ${EXTRA_SWIFT_FLAGS:-} \
     "$ROOT"/mac/Sources/*.swift -o "$ROOT/build/SubtitleQC-$ARCH"
 done
-lipo -create "$ROOT/build/SubtitleQC-arm64" "$ROOT/build/SubtitleQC-x86_64" -output "$APP/Contents/MacOS/SubtitleQC"
+lipo -create $(for ARCH in $ARCHS; do echo "$ROOT/build/SubtitleQC-$ARCH"; done) -output "$APP/Contents/MacOS/SubtitleQC"
 
 # 3. Info.plist and icon
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" "$ROOT/mac/Info.plist" > "$APP/Contents/Info.plist"

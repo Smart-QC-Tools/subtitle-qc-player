@@ -1,0 +1,42 @@
+name: Self-test (Mac app)
+# Runs the app (a test build) against generated ProRes / H.264 / HEVC files and publishes the
+# measurements to the selftest-results branch. Started by hand (Actions tab or API).
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: Name for this run
+        required: false
+        default: run
+permissions:
+  contents: write
+concurrency:
+  group: selftest
+  cancel-in-progress: true
+jobs:
+  selftest:
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: brew install ffmpeg
+      - name: Test media
+        run: bash mac/selftest/make_media.sh "$RUNNER_TEMP/media"
+      - name: Build the test app
+        run: ARCHS=arm64 EXTRA_SWIFT_FLAGS="-D SELFTEST" BUILD_NUMBER=0 bash mac/build.sh
+      - name: Run
+        run: bash mac/selftest/run.sh "$RUNNER_TEMP/media" "$RUNNER_TEMP/out"
+      - name: Publish results (selftest-results branch)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          cd "$RUNNER_TEMP/out"
+          echo "${{ inputs.label }} · run ${{ github.run_number }} · ${GITHUB_SHA::7} · $(date -u)" > RUN.txt
+          git init -q -b selftest-results
+          git -c user.name=selftest -c user.email=selftest@users.noreply.github.com add -A
+          git -c user.name=selftest -c user.email=selftest@users.noreply.github.com commit -q -m "Self-test ${{ inputs.label }} (run ${{ github.run_number }})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" selftest-results
+          echo "::notice::Results on branch selftest-results ($(ls | tr '\n' ' '))"

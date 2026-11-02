@@ -35,6 +35,9 @@ final class MainView: NSView {
         config.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "native")
         let store = Settings.allJSON()
         config.userContentController.addUserScript(WKUserScript(source: "window.__nativeStore = \(store);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        #if SELFTEST
+        SelfTest.install(into: config.userContentController)
+        #endif
 
         webView = DropWebView(frame: bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]

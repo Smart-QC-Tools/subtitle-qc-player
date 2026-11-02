@@ -101,6 +101,15 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             waveJobs[id]?.cancel(); waveJobs.removeValue(forKey: id)
             replyHandler(true, nil)
 
+        #if SELFTEST
+        case "selftestStats":
+            guard let v = view?.video else { replyHandler(nil, "no video"); return }
+            let d = v.testStats()
+            if body["reset"] as? Bool == true { v.frameCounter.reset() }
+            replyHandler(d, nil)
+        case "selftestDone":
+            SelfTest.finish(str("json")); replyHandler(true, nil)
+        #endif
         default:
             replyHandler(nil, "unknown command \(cmd)")
         }

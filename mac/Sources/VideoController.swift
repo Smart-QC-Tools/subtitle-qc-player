@@ -17,6 +17,18 @@ final class VideoController: NSObject {
     private var seekBusy = false
     private var pendingSeek: Double?
     private var lastPaused = true
+    #if SELFTEST
+    let frameCounter = FrameCounter()
+    func testStats() -> [String: Any] {
+        var d: [String: Any] = ["t": now, "rate": Double(player.rate), "timeControl": player.timeControlStatus.rawValue,
+                                "waiting": player.reasonForWaitingToPlay?.rawValue ?? "", "status": item?.status.rawValue ?? -1,
+                                "errorLog": item?.errorLog()?.events.count ?? 0]
+        if let e = item?.errorLog()?.events.last { d["lastError"] = "\(e.errorStatusCode) \(e.errorComment ?? "")" }
+        if let a = item?.accessLog()?.events.last { d["dropped"] = a.numberOfDroppedVideoFrames; d["stalls"] = a.numberOfStalls }
+        d["delivered"] = frameCounter.stats()
+        return d
+    }
+    #endif
 
     override init() {
         super.init()
@@ -47,6 +59,9 @@ final class VideoController: NSObject {
         let it = AVPlayerItem(asset: asset)
         it.audioTimePitchAlgorithm = .timeDomain
         item = it
+        #if SELFTEST
+        frameCounter.attach(it)
+        #endif
         statusObs = it.observe(\.status, options: [.new]) { [weak self] it, _ in
             DispatchQueue.main.async { self?.statusChanged(it, asset: asset, id: id) }
         }
