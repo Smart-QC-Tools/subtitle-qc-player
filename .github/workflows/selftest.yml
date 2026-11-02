@@ -19,9 +19,17 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+      - name: Cached test media
+        id: media
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/media
+          key: selftest-media-${{ hashFiles('mac/selftest/make_media.sh', 'mac/selftest/make_subs.py') }}
       - name: Tools
+        if: steps.media.outputs.cache-hit != 'true'
         run: brew install ffmpeg
       - name: Test media
+        if: steps.media.outputs.cache-hit != 'true'
         run: bash mac/selftest/make_media.sh "$RUNNER_TEMP/media"
       - name: Build the test app
         run: ARCHS=arm64 EXTRA_SWIFT_FLAGS="-D SELFTEST" BUILD_NUMBER=0 bash mac/build.sh
