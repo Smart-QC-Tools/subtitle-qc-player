@@ -101,6 +101,7 @@ final class VideoController: NSObject {
         guard id == loadId, it === item else { return }
         switch it.status {
         case .readyToPlay:
+            prerollIfIdle()
             let duration = it.duration.seconds.finiteOr(0), canReverse = it.canPlayReverse, canFastReverse = it.canPlayFastReverse
             Task {
                 var size = CGSize.zero
@@ -120,6 +121,13 @@ final class VideoController: NSObject {
             bridge?.emit("videoError", ["id": id, "message": msg])
         default: break
         }
+    }
+
+    /// While paused, get the decoders ready to play from here, so pressing play starts at once.
+    /// (Only when AVFoundation allows it: it raises an exception otherwise.)
+    private func prerollIfIdle() {
+        guard let it = item, it.status == .readyToPlay, player.status == .readyToPlay, player.rate == 0, !seekBusy else { return }
+        player.preroll(atRate: 1, completionHandler: nil)
     }
 
     /// Logs how long playback waited for data (helps when files on network storage play unevenly).
@@ -185,6 +193,7 @@ final class VideoController: NSObject {
                 self.seekBusy = false
                 if let next = self.pendingSeek { self.pendingSeek = nil; self.seek(next, fast: self.pendingFast, seq: self.pendingSeq); return }
                 self.bridge?.emit("videoSeeked", ["t": self.now, "seq": seq])
+                self.prerollIfIdle()
             }
         }
     }
