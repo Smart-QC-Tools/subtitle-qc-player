@@ -92,6 +92,11 @@
       if (st.delivered && st.delivered.fps < fps * 0.9) problem('frames not keeping up', { file: v.name, deliveredFps: round(st.delivered.fps, 1), fps: round(fps, 3), maxFrameGapMs: round(st.delivered.maxFrameGapMs, 0) });
       if (gapsOf(tlx) > 250) problem('time updates stalled', { file: v.name, worstGapMs: round(gapsOf(tlx), 0) });
 
+      // second start, from a different place (after a seek while paused)
+      V().currentTime = V().duration / 3; await until(() => !V().seeking, 5000); await sleep(800);
+      { const q = V().currentTime; timeline(); key(' '); const ms2 = await until(() => tl.some(e => e[1] > q + 0.5 / fps), 5000, 5); key(' '); await until(() => V().paused, 2000);
+        step('start again after a seek', { file: v.name, startMs: round(ms2, 0) });
+        if (ms2 == null || ms2 > 250) problem('slow to start after a seek', { file: v.name, startMs: round(ms2, 0) }); }
       // waveform finished?
       const wDone = await until(() => ws().state === 'ready' || ws().state === 'error', 120000, 100);
       step('waveform', { file: v.name, state: ws().state, msg: ws().msg, sinceOpenS: round((now() - wt) / 1000, 1), channels: ws().total, sel: ws().sel });
