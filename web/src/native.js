@@ -78,7 +78,7 @@ const Native = (() => {
     const el = document.createElement('div');
     el.className = 'native-video';
     const st = { src: '', t: 0, at: 0, rate: 0, paused: true, duration: NaN, w: 0, h: 0, seeking: false, error: null,
-                 volume: 1, muted: false, ready: 0, wantRate: 1, canReverse: false, canFastReverse: false, loadId: 0 };
+                 volume: 1, muted: false, ready: 0, wantRate: 1, canReverse: false, canFastReverse: false, loadId: 0, seq: 0 };
     const clampT = (v) => Math.max(0, isFinite(st.duration) ? Math.min(st.duration, +v || 0) : (+v || 0));
     const fire = (type) => el.dispatchEvent(new Event(type));
     // Between the native time updates (30 a second) the position is estimated from the speed, but
@@ -93,7 +93,7 @@ const Native = (() => {
       v = Math.max(0, +v || 0);
       if (isFinite(st.duration)) v = Math.min(st.duration, v);
       st.t = v; st.at = performance.now(); st.seeking = true;
-      post('videoSeek', { t: v });
+      post('videoSeek', { t: v, seq: ++st.seq });
       fire('seeking'); fire('timeupdate');
     });
     def('paused', () => st.paused);
@@ -118,7 +118,7 @@ const Native = (() => {
     // Seek to the nearest earlier keyframe: quick, for shuttling (not frame-exact).
     el.fastSeek = (v) => {
       v = clampT(v); st.t = v; st.at = performance.now(); st.seeking = true;
-      post('videoSeek', { t: v, fast: true });
+      post('videoSeek', { t: v, fast: true, seq: ++st.seq });
       fire('seeking'); fire('timeupdate');
     };
     def('playbackRate', () => st.wantRate, (v) => {
@@ -130,6 +130,8 @@ const Native = (() => {
     def('muted', () => st.muted, (v) => { st.muted = !!v; post('videoVolume', { volume: st.volume, muted: st.muted }); fire('volumechange'); });
     el.play = () => {
       if (!st.src) return Promise.resolve();
+      // At the very end, playing forward starts again from the beginning (like any player).
+      if (st.paused && st.wantRate > 0 && isFinite(st.duration) && st.t >= st.duration - 0.05) el.currentTime = 0;
       if (st.paused) {
         st.t = now(); st.at = performance.now(); st.paused = false; st.rate = st.wantRate;
         post('videoPlay', { rate: st.wantRate });
@@ -165,11 +167,14 @@ const Native = (() => {
       fire('timeupdate');
     });
     on('videoSeeked', (d) => {
+      // Only the report for the latest seek counts: an older one arriving late would pull the playhead
+      // back a frame (and the next frame step would count from there).
+      if (d.seq != null && d.seq !== st.seq) return;
       st.seeking = false; st.t = clampT(d.t); st.at = performance.now();
       fire('seeked'); fire('timeupdate');
     });
     on('videoState', (d) => {   // playback stopped or started on the native side (end of file, start reached in reverse …)
-      st.t = clampT(d.t); st.at = performance.now();
+      if (!st.seeking) { st.t = clampT(d.t); st.at = performance.now(); }   // a seek on its way decides the position
       if (d.paused && !st.paused) { st.paused = true; st.rate = 0; fire('pause'); if (d.ended) fire('ended'); }
       else if (!d.paused && st.paused) { st.paused = false; st.rate = d.rate || 1; fire('play'); fire('playing'); }
     });

@@ -66,7 +66,8 @@ final class MainView: NSView {
         let go = { [weak self] in self?.webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent()) }
         if networkBlocked { _ = go(); return }
         // Safety net: the interface never needs the internet, so every web request is blocked.
-        let rules = #"[{"trigger":{"url-filter":"^(https?|wss?|ftp)://"},"action":{"type":"block"}}]"#
+        // (WebKit's rule syntax has no "a|b": one rule per scheme.)
+        let rules = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}},{"trigger":{"url-filter":"^wss?://"},"action":{"type":"block"}},{"trigger":{"url-filter":"^ftp://"},"action":{"type":"block"}}]"#
         WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "no-network", encodedContentRuleList: rules) { [weak self] list, error in
             guard let self = self else { return }
             if let list = list { self.webView.configuration.userContentController.add(list); self.networkBlocked = true }

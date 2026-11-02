@@ -72,16 +72,23 @@
       const wt = now();
       // ---------------------------------------------------------------- normal playback
       await stats(true); timeline();
-      const r0 = now(), p0 = V().currentTime;
+      const p0 = V().currentTime;
       key(' ');
-      await sleep(8000);
+      const k0 = now();
+      // start-up delay: until the native side reports the position moving
+      const startMs = await until(() => tl.some(e => e[1] > p0 + 0.5 / fps), 5000, 5);
+      await sleep(1000);
+      await stats(true); timeline();
+      const r0 = now(), q0 = V().currentTime;
+      await sleep(7000);
       const tlx = timeline(), st = await stats(true);
-      const p1 = V().currentTime, wall = (now() - r0) / 1000;
+      const p1 = V().currentTime, wall = (now() - r0) / 1000, p0s = q0;
       key(' ');
       await until(() => V().paused, 2000);
-      const speed = (p1 - p0) / wall;
-      step('play 8 s', { file: v.name, playheadSpeed: round(speed), events: tlx.length, worstEventGapMs: round(gapsOf(tlx), 0), worstPageFrameMs: rafWorst(r0), delivered: st.delivered, timeControl: st.timeControl, waiting: st.waiting, wave: ws().state });
-      if (Math.abs(speed - 1) > 0.05) problem('playhead speed off while playing', { file: v.name, speed: round(speed) });
+      const speed = (p1 - p0s) / wall;
+      step('play (start-up, then 7 s steady)', { file: v.name, startMs: round(startMs, 0), playheadSpeed: round(speed), events: tlx.length, worstEventGapMs: round(gapsOf(tlx), 0), worstPageFrameMs: rafWorst(r0), delivered: st.delivered, timeControl: st.timeControl, waiting: st.waiting, wave: ws().state });
+      if (startMs == null || startMs > 400) problem('slow to start playing', { file: v.name, startMs: round(startMs, 0) });
+      if (Math.abs(speed - 1) > 0.03) problem('playhead speed off while playing', { file: v.name, speed: round(speed) });
       if (st.delivered && st.delivered.fps < fps * 0.9) problem('frames not keeping up', { file: v.name, deliveredFps: round(st.delivered.fps, 1), fps: round(fps, 3), maxFrameGapMs: round(st.delivered.maxFrameGapMs, 0) });
       if (gapsOf(tlx) > 250) problem('time updates stalled', { file: v.name, worstGapMs: round(gapsOf(tlx), 0) });
 
@@ -179,7 +186,7 @@
       await sleep(500);
       const a = V().currentTime; key(' '); await sleep(2000); const b = V().currentTime; key(' ');
       step('rapid episode switching (12 switches)', { ms: round(now() - t, 0), settledMs: round(ok, 0), expected: lastName, got: Player.currentVideoFile() && Player.currentVideoFile().name, duration: round(V().duration, 2), playsAfter: round(b - a, 2), worstPageFrameMs: rafWorst(t), errors: R.errors.length });
-      if (!ok) problem('did not settle on the last episode', { expected: lastName });
+      if (ok == null) problem('did not settle on the last episode', { expected: lastName });
       if (b - a < 1.5) problem('not playing properly after switching', { moved: round(b - a, 2) });
       const exp = state.videos.find(v => v.name === lastName);
       if (exp && exp.probe && Math.abs(V().duration - exp.probe.duration) > 0.5) problem('duration belongs to another episode', { got: V().duration, expected: exp.probe.duration });

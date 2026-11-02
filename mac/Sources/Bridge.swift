@@ -82,7 +82,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "videoPlay": view?.video.play(rate: num("rate")); replyHandler(true, nil)
         case "videoPause": view?.video.pause(); replyHandler(true, nil)
         case "videoRate": view?.video.setRate(num("rate")); replyHandler(true, nil)
-        case "videoSeek": view?.video.seek(num("t"), fast: body["fast"] as? Bool ?? false); replyHandler(true, nil)
+        case "videoSeek": view?.video.seek(num("t"), fast: body["fast"] as? Bool ?? false, seq: Int(num("seq"))); replyHandler(true, nil)
         case "videoVolume": view?.video.setVolume(num("volume"), muted: body["muted"] as? Bool ?? false); replyHandler(true, nil)
 
         case "waveStart":

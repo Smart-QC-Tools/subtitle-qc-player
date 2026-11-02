@@ -26,7 +26,8 @@ final class WaveformJob {
     }
 
     func start(done: @escaping () -> Void) {
-        Task.detached(priority: .userInitiated) { [self] in
+        // Lower priority than playback: on a busy or network drive the picture and sound come first.
+        Task.detached(priority: .utility) { [self] in
             do { try await self.run() }
             catch { if !self.isCancelled { self.post(["type": "error", "message": error.localizedDescription]) } }
             DispatchQueue.main.async { done() }
@@ -82,57 +83,63 @@ final class WaveformJob {
             pendStart = Int.max; pendEnd = -1
         }
 
-        // Group the picked channels per track and read each track once.
+        // Group the picked channels per track; read all those tracks in a single pass over the file
+        // (one reader, outputs taken in turn), so a file with many mono tracks isn't read many times.
         var byTrack: [Int: [Int]] = [:]
         for g in picks { byTrack[channels[g].track, default: []].append(channels[g].ch) }
         let order = byTrack.keys.sorted()
-        for (n, ti) in order.enumerated() {
-            let chans = byTrack[ti]!
-            let reader = try AVAssetReader(asset: asset)
+        let reader = try AVAssetReader(asset: asset)
+        var outs: [(out: AVAssetReaderTrackOutput, chans: [Int], pts: Double, done: Bool)] = []
+        for ti in order {
             let out = AVAssetReaderTrackOutput(track: tracks[ti], outputSettings: [
                 AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
                 AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
             ])
             out.alwaysCopiesSampleData = false
             reader.add(out)
-            guard reader.startReading() else { throw reader.error ?? NSError(domain: "wave", code: 2, userInfo: [NSLocalizedDescriptionKey: "Can't read the audio."]) }
-            var buf = [Float]()
-            while let sb = out.copyNextSampleBuffer() {
-                if isCancelled { reader.cancelReading(); return }
-                guard let block = CMSampleBufferGetDataBuffer(sb), let fd = CMSampleBufferGetFormatDescription(sb),
-                      let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(fd)?.pointee else { continue }
-                let nch = max(1, Int(asbd.mChannelsPerFrame)), sr = asbd.mSampleRate > 0 ? asbd.mSampleRate : 48000
-                let len = CMBlockBufferGetDataLength(block)
-                let floats = len / 4
-                if buf.count < floats { buf = [Float](repeating: 0, count: floats) }
-                buf.withUnsafeMutableBytes { raw in _ = CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: floats * 4, destination: raw.baseAddress!) }
-                let pts = CMSampleBufferGetPresentationTimeStamp(sb).seconds.finiteOr(0)
-                let frames = floats / nch
-                let base = pts * WaveformJob.rate, step = WaveformJob.rate / sr
-                buf.withUnsafeBufferPointer { p in
-                    for f in 0..<frames {
-                        let i = Int(base + Double(f) * step)
-                        if i < 0 || i >= count { continue }
-                        let o = f * nch
-                        for c in chans where c < nch {
-                            let x = p[o + c], a = abs(x)
-                            if a > peaks[i] { peaks[i] = a }
-                            sumsq[i] += Double(x) * Double(x); counts[i] += 1
-                        }
-                        if i < pendStart { pendStart = i }
-                        if i > pendEnd { pendEnd = i }
+            outs.append((out, byTrack[ti]!, 0, false))
+        }
+        guard reader.startReading() else { throw reader.error ?? NSError(domain: "wave", code: 2, userInfo: [NSLocalizedDescriptionKey: "Can't read the audio."]) }
+        var buf = [Float]()
+        while true {
+            if isCancelled { reader.cancelReading(); return }
+            // the output that is furthest behind goes next, so the tracks advance together
+            guard let k = outs.indices.filter({ !outs[$0].done }).min(by: { outs[$0].pts < outs[$1].pts }) else { break }
+            guard let sb = outs[k].out.copyNextSampleBuffer() else { outs[k].done = true; continue }
+            let chans = outs[k].chans
+            guard let block = CMSampleBufferGetDataBuffer(sb), let fd = CMSampleBufferGetFormatDescription(sb),
+                  let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(fd)?.pointee else { continue }
+            let nch = max(1, Int(asbd.mChannelsPerFrame)), sr = asbd.mSampleRate > 0 ? asbd.mSampleRate : 48000
+            let len = CMBlockBufferGetDataLength(block)
+            let floats = len / 4
+            if buf.count < floats { buf = [Float](repeating: 0, count: floats) }
+            buf.withUnsafeMutableBytes { raw in _ = CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: floats * 4, destination: raw.baseAddress!) }
+            let pts = CMSampleBufferGetPresentationTimeStamp(sb).seconds.finiteOr(0)
+            let frames = floats / nch
+            outs[k].pts = pts + Double(frames) / sr
+            let base = pts * WaveformJob.rate, step = WaveformJob.rate / sr
+            buf.withUnsafeBufferPointer { p in
+                for f in 0..<frames {
+                    let i = Int(base + Double(f) * step)
+                    if i < 0 || i >= count { continue }
+                    let o = f * nch
+                    for c in chans where c < nch {
+                        let x = p[o + c], a = abs(x)
+                        if a > peaks[i] { peaks[i] = a }
+                        sumsq[i] += Double(x) * Double(x); counts[i] += 1
                     }
-                }
-                flush(force: false)
-                if Date().timeIntervalSince(lastProgress) > 0.25, duration > 0 {
-                    lastProgress = Date()
-                    let p = (Double(n) + min(1, pts / duration)) / Double(order.count)
-                    post(["type": "progress", "p": min(1, p)])
+                    if i < pendStart { pendStart = i }
+                    if i > pendEnd { pendEnd = i }
                 }
             }
-            if reader.status == .failed { throw reader.error ?? NSError(domain: "wave", code: 3, userInfo: [NSLocalizedDescriptionKey: "Reading the audio failed."]) }
-            flush(force: true)
+            flush(force: false)
+            if Date().timeIntervalSince(lastProgress) > 0.25, duration > 0 {
+                lastProgress = Date()
+                let behind = outs.filter { !$0.done }.map { $0.pts }.min() ?? duration
+                post(["type": "progress", "p": min(1, behind / duration)])
+            }
         }
+        if reader.status == .failed { throw reader.error ?? NSError(domain: "wave", code: 3, userInfo: [NSLocalizedDescriptionKey: "Reading the audio failed."]) }
         flush(force: true)
         post(["type": "done"])
     }

@@ -484,8 +484,10 @@
     else if (speed < 0 && video.canPlayReverse && (speed === -1 || video.canPlayFastReverse)) {   // the Mac app plays backwards for real (ProRes …)
       video.playbackRate = speed; if (video.paused) video.play().catch(() => {});
     } else {
-      video.playbackRate = 1;
+      // Pause first, then reset the speed: the other way round, the Mac app could briefly be told to play
+      // forward at 1× and (on ProRes after native reverse) keep doing so after the pause.
       if (!video.paused) { ownPause = true; video.pause(); }
+      video.playbackRate = 1;
       if (speed < 0) { rwLast = 0; rwPos = video.currentTime; rwRaf = requestAnimationFrame(reverseLoop); }
     }
     showSpeed(); syncPlayIcon();
