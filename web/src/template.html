@@ -356,7 +356,9 @@ html.native .translate-btn{display:none}   /* Chrome-only feature */
 body.ev-expanded #sidebar{overflow:hidden;flex-direction:column}
 body.ev-expanded #sidebar .sidebar-sticky{position:static;flex:none}
 body.ev-expanded .ev-lim{display:flex}
-body.ev-expanded #cueListContainer,body.ev-expanded #sidebar .translate-btn,body.ev-expanded #sidebar .cue-translation{display:none}
+body.ev-expanded #cueListContainer{display:none}
+.ev-table .cue-translation{display:block;margin-top:4px;color:#a9c4ff;font-size:12px;line-height:1.35;white-space:normal}
+#sidebar .search-bar .translate-btn{padding:5px 9px;font-size:11px}
 body.ev-expanded .ev-wrap{display:block;flex:1 1 auto;min-height:0;overflow:auto}
 body.ev-expanded #sidebar .search-bar{max-width:560px}
 body.ev-expanded #sidebar .search-status-row:has(.status:empty){display:none}
@@ -502,7 +504,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
           </div>
           <div class="search-status-row">
             <div class="status" id="searchStatus"></div>
-            <button type="button" id="translateBtn" class="translate-btn" title="Translate the subtitle events currently visible in this box to English">Translate</button>
+            <button type="button" id="translateBtn" class="translate-btn" title="Translate the events currently in view in the table to English (Chrome only)">Translate</button>
           </div>
           <div class="filter-bar" id="filterBar"></div>
         </div>

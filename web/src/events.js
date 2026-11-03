@@ -72,7 +72,14 @@
       dur.appendChild(span(c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '', durText(c.duration)));
       tr.appendChild(dur);
       const t = cell('ev-text');
-      renderCueText(t, c.text, searchQuery, searchCaseSensitive);
+      const tx = document.createElement('span');
+      renderCueText(tx, c.text, searchQuery, searchCaseSensitive);
+      t.appendChild(tx);
+      const tl = document.createElement('span');   // English translation (web version, Translate button)
+      tl.className = 'cue-translation';
+      tl.style.display = 'none';
+      t.appendChild(tl);
+      if (translationCache.has(i)) applyTranslationToRow(tl, translationCache.get(i));
       tr.appendChild(t);
       tr.appendChild(cell('ev-num' + (c.lineCount >= LINE_COUNT_THRESHOLD ? ' bad' : ''), String(c.lineCount)));
       tr.appendChild(cell('ev-num' + (c.charLimitExceeded ? ' bad' : ''), String(c.maxLineLength)));
@@ -214,6 +221,8 @@
   document.addEventListener('qc-limits', () => { showLimits(); renderFilterBar(); applyFilterVisibility(); });
 
   document.body.classList.add('ev-expanded');
+  // Translate sits next to the search box (it translates the rows in view).
+  { const tb = document.getElementById('translateBtn'), bar = document.querySelector('#sidebar .search-bar'); if (tb && bar) bar.appendChild(tb); }
 
   window.Player.pause = () => { setSpeed(0); if (video && !video.paused) video.pause(); };
   window.Player.setLimits = setLimits;

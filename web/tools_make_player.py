@@ -189,5 +189,22 @@ rep("""      filterBarEl.appendChild(btn);
     const chips = filterBarEl.querySelectorAll('.filter-chip');
     if (chips.length > 4) { const br = document.createElement('span'); br.className = 'fb-break'; chips[Math.ceil(chips.length / 2) - 1].after(br); }""")
 
+
+# Translate (Chrome only) works on the table: the rows in view that pass the filter / search.
+rep("""  function getVisibleUntranslatedRows() {
+    const stickyEl = sidebar.querySelector('.sidebar-sticky');""", """  function getVisibleUntranslatedRows() {
+    if (evRows.length) {
+      const wr = evWrap.getBoundingClientRect(), head = evTable.tHead.getBoundingClientRect().bottom, out = [];
+      for (const row of evBody.rows) {
+        if (row.hidden) continue;
+        const idx = Number(row.dataset.index);
+        if (translationCache.has(idx)) continue;
+        const r = row.getBoundingClientRect();
+        if (r.bottom > head && r.top < wr.bottom) out.push({ row, idx });
+      }
+      return out;
+    }
+    const stickyEl = sidebar.querySelector('.sidebar-sticky');""")
+
 open('src/player.js','w').write(js)
 print('ok', len(js))
