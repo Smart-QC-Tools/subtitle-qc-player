@@ -87,7 +87,7 @@ js=js[:-5]+"""
   window.CueCheck = {
     parse: parseRawCueList, finalizeDurationFlags, finalizeCharFlags, finalizeQcFlags, setLimits,
     get CHAR_LIMIT() { return CHAR_LIMIT; }, get CPS_LIMIT() { return CPS_LIMIT; },
-    LINE_COUNT_THRESHOLD, SHORT_DURATION_SECONDS, SHORT_DURATION_CRITICAL_CHARS, MAX_DURATION_SECONDS
+    get LINE_COUNT_THRESHOLD() { return LINE_COUNT_THRESHOLD; }, SHORT_DURATION_SECONDS, SHORT_DURATION_CRITICAL_CHARS, MAX_DURATION_SECONDS
   };
 })();
 """
@@ -119,6 +119,7 @@ rep("""  function formatRange(begin, end) {
 
 # ---- per-event QC info (cueinfo.js): CPS, placement, issue tags, limits
 rep("""  const CHAR_LIMIT = 42;""", """  let CHAR_LIMIT = 42;""")
+rep("""  const LINE_COUNT_THRESHOLD = 3;""", """  let LINE_COUNT_THRESHOLD = 3;   // set from the "max lines" limit (2 → 3+ flagged)""")
 rep("""        results.push({
           begin, end,
           region: region || '(default)',""", """        results.push({

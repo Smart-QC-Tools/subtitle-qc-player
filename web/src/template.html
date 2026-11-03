@@ -349,6 +349,7 @@ html.native .web-only{display:none}
 .exp-btn svg{width:14px;height:14px}
 .ev-lim{display:none;align-items:center;gap:10px}
 .ev-lim label{display:flex;align-items:center;gap:4px;font-size:11px;letter-spacing:.4px;color:var(--dim)}
+.ev-lim select{font-size:12px;padding:1px 3px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px}
 .ev-lim input{width:50px;font-size:12px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;text-transform:none}
 .ev-wrap{display:none}
 html.native .translate-btn{display:none}   /* Chrome-only feature */
@@ -447,7 +448,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
       </div>
       <div id="progress" hidden></div>
       <div id="groups"></div>
-      <div class="foot">Click a row for details · ▶ opens it in the player · Cue checks <span class="ft ft-issue">red</span> S over the CPS limit · C over the line-length limit · L 3+ lines · O overlaps · D duration · ! very short with long line · # odd characters · M mixed alignment · <span class="ft ft-warn">amber</span> G 1-frame gaps · ↑ raised · ↔ left/right</div>
+      <div class="foot">Click a row for details · ▶ opens it in the player · Cue checks <span class="ft ft-issue">red</span> S over the CPS limit · C over the line-length limit · L too many lines · O overlaps · D duration · ! very short with long line · # odd characters · M mixed alignment · <span class="ft ft-warn">amber</span> G 1-frame gaps · ↑ raised · ↔ left/right</div>
     </div>
   </section>
 
@@ -490,6 +491,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         <div class="sidebar-sticky">
           <div class="sidebar-header"><span>Subtitle events</span><span class="sh-count" id="evCount"></span><span class="spacer"></span>
             <span class="ev-lim" title="Limits for the red flags, here and on the Conform page">
+              <label title="Most lines allowed on screen">Lines <select id="limLines"><option>2</option><option>3</option><option>4</option></select></label>
               <label>CPS <input type="number" id="limCps" min="5" max="60" step="1"></label>
               <label>CPL <input type="number" id="limCpl" min="10" max="99" step="1"></label></span>
 </div>
@@ -511,7 +513,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
           <table class="ev-table" id="evTable">
             <thead><tr>
               <th data-sort="begin" title="In / out timecode. Red: overlaps. Amber: 1-frame gap to the next event">In / Out</th>
-              <th data-sort="duration" title="Time on screen, in seconds:frames">Dur<small>s:ff</small></th>
+              <th data-sort="duration" title="Time on screen: seconds:frames (2:13s), or minutes:seconds:frames from a minute up (1:05:12m)">Dur</th>
               <th class="ev-textcol">Text</th>
               <th data-sort="lines" title="Lines">Ln</th>
               <th data-sort="cpl" title="Characters on the longest line">CPL</th>
@@ -557,7 +559,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         </ul>
         <h4>Colours</h4>
         <ul>
-          <li><span class="qtag q-issue" style="margin:0">Red</span> breaks a rule: over the CPS or line-length limit, 3+ lines, overlap, too short / too long, very short with a long line, odd characters, mixed alignment.</li>
+          <li><span class="qtag q-issue" style="margin:0">Red</span> breaks a rule: over the CPS or line-length limit, more lines than allowed, overlap, too short / too long, very short with a long line, odd characters, mixed alignment.</li>
           <li><span class="qtag q-warn" style="margin:0">Amber</span> worth a look: unusual placement (raised, or left / right-aligned), or a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine). <span class="qtag q-neutral" style="margin:0">Grey</span> placed at the top.</li>
           <li>CPS counts every character, spaces included, over the time on screen. The CPS and line-length limits are set in the expanded table's header and apply everywhere.</li>
         </ul>

@@ -18,13 +18,13 @@
     cpl: c => c.maxLineLength, cps: c => c.cps ?? -1, place: c => placeRank(c.placement),
   };
 
-  // Duration as trimmed seconds:frames (2:13), with minutes when needed (1:05:12).
+  // Duration as trimmed seconds:frames with its unit (2:13s); from a minute up, minutes:seconds:frames (1:05:12m).
   function durText(d) {
     if (d == null || !isFinite(d)) return '';
     const nom = Math.round(fps() || docEffectiveFrameRate || 24);
     const f = Math.round(d * (fps() || docEffectiveFrameRate || 24));
     const ff = String(f % nom).padStart(2, '0'), s = Math.floor(f / nom);
-    return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}:${ff}` : `${s}:${ff}`;
+    return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}:${ff}m` : `${s}:${ff}s`;
   }
   // Placement text: empty for the usual bottom-centre.
   // Placement text: empty for the usual bottom-centre. Short form for the table (L / R / Mix, Raised, Top);
@@ -167,7 +167,7 @@
     const times = row('evd-times');
     item(times, 'In', formatVideoTC(c.begin), c.overlapsPrev ? 'bad' : '');
     item(times, 'Out', isFinite(c.end) ? formatVideoTC(c.end) : '…', c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '');
-    item(times, 'Duration', durText(c.duration) + (c.duration != null ? 's' : ''), c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '');
+    item(times, 'Duration', durText(c.duration), c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '');
     top.appendChild(times);
     const lines = document.createElement('div');
     const ls = c.text.split('\n');
@@ -192,13 +192,6 @@
     const [pt, pc] = placeText(p, true);
     item(meta, 'Placement', pt || 'Bottom · centre', pc);
     item(meta, 'Gap after', c.gap != null ? (Math.round(c.gap * fps()) < 100 ? `${Math.round(c.gap * fps())}f` : `${c.gap.toFixed(1)}s`) : '—', c.gap != null && c.gap < -0.001 ? 'bad' : c.gapWarn ? 'warn' : '');
-    const flags = [...(c.issues || []), ...(c.warns || [])];
-    if (flags.length) {
-      const tags = document.createElement('span');
-      tags.className = 'evd-tags';
-      for (const t of flags) { const q = span('qtag q-' + t.kind, t.text); q.title = t.title; tags.appendChild(q); }
-      meta.appendChild(tags);
-    }
     evDetail.appendChild(meta);
   }
 
@@ -209,13 +202,13 @@
   });
 
   // Limits (shared with the list and the Conform page). Shown in the panel header while expanded.
-  const limCps = document.getElementById('limCps'), limCpl = document.getElementById('limCpl');
-  function showLimits() { if (limCps) limCps.value = CPS_LIMIT; if (limCpl) limCpl.value = CHAR_LIMIT; }
+  const limCps = document.getElementById('limCps'), limCpl = document.getElementById('limCpl'), limLines = document.getElementById('limLines');
+  function showLimits() { if (limCps) limCps.value = CPS_LIMIT; if (limCpl) limCpl.value = CHAR_LIMIT; if (limLines) limLines.value = String(LINE_COUNT_THRESHOLD - 1); }
   showLimits();
-  for (const el of [limCps, limCpl]) if (el) el.addEventListener('change', () => {
-    const cps = Number(limCps.value), cpl = Math.round(Number(limCpl.value));
+  for (const el of [limCps, limCpl, limLines]) if (el) el.addEventListener('change', () => {
+    const cps = Number(limCps.value), cpl = Math.round(Number(limCpl.value)), lines = Number(limLines.value);
     if (!(cps > 0 && cps < 100) || !(cpl > 0 && cpl < 200)) { showLimits(); return; }
-    setLimits({ cps, cpl });
+    setLimits({ cps, cpl, lines });
     showLimits();
   });
   document.addEventListener('qc-limits', () => { showLimits(); renderFilterBar(); applyFilterVisibility(); });

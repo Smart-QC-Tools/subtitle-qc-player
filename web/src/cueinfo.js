@@ -11,6 +11,7 @@
       const v = JSON.parse(Store.get(QC_LIMITS_KEY) || 'null');
       if (v && v.cps > 0) CPS_LIMIT = +v.cps;
       if (v && v.cpl > 0) CHAR_LIMIT = +v.cpl;
+      if (v && v.lines > 0) LINE_COUNT_THRESHOLD = +v.lines + 1;
     } catch (e) { /* defaults */ }
   })();
 
@@ -180,7 +181,7 @@
     { key: 'issues', label: 'Issues', cls: 'f-issue', title: 'Every event with a red flag', test: c => !!(c.issues && c.issues.length) },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-issue', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'chars', get label() { return `CPL > ${CHAR_LIMIT}`; }, cls: 'f-issue', get title() { return `A line longer than ${CHAR_LIMIT} characters`; }, test: c => !!c.charLimitExceeded },
-    { key: 'lines', label: '3+ Lines', cls: 'f-issue', test: c => c.lineCount >= LINE_COUNT_THRESHOLD },
+    { key: 'lines', get label() { return `Lines > ${LINE_COUNT_THRESHOLD - 1}`; }, cls: 'f-issue', get title() { return `More than ${LINE_COUNT_THRESHOLD - 1} lines`; }, test: c => c.lineCount >= LINE_COUNT_THRESHOLD },
     { key: 'overlap', label: 'Overlaps', cls: 'f-issue', test: c => !!c.overlap },
     { key: 'duration', label: 'Duration', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s or over ${MAX_DURATION_SECONDS}s on screen`, test: c => !!(c.tooShort || c.tooLong) },
     { key: 'durationCritical', label: 'Critical', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s with a line of ${SHORT_DURATION_CRITICAL_CHARS}+ characters`, test: c => !!c.tooShortCritical },
@@ -192,10 +193,11 @@
   );
 
   // Limits: changing them re-checks the loaded file at once (the Conform page re-counts too).
-  function setLimits({ cps, cpl }) {
+  function setLimits({ cps, cpl, lines }) {
     if (cps > 0) CPS_LIMIT = +cps;
     if (cpl > 0) CHAR_LIMIT = +cpl;
-    Store.set(QC_LIMITS_KEY, JSON.stringify({ cps: CPS_LIMIT, cpl: CHAR_LIMIT }));
+    if (lines > 0) LINE_COUNT_THRESHOLD = +lines + 1;
+    Store.set(QC_LIMITS_KEY, JSON.stringify({ cps: CPS_LIMIT, cpl: CHAR_LIMIT, lines: LINE_COUNT_THRESHOLD - 1 }));
     if (cueList.length) { finalizeQcFlags(cueList); renderSidebarList(); tlDirty = true; }
     document.dispatchEvent(new CustomEvent('qc-limits'));
   }
