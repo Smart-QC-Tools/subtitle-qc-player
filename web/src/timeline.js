@@ -695,11 +695,16 @@
     if (window.innerWidth >= 1100 && spare > 0 && spare <= 48) rw = RIGHT_MIN + spare;
     // Expanded event table: a fixed 640 px. The black area shrinks to the picture's own 16:9 height, and
     // the selected event's details fill the space under the bar. Animated via expandT.
-    const xw = 640;
+    // The details panel needs DETAIL_H (two rows, never a scroll bar). If the window is too short for a
+    // full-width 16:9 picture above it, the picture narrows and the table takes the spare width.
+    const DETAIL_H = 152;
+    let midW = total - LEFT_W - 640;
+    let picH = Math.min(Math.round(midW * 9 / 16), fullH - DETAIL_H);
+    if (picH < midW * 9 / 16) midW = Math.round(picH * 16 / 9);
+    const xw = total - LEFT_W - midW;
     rw = Math.round(rw + (xw - rw) * expandT);
     qcGrid.style.gridTemplateColumns = window.innerWidth >= 1100 ? `${LEFT_W}px minmax(0,1fr) ${rw}px` : '';
-    const midW = Math.max(200, total - LEFT_W - rw);
-    const picH = Math.min(fullH, Math.max(160, Math.min(Math.round(midW * 9 / 16), fullH - 150)));
+    picH = Math.max(160, picH);
     const stageH = Math.round(fullH + (picH - fullH) * expandT);
     stage.parentElement.style.height = (avail + BOTTOM_PAD) + 'px';
     tlDirty = true;   // the bar's width changed: redraw it at its new size (otherwise it looks stretched)

@@ -1,7 +1,7 @@
   // ================================================================ per-event QC info
   // Reading speed (CPS), placement (left / right / raised / top) and the issue list for each event.
   // Shared by the event list, the waveform, the Events table and the Conform page.
-  // Colour scheme: red = a rule is broken, amber = a warning (1-frame gap), violet = unusual placement,
+  // Colour scheme: red = a rule is broken, amber = worth a look (1-frame gap, unusual placement),
 // grey = top (neutral).
 
   const QC_LIMITS_KEY = 'qc:limits';

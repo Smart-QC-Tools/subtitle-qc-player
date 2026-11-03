@@ -201,11 +201,11 @@ td.hl-error code,td.hl-warn code{background:transparent}
 .ok{color:var(--ok);font-weight:600}
 .ft{display:inline-flex;gap:3px;align-items:baseline;font-size:11px;font-weight:700;border-radius:4px;padding:0 5px;margin:0 4px 4px 0;color:#14161a}
 .ft b{font-weight:600}
-.ft-issue{background:rgba(255,92,92,.18);color:#ff8f8f;box-shadow:inset 0 0 0 1px rgba(255,92,92,.45)} .ft-warn{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)} .ft-place{background:rgba(178,140,255,.16);color:#c7aeff;box-shadow:inset 0 0 0 1px rgba(178,140,255,.45)}
-/* per-event colour coding: red = rule broken, violet = unusual placement, grey = top */
+.ft-issue{background:rgba(255,92,92,.18);color:#ff8f8f;box-shadow:inset 0 0 0 1px rgba(255,92,92,.45)} .ft-warn{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)} .ft-place{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)}
+/* per-event colour coding: red = rule broken, amber = worth a look (placement, 1-frame gap), grey = top */
 .qtag{display:inline-block;font-size:10.5px;font-weight:600;line-height:15px;border-radius:3px;padding:0 5px;margin-left:5px;vertical-align:1px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .q-issue{background:rgba(255,92,92,.18);color:#ff8f8f;box-shadow:inset 0 0 0 1px rgba(255,92,92,.45)}
-.q-place{background:rgba(178,140,255,.16);color:#c7aeff;box-shadow:inset 0 0 0 1px rgba(178,140,255,.45)}
+.q-place{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)}
 .q-warn{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)}
 .filter-chip.f-warn.active{border-color:#f0a830;background:rgba(240,168,48,.15)}
 .filter-chip.empty{opacity:.45}
@@ -214,15 +214,15 @@ td.hl-error code,td.hl-warn code{background:transparent}
 .cue-item.has-issue,.cue-item.has-issue.active{background:rgba(255,120,120,.32)}
 .cue-item.has-warn,.cue-item.has-warn.active{border-left:3px solid #f0a830;padding-left:11px}
 .cue-item.has-warn,.cue-item.has-warn.active{background:rgba(250,190,80,.28)}
-.cue-item.has-place,.cue-item.has-place.active{background:rgba(195,165,255,.26)}
+.cue-item.has-place,.cue-item.has-place.active{background:rgba(250,190,80,.28)}
 .cue-item.active.has-issue,.cue-item.active.has-warn,.cue-item.active.has-place{box-shadow:inset 0 0 0 2px rgba(111,168,255,.75)}
 .cue-item.tl-sel.has-issue,.cue-item.tl-sel.has-warn,.cue-item.tl-sel.has-place{box-shadow:inset 0 0 0 2px #fff}
 /* filters in two even rows when expanded */
 .fb-break{display:none}
 body.ev-expanded .fb-break{display:block;flex-basis:100%;height:0}
-.cue-item.has-place,.cue-item.has-place.active{border-left:3px solid #b28cff;padding-left:11px}
+.cue-item.has-place,.cue-item.has-place.active{border-left:3px solid #f0a830;padding-left:11px}
 .filter-chip.f-issue.active{border-color:#ff5c5c;background:rgba(255,92,92,.15)}
-.filter-chip.f-place.active{border-color:#b28cff;background:rgba(178,140,255,.15)}
+.filter-chip.f-place.active{border-color:#f0a830;background:rgba(240,168,48,.15)}
 .filter-chip.f-neutral.active{border-color:#aab0ba;background:rgba(255,255,255,.08)}
 button.play{background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:6px;cursor:pointer;padding:3px 8px}
 button.play:hover{border-color:var(--accent);background:var(--info-bg)}
@@ -370,10 +370,10 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table td:first-child{box-shadow:inset 3px 0 0 transparent}
 .ev-table tr.has-issue td:first-child{box-shadow:inset 3px 0 0 #ff5c5c}
 .ev-table tr.has-warn td:first-child{box-shadow:inset 3px 0 0 #f0a830}
-.ev-table tr.has-place td:first-child{box-shadow:inset 3px 0 0 #b28cff}
+.ev-table tr.has-place td:first-child{box-shadow:inset 3px 0 0 #f0a830}
 .ev-table tr.has-issue td{background-color:rgba(255,120,120,.32)}
 .ev-table tr.has-warn td{background-color:rgba(250,190,80,.28)}
-.ev-table tr.has-place td{background-color:rgba(195,165,255,.26)}
+.ev-table tr.has-place td{background-color:rgba(250,190,80,.28)}
 /* selected / playing: outlines only, so the row's own colour stays visible */
 .ev-table tr.active{outline:2px solid rgba(111,168,255,.75);outline-offset:-2px}
 .ev-table tr.sel{outline:2px solid #fff;outline-offset:-2px}
@@ -388,7 +388,7 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table .bad{color:#ff8f8f;font-weight:600}
 .ev-table .warn{color:#f5bd5c;font-weight:600}
 .ev-table .crit{background:#ff5c5c;color:#1a0d0d;border-radius:3px;padding:0 4px;font-weight:700}
-.ev-table .place{color:#c7aeff;font-weight:600}
+.ev-table .place{color:#f5bd5c;font-weight:600}
 .ev-table .neutral{color:#aab0ba}
 .ev-sep{color:var(--dim);margin:0 3px}
 #searchCaseToggle{display:none}   /* search is always case-insensitive */
@@ -396,23 +396,27 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-detail{display:none}
 body.ev-expanded #tab-player .stagecol{display:flex;flex-direction:column;min-height:0}
 body.ev-expanded #stage,body.ev-expanded #timeline{flex:none}
-body.ev-expanded .ev-detail{display:block;flex:1 1 auto;min-height:0;overflow:auto;border-top:1px solid var(--border);padding:12px 16px;font-size:13.5px;background:var(--panel)}
+body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:center;flex:1 1 auto;min-height:0;overflow:hidden;border-top:1px solid var(--border);padding:14px 16px;font-size:13.5px;background:var(--panel);box-sizing:border-box}
 .evd-empty{color:var(--dim)}
-.evd-head{font-variant-numeric:tabular-nums;margin-bottom:10px;white-space:pre;font-size:14px}
+.evd-top{display:flex;gap:16px;align-items:stretch;margin-bottom:12px;flex:none}
+.evd-times{display:flex;flex-direction:column;justify-content:center;gap:2px;font-variant-numeric:tabular-nums;font-size:14px;line-height:1.5;white-space:pre;flex:none}
 .evd-dim{color:var(--dim)}
-.evd-lines{background:#070708;border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:15px}
-.evd-lines > div{display:flex;gap:14px;justify-content:space-between;line-height:1.55}
+.evd-lines{flex:1 1 auto;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;background:#070708;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:15px;overflow:hidden}
+.evd-lines > div{display:flex;gap:14px;justify-content:space-between;line-height:1.5}
+.evd-lines.many{font-size:12.5px}
+.evd-lines.many > div{line-height:1.25}
 .evd-t{white-space:pre-wrap}
 .evd-n{color:var(--dim);font-variant-numeric:tabular-nums;font-size:13px}
-.evd-meta{display:flex;flex-wrap:wrap;gap:8px 30px;margin-bottom:12px}
+.evd-meta{flex:none;display:flex;flex-wrap:nowrap;align-items:center;gap:0 30px;white-space:nowrap;overflow:hidden;height:22px}
 .evd-meta i{font-style:normal;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--dim);margin-right:7px}
 .evd-meta span span{font-weight:600}
 .ev-detail .bad{color:#ff8f8f;font-weight:600}
 .ev-detail .warn{color:#f5bd5c;font-weight:600}
 .ev-detail .crit{background:#ff5c5c;color:#1a0d0d;border-radius:3px;padding:0 4px;font-weight:700}
-.ev-detail .place{color:#c7aeff}
+.ev-detail .place{color:#f5bd5c}
 .ev-detail .neutral{color:#aab0ba}
-.evd-tags .qtag{margin:0 5px 4px 0}
+.evd-tags{display:inline-flex;gap:5px;margin-left:-8px}
+.evd-tags .qtag{margin:0}
 </style>
 </head>
 <body>
@@ -441,7 +445,7 @@ body.ev-expanded .ev-detail{display:block;flex:1 1 auto;min-height:0;overflow:au
       </div>
       <div id="progress" hidden></div>
       <div id="groups"></div>
-      <div class="foot">Click a row for details · ▶ opens it in the player · Cue checks <span class="ft ft-issue">red</span> S over the CPS limit · C over the line-length limit · L 3+ lines · O overlaps · D duration · ! very short with long line · # odd characters · M mixed alignment · <span class="ft ft-warn">amber</span> G 1-frame gaps · placement <span class="ft ft-place">violet</span> ↑ raised · ↔ left/right</div>
+      <div class="foot">Click a row for details · ▶ opens it in the player · Cue checks <span class="ft ft-issue">red</span> S over the CPS limit · C over the line-length limit · L 3+ lines · O overlaps · D duration · ! very short with long line · # odd characters · M mixed alignment · <span class="ft ft-warn">amber</span> G 1-frame gaps · ↑ raised · ↔ left/right</div>
     </div>
   </section>
 
@@ -553,8 +557,7 @@ body.ev-expanded .ev-detail{display:block;flex:1 1 auto;min-height:0;overflow:au
         <h4>Colours</h4>
         <ul>
           <li><span class="qtag q-issue" style="margin:0">Red</span> breaks a rule: over the CPS or line-length limit, 3+ lines, overlap, too short / too long, very short with a long line, odd characters, mixed alignment.</li>
-          <li><span class="qtag q-warn" style="margin:0">Amber</span> a 1-frame gap to the next event (the subtitle blinks off for a frame). Back-to-back events (no gap) are fine.</li>
-          <li><span class="qtag q-place" style="margin:0">Violet</span> unusual placement: raised, or left / right-aligned. <span class="qtag q-neutral" style="margin:0">Grey</span> placed at the top.</li>
+          <li><span class="qtag q-warn" style="margin:0">Amber</span> worth a look: unusual placement (raised, or left / right-aligned), or a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine). <span class="qtag q-neutral" style="margin:0">Grey</span> placed at the top.</li>
           <li>CPS counts every character, spaces included, over the time on screen. The CPS and line-length limits are set in the expanded table's header and apply everywhere.</li>
         </ul>
         <h4>Event table</h4>

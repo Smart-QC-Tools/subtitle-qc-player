@@ -160,18 +160,22 @@
     const c = cueList[i];
     evDetail.textContent = '';
     if (!c) { evDetail.innerHTML = `<div class="evd-empty">${cueList.length ? 'Click an event to see it here.' : 'Open a subtitle file to see its events.'}</div>`; return; }
-    const head = document.createElement('div');
-    head.className = 'evd-head';
-    head.appendChild(span(c.overlapsPrev ? 'bad' : '', formatVideoTC(c.begin)));
-    head.appendChild(span('evd-dim', '  –  '));
-    head.appendChild(span(c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '', isFinite(c.end) ? formatVideoTC(c.end) : '…'));
-    head.appendChild(span('evd-dim', '   ·   '));
-    head.appendChild(span(c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '', durText(c.duration)));
-    if (c.duration != null) head.appendChild(span('evd-dim', `  (${c.duration.toFixed(3)} s)`));
-    evDetail.appendChild(head);
+    // Row 1: in / out / duration stacked (like the table), the text beside them.
+    const top = document.createElement('div');
+    top.className = 'evd-top';
+    const times = document.createElement('div');
+    times.className = 'evd-times';
+    times.appendChild(span(c.overlapsPrev ? 'bad' : '', formatVideoTC(c.begin)));
+    times.appendChild(span(c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '', isFinite(c.end) ? formatVideoTC(c.end) : '…'));
+    const dur = document.createElement('span');
+    dur.appendChild(span(c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '', durText(c.duration)));
+    if (c.duration != null) dur.appendChild(span('evd-dim', `  ${c.duration.toFixed(3)} s`));
+    times.appendChild(dur);
+    top.appendChild(times);
     const lines = document.createElement('div');
-    lines.className = 'evd-lines';
-    for (const l of c.text.split('\n')) {
+    const ls = c.text.split('\n');
+    lines.className = 'evd-lines' + (ls.length > 3 ? ' many' : '');
+    for (const l of ls) {
       const row = document.createElement('div');
       const n = Array.from(l).length;
       const tx = document.createElement('span'); tx.className = 'evd-t'; renderCueText(tx, l, '', false);
@@ -180,24 +184,27 @@
       row.appendChild(tx); row.appendChild(ct);
       lines.appendChild(row);
     }
-    evDetail.appendChild(lines);
+    top.appendChild(lines);
+    evDetail.appendChild(top);
+    // Row 2: the same order as the table's columns, then the gap and any flags in words.
     const p = c.placement;
     const meta = document.createElement('div');
     meta.className = 'evd-meta';
-    const item = (k, v, cls) => { const s = document.createElement('span'); const i = document.createElement('i'); i.textContent = k + ' '; s.appendChild(i); s.appendChild(span(cls || '', v)); meta.appendChild(s); };
-    item('CPS', c.cps != null ? c.cps.toFixed(1) : '—', c.cpsOver ? 'bad' : '');
-    item('Characters', String(c.chars));
+    const item = (k, v, cls) => { const s = document.createElement('span'); const i = document.createElement('i'); i.textContent = k; s.appendChild(i); s.appendChild(span(cls || '', v)); meta.appendChild(s); };
     item('Lines', String(c.lineCount), c.lineCount >= LINE_COUNT_THRESHOLD ? 'bad' : '');
+    item('Characters', String(c.chars));
+    item('CPS', c.cps != null ? c.cps.toFixed(1) : '—', c.cpsOver ? 'bad' : '');
     const [pt, pc] = placeText(p, true);
     item('Placement', pt || 'Bottom · centre', pc);
     item('Gap after', c.gap != null ? (Math.round(c.gap * fps()) < 100 ? `${Math.round(c.gap * fps())}f` : `${c.gap.toFixed(1)}s`) : '—', c.gap != null && c.gap < -0.001 ? 'bad' : c.gapWarn ? 'warn' : '');
-    evDetail.appendChild(meta);
-    if ((c.issues || []).length || (c.warns || []).length || (c.placeTags || []).length) {
-      const tags = document.createElement('div');
+    const flags = [...(c.issues || []), ...(c.warns || [])];
+    if (flags.length) {
+      const tags = document.createElement('span');
       tags.className = 'evd-tags';
-      appendCueTags(tags, c);
-      evDetail.appendChild(tags);
+      for (const t of flags) { const q = span('qtag q-' + t.kind, t.text); q.title = t.title; tags.appendChild(q); }
+      meta.appendChild(tags);
     }
+    evDetail.appendChild(meta);
   }
 
   if (evBody) evBody.addEventListener('click', e => {
