@@ -6,16 +6,17 @@
   const evBody = evTable ? evTable.tBodies[0] : null;
   const evWrap = document.getElementById('evWrap');
   const evCount = document.getElementById('evCount');
+  const evDetail = document.getElementById('evDetail');
   const expandBtn = document.getElementById('expandEvents');
   const EXPANDED_KEY = 'qc:eventsExpanded';
-  let expanded = false, evDirty = true, evRows = [];
+  let expanded = false, evDirty = true, evRows = [], evDetailIdx = -2;
   let expandT = 0, expandAnim = 0;                 // 0 = collapsed, 1 = expanded (animated in between)
   const evSort = { key: 'begin', dir: 1 };
 
   const placeRank = p => !p ? 0 : (p.h === 'mixed' ? 4 : 0) + (p.v === 'raised' ? 2 + (p.lift || 0) / 100 : 0) + (p.h === 'left' || p.h === 'right' ? 1 : 0) + (p.v === 'top' ? 0.5 : 0);
   const EV_SORT = {
-    begin: c => c.begin, duration: c => c.duration ?? -1,
-    cpl: c => c.maxLineLength * 10 + c.lineCount, cps: c => c.cps ?? -1, place: c => placeRank(c.placement),
+    begin: c => c.begin, duration: c => c.duration ?? -1, lines: c => c.lineCount * 1000 + c.maxLineLength,
+    cpl: c => c.maxLineLength, cps: c => c.cps ?? -1, place: c => placeRank(c.placement),
   };
 
   // Duration as trimmed seconds:frames (2:13), with minutes when needed (1:05:12).
@@ -62,7 +63,6 @@
       const kind = cueKind(c);
       if (kind) tr.className = 'has-' + kind;
       tr.title = rowTitle(c);
-      tr.appendChild(cell('ev-n', String(i + 1)));
       const io = cell('ev-io');
       io.appendChild(span(c.overlapsPrev ? 'bad' : '', formatVideoTC(c.begin)));
       io.appendChild(span(c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '', isFinite(c.end) ? formatVideoTC(c.end) : '…'));
@@ -73,11 +73,8 @@
       const t = cell('ev-text');
       renderCueText(t, c.text, searchQuery, searchCaseSensitive);
       tr.appendChild(t);
-      const lc = cell('ev-num');
-      lc.appendChild(span(c.lineCount >= LINE_COUNT_THRESHOLD ? 'bad' : '', String(c.lineCount)));
-      lc.appendChild(span('ev-sep', '·'));
-      lc.appendChild(span(c.charLimitExceeded ? 'bad' : '', String(c.maxLineLength)));
-      tr.appendChild(lc);
+      tr.appendChild(cell('ev-num' + (c.lineCount >= LINE_COUNT_THRESHOLD ? ' bad' : ''), String(c.lineCount)));
+      tr.appendChild(cell('ev-num' + (c.charLimitExceeded ? ' bad' : ''), String(c.maxLineLength)));
       tr.appendChild(cell('ev-num' + (c.cpsOver ? ' bad' : ''), c.cps != null ? c.cps.toFixed(1) : ''));
       const [pt, pc] = placeText(c.placement);
       tr.appendChild(cell(pc, pt));
@@ -106,7 +103,7 @@
   function updateSortHeads() {
     if (!evTable) return;
     evTable.querySelectorAll('th[data-sort]').forEach(th => {
-      const on = th.dataset.sort === evSort.key && !(evSort.key === 'begin' && th.cellIndex === 0);
+      const on = th.dataset.sort === evSort.key;
       th.classList.toggle('sorted', on);
       th.dataset.dir = on ? (evSort.dir > 0 ? '▲' : '▼') : '';
     });
@@ -130,12 +127,14 @@
     if (evCount) evCount.textContent = !cueList.length ? '' : n === cueList.length ? `· ${n}` : `· ${n} of ${cueList.length}`;
   }
   function evSyncSel() {
+    updateEvDetail();
     if (!evRows.length) return;
     for (const r of evBody.querySelectorAll('tr.sel')) r.classList.remove('sel');
     const r = evRows[tlSelected];
     if (r) r.classList.add('sel');
   }
   function evSyncActive() {
+    updateEvDetail();
     if (!evRows.length) return;
     for (const r of evBody.querySelectorAll('tr.active')) r.classList.remove('active');
     let first = null;
@@ -145,7 +144,57 @@
       if (rr.top < wr.top + 28 || rr.bottom > wr.bottom) first.scrollIntoView({ block: 'nearest' });
     }
   }
-  function evMarkDirty() { evDirty = true; if (expanded) renderEventsTable(); }
+  function evMarkDirty() { evDirty = true; evDetailIdx = -2; if (expanded) renderEventsTable(); else updateEvDetail(); }
+
+  // Under the player (expanded view): the selected event, or the one playing, in detail.
+  function updateEvDetail() {
+    if (!evDetail || !expanded) return;
+    let i = tlSelected;
+    if ((isMoving() || i < 0) && activeCueIndices.size) i = [...activeCueIndices][0];
+    if (i === evDetailIdx) return;
+    evDetailIdx = i;
+    const c = cueList[i];
+    evDetail.textContent = '';
+    if (!c) { evDetail.innerHTML = `<div class="evd-empty">${cueList.length ? 'Click an event to see it here.' : 'Open a subtitle file to see its events.'}</div>`; return; }
+    const head = document.createElement('div');
+    head.className = 'evd-head';
+    head.appendChild(span(c.overlapsPrev ? 'bad' : '', formatVideoTC(c.begin)));
+    head.appendChild(span('evd-dim', '  –  '));
+    head.appendChild(span(c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '', isFinite(c.end) ? formatVideoTC(c.end) : '…'));
+    head.appendChild(span('evd-dim', '   ·   '));
+    head.appendChild(span(c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '', durText(c.duration)));
+    if (c.duration != null) head.appendChild(span('evd-dim', `  (${c.duration.toFixed(3)} s)`));
+    evDetail.appendChild(head);
+    const lines = document.createElement('div');
+    lines.className = 'evd-lines';
+    for (const l of c.text.split('\n')) {
+      const row = document.createElement('div');
+      const n = Array.from(l).length;
+      const tx = document.createElement('span'); tx.className = 'evd-t'; renderCueText(tx, l, '', false);
+      const ct = span('evd-n' + (n > CHAR_LIMIT ? ' bad' : ''), String(n));
+      ct.title = 'Characters on this line';
+      row.appendChild(tx); row.appendChild(ct);
+      lines.appendChild(row);
+    }
+    evDetail.appendChild(lines);
+    const p = c.placement;
+    const meta = document.createElement('div');
+    meta.className = 'evd-meta';
+    const item = (k, v, cls) => { const s = document.createElement('span'); const i = document.createElement('i'); i.textContent = k + ' '; s.appendChild(i); s.appendChild(span(cls || '', v)); meta.appendChild(s); };
+    item('CPS', c.cps != null ? c.cps.toFixed(1) : '—', c.cpsOver ? 'bad' : '');
+    item('Characters', String(c.chars));
+    item('Lines', String(c.lineCount), c.lineCount >= LINE_COUNT_THRESHOLD ? 'bad' : '');
+    const [pt, pc] = placeText(p);
+    item('Placement', pt || 'Bottom · centre', pc);
+    item('Gap after', c.gap != null ? (Math.round(c.gap * fps()) < 100 ? `${Math.round(c.gap * fps())}f` : `${c.gap.toFixed(1)}s`) : '—', c.gap != null && c.gap < -0.001 ? 'bad' : c.gapWarn ? 'warn' : '');
+    evDetail.appendChild(meta);
+    if ((c.issues || []).length || (c.warns || []).length || (c.placeTags || []).length) {
+      const tags = document.createElement('div');
+      tags.className = 'evd-tags';
+      appendCueTags(tags, c);
+      evDetail.appendChild(tags);
+    }
+  }
 
   if (evBody) evBody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
@@ -182,6 +231,7 @@
     showExpandBtn();
     if (on && evDirty) renderEventsTable();
     else if (on) { evSyncSel(); evSyncActive(); }
+    evDetailIdx = -2; updateEvDetail();
     cancelAnimationFrame(expandAnim);
     const from = expandT, to = on ? 1 : 0, t0 = performance.now(), MS = animate && document.body.dataset.tab === 'player' ? 200 : 0;
     const step = now => {

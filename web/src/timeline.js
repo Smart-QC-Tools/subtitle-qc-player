@@ -685,19 +685,24 @@
     left.style.height = (avail + BOTTOM_PAD) + 'px'; side.style.height = (avail + BOTTOM_PAD) + 'px';
     const tl = document.getElementById('timeline');
     const tlH = tl.offsetHeight;
-    const stageH = avail - tlH;
-    // Left column keeps its width. The right column grows only when the window is wide enough that
-    // the player would otherwise have grey space at its sides, so the player stays exactly 16:9.
-    const LEFT_W = 300, RIGHT_MIN = 370;
-    const total = qcGrid.clientWidth, want = Math.floor(stageH * 16 / 9);
+    const fullH = avail - tlH;
+    // The file panel has one fixed width. The event list (collapsed) grows only when the window is wide
+    // enough that the player would otherwise have grey space at its sides, so the player stays 16:9.
+    const LEFT_W = 270, RIGHT_MIN = 370;
+    const total = qcGrid.clientWidth, want = Math.floor(fullH * 16 / 9);
     let rw = RIGHT_MIN;
-    // A small leftover beside the 16:9 picture goes to the right bar; a larger one stays dark grey.
     const spare = total - LEFT_W - RIGHT_MIN - want;
     if (window.innerWidth >= 1100 && spare > 0 && spare <= 48) rw = RIGHT_MIN + spare;
-    // Expanded event table: about half the window; the file panel narrows to 220 px. Animated via expandT.
-    const lw = Math.round(LEFT_W + (220 - LEFT_W) * expandT);
-    rw = Math.round(rw + (Math.round(total * 0.5) - rw) * expandT);
-    qcGrid.style.gridTemplateColumns = window.innerWidth >= 1100 ? `${lw}px minmax(0,1fr) ${rw}px` : '';
+    // Expanded event table: ~44% of the window (640–880 px). The black area shrinks to the picture's own
+    // 16:9 height, and the selected event's details fill the space under the bar. Animated via expandT.
+    const xw = Math.round(Math.min(880, Math.max(640, total * 0.44)));
+    rw = Math.round(rw + (xw - rw) * expandT);
+    qcGrid.style.gridTemplateColumns = window.innerWidth >= 1100 ? `${LEFT_W}px minmax(0,1fr) ${rw}px` : '';
+    const midW = Math.max(200, total - LEFT_W - rw);
+    const picH = Math.min(fullH, Math.max(160, Math.min(Math.round(midW * 9 / 16), fullH - 150)));
+    const stageH = Math.round(fullH + (picH - fullH) * expandT);
+    stage.parentElement.style.height = (avail + BOTTOM_PAD) + 'px';
+    tlDirty = true;   // the bar's width changed: redraw it at its new size (otherwise it looks stretched)
     const vp = document.querySelector('.qcleft .vpanel'), sp = document.querySelector('.qcleft .spanel');
     const GUTTER = 6, colH = avail + BOTTOM_PAD;
     const vH = Math.round((colH - GUTTER) / 2);

@@ -113,7 +113,7 @@
       // A gap of a single frame makes the subtitle blink off and on. 0 (back-to-back) is normal.
       const frame = 1 / (fps() || docEffectiveFrameRate || 24);
       c.gapWarn = c.gap != null && c.gap > 0.001 && c.gap < frame * 1.5;
-      c.gapNext = c.gapWarn ? i + 2 : null;
+      c.gapNext = c.gapWarn ? nx.begin : null;
       c.mixedAlign = !!(c.placement && c.placement.h === 'mixed');
     });
     // Which side of an event collides: its start (with an earlier event) and/or its end (with a later one).
@@ -150,7 +150,7 @@
   }
   function cueWarns(c) {
     if (!c.gapWarn) return [];
-    return [{ key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (#${c.gapNext}): the subtitle blinks off for a single frame`, kind: 'warn' }];
+    return [{ key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (${formatVideoTC(c.gapNext)}): the subtitle blinks off for a single frame`, kind: 'warn' }];
   }
   function cuePlaceTags(c) {
     const p = c.placement, out = [];

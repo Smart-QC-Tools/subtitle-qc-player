@@ -135,6 +135,13 @@ a = js.index("      if (cue.showRegionTag) {")
 b = js.index("      const textEl = document.createElement('span');\n      textEl.className = 'cue-text';")
 js = js[:a] + "      appendCueTags(timeEl, cue);\n\n" + js[b:]
 # filter chips: hide the ones with nothing to show (except All / Issues / the active one)
+rep("""      btn.addEventListener('click', () => {
+        currentFilter = f.key;""", """      btn.addEventListener('click', () => {
+        currentFilter = currentFilter === f.key ? 'all' : f.key;   // click the active filter again to show everything""")
+rep("""    FILTERS.forEach(f => {
+      const count = f.key === 'all'""", """    FILTERS.forEach(f => {
+      if (f.key === 'all') return;   // no chip: "all" is simply no filter selected
+      const count = f.key === 'all'""")
 rep("""      btn.className = 'filter-chip' + (f.key === currentFilter ? ' active' : '') + (f.cls ? ' ' + f.cls : '');""",
     """      btn.className = 'filter-chip' + (f.key === currentFilter ? ' active' : '') + (f.cls ? ' ' + f.cls : '') + (count || f.key === 'all' ? '' : ' empty');
       if (f.title) btn.title = f.title;""")

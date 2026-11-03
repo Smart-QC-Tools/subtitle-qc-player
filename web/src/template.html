@@ -44,7 +44,7 @@ header.top{padding:0 28px!important;height:68px;box-sizing:border-box;flex-wrap:
 .tab.active{background:#4f86e8!important;color:#fff!important}
 .tabs{border:1px solid #5a6273!important;background:#1c1f26!important;box-shadow:0 1px 6px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)}
 .tab{color:#c3c9d4!important}
-.hdr-left{width:calc(300px - 40px);flex:none;display:flex;align-items:center}
+.hdr-left{width:calc(270px - 40px);flex:none;display:flex;align-items:center}
 header.top{padding-left:40px!important}
 #helpBtn{font-size:14.5px;margin-right:14px}
 .vsep{width:1px;height:22px;background:var(--border);margin:0 8px 0 10px}
@@ -211,10 +211,10 @@ td.hl-error code,td.hl-warn code{background:transparent}
 .filter-chip.empty{opacity:.45}
 .q-neutral{background:rgba(255,255,255,.06);color:#aab0ba;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 .cue-item.has-issue,.cue-item.has-issue.active{border-left:3px solid #ff5c5c;padding-left:11px}
-.cue-item.has-issue{background:rgba(255,92,92,.13)}
+.cue-item.has-issue{background:rgba(255,105,105,.22)}
 .cue-item.has-warn,.cue-item.has-warn.active{border-left:3px solid #f0a830;padding-left:11px}
-.cue-item.has-warn{background:rgba(240,168,48,.11)}
-.cue-item.has-place{background:rgba(178,140,255,.10)}
+.cue-item.has-warn{background:rgba(245,180,70,.19)}
+.cue-item.has-place{background:rgba(190,160,255,.17)}
 .cue-item.has-place,.cue-item.has-place.active{border-left:3px solid #b28cff;padding-left:11px}
 .filter-chip.f-issue.active{border-color:#ff5c5c;background:rgba(255,92,92,.15)}
 .filter-chip.f-place.active{border-color:#b28cff;background:rgba(178,140,255,.15)}
@@ -241,7 +241,7 @@ ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul
 #tab-player{display:flex;flex-direction:column;align-items:stretch}
 #tab-player[hidden],#tab-qc[hidden]{display:none}
 #tab-player > *{width:100%}
-.qcgrid{display:grid;grid-template-columns:300px minmax(0,1fr) 370px;gap:12px;align-items:start;margin-bottom:16px}
+.qcgrid{display:grid;grid-template-columns:270px minmax(0,1fr) 370px;gap:12px;align-items:start;margin-bottom:16px}
 @media (max-width:1100px){.qcgrid{grid-template-columns:260px minmax(0,1fr)} .qcgrid .sidebar{grid-column:1 / -1}}
 .qcleft{display:flex;flex-direction:column;gap:12px;min-width:0}
 .qcgrid .stage,.stagecol{min-width:0}
@@ -355,28 +355,29 @@ body.ev-expanded #sidebar .search-bar{max-width:560px}
 body.ev-expanded #sidebar .search-status-row:has(.status:empty){display:none}
 body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table{table-layout:auto;border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
-.ev-table thead th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--dim);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;text-align:left;padding:7px 7px;border-bottom:1px solid var(--border);white-space:nowrap;user-select:none}
+.ev-table thead th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--dim);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;text-align:left;padding:7px 12px;border-bottom:1px solid var(--border);white-space:nowrap;user-select:none}
 .ev-table th[data-sort]{cursor:pointer}
 .ev-table th[data-sort]:hover,.ev-table th.sorted{color:var(--text)}
 .ev-table th.sorted::after{content:' ' attr(data-dir);font-size:8px;vertical-align:1px}
-.ev-table td{padding:6px 7px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap}
+.ev-table td{padding:6px 12px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap}
 .ev-table tbody tr{cursor:pointer}
 .ev-table tbody tr:hover td{background-image:linear-gradient(rgba(255,255,255,.04),rgba(255,255,255,.04))}
 .ev-table td:first-child{box-shadow:inset 3px 0 0 transparent}
 .ev-table tr.has-issue td:first-child{box-shadow:inset 3px 0 0 #ff5c5c}
 .ev-table tr.has-warn td:first-child{box-shadow:inset 3px 0 0 #f0a830}
 .ev-table tr.has-place td:first-child{box-shadow:inset 3px 0 0 #b28cff}
-.ev-table tr.has-issue td{background-color:rgba(255,92,92,.13)}
-.ev-table tr.has-warn td{background-color:rgba(240,168,48,.11)}
-.ev-table tr.has-place td{background-color:rgba(178,140,255,.10)}
+.ev-table tr.has-issue td{background-color:rgba(255,105,105,.22)}
+.ev-table tr.has-warn td{background-color:rgba(245,180,70,.19)}
+.ev-table tr.has-place td{background-color:rgba(190,160,255,.17)}
 .ev-table tr.active td{background-color:rgba(111,168,255,.17)}
 .ev-table tr.sel td{background-color:rgba(111,168,255,.24)}
 .ev-table tr.sel{outline:2px solid rgba(255,255,255,.55);outline-offset:-2px}
 .ev-n{color:var(--dim);text-align:right}
-.ev-io{color:#7fb0ff;line-height:1.45}
+.ev-io{line-height:1.45}
 .ev-io span{display:block}
 .ev-num{text-align:right}
 .ev-text{white-space:pre-wrap!important;min-width:150px;width:100%;line-height:1.4}
+.ev-table th:not(.ev-textcol){width:1%}
 .ev-textcol{width:100%}
 .ev-table .bad{color:#ff8f8f;font-weight:600}
 .ev-table .warn{color:#f5bd5c;font-weight:600}
@@ -384,6 +385,28 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table .place{color:#c7aeff;font-weight:600}
 .ev-table .neutral{color:#aab0ba}
 .ev-sep{color:var(--dim);margin:0 3px}
+#searchCaseToggle{display:none}   /* search is always case-insensitive */
+/* details of the selected event, under the player (expanded view only) */
+.ev-detail{display:none}
+body.ev-expanded #tab-player .stagecol{display:flex;flex-direction:column;min-height:0}
+body.ev-expanded #stage,body.ev-expanded #timeline{flex:none}
+body.ev-expanded .ev-detail{display:block;flex:1 1 auto;min-height:0;overflow:auto;border-top:1px solid var(--border);padding:12px 16px;font-size:13.5px;background:var(--panel)}
+.evd-empty{color:var(--dim)}
+.evd-head{font-variant-numeric:tabular-nums;margin-bottom:10px;white-space:pre;font-size:14px}
+.evd-dim{color:var(--dim)}
+.evd-lines{background:#070708;border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:15px}
+.evd-lines > div{display:flex;gap:14px;justify-content:space-between;line-height:1.55}
+.evd-t{white-space:pre-wrap}
+.evd-n{color:var(--dim);font-variant-numeric:tabular-nums;font-size:13px}
+.evd-meta{display:flex;flex-wrap:wrap;gap:6px 20px;margin-bottom:10px}
+.evd-meta i{font-style:normal;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--dim)}
+.evd-meta span span{font-weight:600}
+.ev-detail .bad{color:#ff8f8f;font-weight:600}
+.ev-detail .warn{color:#f5bd5c;font-weight:600}
+.ev-detail .crit{background:#ff5c5c;color:#1a0d0d;border-radius:3px;padding:0 4px;font-weight:700}
+.ev-detail .place{color:#c7aeff}
+.ev-detail .neutral{color:#aab0ba}
+.evd-tags .qtag{margin:0 5px 4px 0}
 </style>
 </head>
 <body>
@@ -449,6 +472,7 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
             </div>
           </div>
         </div>
+        <div class="ev-detail" id="evDetail"></div>
       </div>
       <div class="sidebar" id="sidebar">
         <div class="sidebar-sticky">
@@ -474,11 +498,11 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
         <div class="ev-wrap" id="evWrap">
           <table class="ev-table" id="evTable">
             <thead><tr>
-              <th data-sort="begin" title="Event number (time order)">#</th>
               <th data-sort="begin" title="In / out timecode. Red: overlaps. Amber: 1-frame gap to the next event">In / Out</th>
               <th data-sort="duration" title="Time on screen, seconds:frames">Dur</th>
               <th class="ev-textcol">Text</th>
-              <th data-sort="cpl" title="Lines · characters on the longest line">Ln · CPL</th>
+              <th data-sort="lines" title="Lines">Lines</th>
+              <th data-sort="cpl" title="Characters on the longest line">CPL</th>
               <th data-sort="cps" title="Characters per second (all characters, including spaces)">CPS</th>
               <th data-sort="place" title="Only shown when not bottom-centre">Placement</th>
             </tr></thead>
