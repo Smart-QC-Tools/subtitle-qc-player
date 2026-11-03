@@ -213,9 +213,9 @@
   function showLimits() { if (limCps) limCps.value = CPS_LIMIT; if (limCpl) limCpl.value = CHAR_LIMIT; if (limLines) limLines.value = String(LINE_COUNT_THRESHOLD - 1); }
   showLimits();
   for (const el of [limCps, limCpl, limLines]) if (el) el.addEventListener('change', () => {
-    const cps = Number(limCps.value), cpl = Math.round(Number(limCpl.value)), lines = Number(limLines.value);
-    if (!(cps > 0 && cps < 100) || !(cpl > 0 && cpl < 200)) { showLimits(); return; }
-    setLimits({ cps, cpl, lines });
+    // Out-of-range values snap to the nearest allowed one; anything that isn't a number is ignored.
+    const val = (inp, cur) => { const v = Number(inp.value); if (!inp.value.trim() || !isFinite(v)) return cur; return Math.min(+inp.max, Math.max(+inp.min, Math.round(v))); };
+    setLimits({ cps: val(limCps, CPS_LIMIT), cpl: val(limCpl, CHAR_LIMIT), lines: val(limLines, LINE_COUNT_THRESHOLD - 1) });
     showLimits();
   });
   document.addEventListener('qc-limits', () => { showLimits(); renderFilterBar(); applyFilterVisibility(); });

@@ -349,7 +349,7 @@ html.native .web-only{display:none}
 .exp-btn svg{width:14px;height:14px}
 .ev-lim{display:none;align-items:center;gap:10px}
 .ev-lim label{display:flex;align-items:center;gap:4px;font-size:11px;letter-spacing:.4px;color:var(--dim)}
-.ev-lim select{font-size:12px;padding:1px 3px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px}
+.ev-lim #limLines{width:40px}
 .ev-lim input{width:50px;font-size:12px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;text-transform:none}
 .ev-wrap{display:none}
 html.native .translate-btn{display:none}   /* Chrome-only feature */
@@ -493,9 +493,9 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         <div class="sidebar-sticky">
           <div class="sidebar-header"><span>Subtitle events</span><span class="sh-count" id="evCount"></span><span class="spacer"></span>
             <span class="ev-lim" title="Limits for the red flags, here and on the Conform page">
-              <label title="Most lines allowed on screen">Lines <select id="limLines"><option>2</option><option>3</option><option>4</option></select></label>
-              <label>CPS <input type="number" id="limCps" min="5" max="60" step="1"></label>
-              <label>CPL <input type="number" id="limCpl" min="10" max="99" step="1"></label></span>
+              <label title="Most lines allowed on screen (2–4)">Lines <input type="number" id="limLines" min="2" max="4" step="1"></label>
+              <label title="Characters per second limit (3–40)">CPS <input type="number" id="limCps" min="3" max="40" step="1"></label>
+              <label title="Characters per line limit (10–60)">CPL <input type="number" id="limCpl" min="10" max="60" step="1"></label></span>
 </div>
           <div class="search-bar">
             <input type="text" id="searchInput" placeholder="Search cue text — paste a character to find more of it" />
