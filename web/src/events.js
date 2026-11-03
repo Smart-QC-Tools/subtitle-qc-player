@@ -28,16 +28,18 @@
     return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}:${ff}` : `${s}:${ff}`;
   }
   // Placement text: empty for the usual bottom-centre.
-  function placeText(p) {
+  // Placement text: empty for the usual bottom-centre. Short form for the table (L / R / Mix, Raised, Top);
+  // the long form (details panel) adds roughly how high a raised subtitle sits.
+  function placeText(p, long) {
     if (!p) return ['', ''];
-    if (p.h === 'mixed') return ['Mixed' + (p.v === 'raised' ? ` · Raised${p.lift != null ? ' ' + p.lift + '%' : ''}` : p.v === 'top' ? ' · Top' : ''), 'bad'];
     const parts = [];
-    if (p.h === 'left' || p.h === 'right') parts.push(hText(p.h));
-    if (p.v === 'raised') parts.push(`Raised${p.lift != null ? ' ' + p.lift + '%' : ''}`);
+    if (p.h === 'mixed') parts.push(long ? 'Mixed alignment' : 'Mix');
+    else if (p.h === 'left' || p.h === 'right') parts.push(long ? hText(p.h) : p.h === 'left' ? 'L' : 'R');
+    if (p.v === 'raised') parts.push(long && p.lift != null ? `Raised (about ${p.lift}% up)` : 'Raised');
     if (p.v === 'top') parts.push('Top');
-    if (p.v === 'vertical') parts.push('Vertical');
+    if (p.v === 'vertical') parts.push(long ? 'Vertical' : 'Vert');
     const unusual = p.v === 'raised' || p.h === 'left' || p.h === 'right';
-    return [parts.join(' · '), unusual ? 'place' : parts.length ? 'neutral' : ''];
+    return [parts.join(long ? ' · ' : ' '), p.h === 'mixed' ? 'bad' : unusual ? 'place' : parts.length ? 'neutral' : ''];
   }
   // Hover text for a row: characters per line, then every flag in words.
   function rowTitle(c) {
@@ -77,7 +79,9 @@
       tr.appendChild(cell('ev-num' + (c.charLimitExceeded ? ' bad' : ''), String(c.maxLineLength)));
       tr.appendChild(cell('ev-num' + (c.cpsOver ? ' bad' : ''), c.cps != null ? c.cps.toFixed(1) : ''));
       const [pt, pc] = placeText(c.placement);
-      tr.appendChild(cell(pc, pt));
+      const pcell = cell(pc, pt);
+      if (pt) pcell.title = placeText(c.placement, true)[0];
+      tr.appendChild(pcell);
       evRows[i] = tr;
       frag.appendChild(tr);
     });
@@ -184,7 +188,7 @@
     item('CPS', c.cps != null ? c.cps.toFixed(1) : '—', c.cpsOver ? 'bad' : '');
     item('Characters', String(c.chars));
     item('Lines', String(c.lineCount), c.lineCount >= LINE_COUNT_THRESHOLD ? 'bad' : '');
-    const [pt, pc] = placeText(p);
+    const [pt, pc] = placeText(p, true);
     item('Placement', pt || 'Bottom · centre', pc);
     item('Gap after', c.gap != null ? (Math.round(c.gap * fps()) < 100 ? `${Math.round(c.gap * fps())}f` : `${c.gap.toFixed(1)}s`) : '—', c.gap != null && c.gap < -0.001 ? 'bad' : c.gapWarn ? 'warn' : '');
     evDetail.appendChild(meta);

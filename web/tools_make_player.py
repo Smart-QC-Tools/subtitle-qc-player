@@ -180,5 +180,13 @@ rep("""      filterEmptyMsg.style.display = 'none';
     }
     sidebarEmpty.style.display = 'none';""")
 
+
+# Expanded view: filter chips in two even rows.
+rep("""      filterBarEl.appendChild(btn);
+    });""", """      filterBarEl.appendChild(btn);
+    });
+    const chips = filterBarEl.querySelectorAll('.filter-chip');
+    if (chips.length > 4) { const br = document.createElement('span'); br.className = 'fb-break'; chips[Math.ceil(chips.length / 2) - 1].after(br); }""")
+
 open('src/player.js','w').write(js)
 print('ok', len(js))

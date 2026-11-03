@@ -693,9 +693,9 @@
     let rw = RIGHT_MIN;
     const spare = total - LEFT_W - RIGHT_MIN - want;
     if (window.innerWidth >= 1100 && spare > 0 && spare <= 48) rw = RIGHT_MIN + spare;
-    // Expanded event table: ~44% of the window (640–880 px). The black area shrinks to the picture's own
-    // 16:9 height, and the selected event's details fill the space under the bar. Animated via expandT.
-    const xw = Math.round(Math.min(880, Math.max(640, total * 0.44)));
+    // Expanded event table: a fixed 640 px. The black area shrinks to the picture's own 16:9 height, and
+    // the selected event's details fill the space under the bar. Animated via expandT.
+    const xw = 640;
     rw = Math.round(rw + (xw - rw) * expandT);
     qcGrid.style.gridTemplateColumns = window.innerWidth >= 1100 ? `${LEFT_W}px minmax(0,1fr) ${rw}px` : '';
     const midW = Math.max(200, total - LEFT_W - rw);
