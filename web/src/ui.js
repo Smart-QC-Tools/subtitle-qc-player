@@ -533,6 +533,7 @@ async function playFromQC(name) {
 // ------------------------------------------------------------ wiring
 document.addEventListener('DOMContentLoaded', () => {
   document.body.dataset.tab = 'qc';
+  $('#appVersion').textContent = 'Version ' + APP_VERSION + (NATIVE ? ' · Mac app' : '');
   $('#pickSubs').onclick = () => pick('subs');
   $('#pickVids').onclick = () => pick('videos');
   $('#subDirInput').onchange = e => onDirInput('subs', e);

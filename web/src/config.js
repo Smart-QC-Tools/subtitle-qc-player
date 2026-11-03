@@ -1,3 +1,6 @@
+// Version of Subtitle QC Player (shown in Help; the Mac app and the download page use it too).
+const APP_VERSION = '1.0.0';
+
 /* ==========================================================================
    REFERENCE LANGUAGE LIST  (edit here)
    Source: DETE_Language_Code.xlsx. Each entry: [name, code].

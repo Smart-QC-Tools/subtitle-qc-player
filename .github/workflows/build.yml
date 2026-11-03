@@ -37,5 +37,5 @@ jobs:
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
             --target "$GITHUB_SHA" \
-            --title "Subtitle QC Player — build ${{ github.run_number }}" \
+            --title "Subtitle QC Player $(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js) — build ${{ github.run_number }}" \
             --notes "Latest build ($(date -u '+%Y-%m-%d %H:%M UTC'), commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."

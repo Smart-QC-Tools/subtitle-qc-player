@@ -5,7 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-VERSION="${VERSION:-0.1}"
+# The version lives in web/src/config.js (APP_VERSION).
+VERSION="${VERSION:-$(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js)}"
 BUILD="${BUILD_NUMBER:-1}"
 APP="$ROOT/build/Subtitle QC Player.app"
 
