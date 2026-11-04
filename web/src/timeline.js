@@ -172,7 +172,7 @@
   const holdWidth = () => {
     if (!tcW) return;
     tcDisplay.style.paddingLeft = tcDisplay.style.paddingRight = '0px';
-    const pad = Math.max(0, (tcW - tcDisplay.getBoundingClientRect().width) / 2);
+    const pad = Math.max(0, (tcW - tcDisplay.getBoundingClientRect().width) / 2 / uiZoom());
     tcDisplay.style.setProperty('padding-left', pad + 'px', 'important'); tcDisplay.style.setProperty('padding-right', pad + 'px', 'important');
   };
   tcDisplay.addEventListener('focus', () => { tcW = tcDisplay.getBoundingClientRect().width; });
@@ -218,7 +218,7 @@
   // ---------------------------------------------------------------- drawing
   const cueVideoTime = c => [c.begin - effectiveOffset(), c.end - effectiveOffset()];
   function fitCanvas(c) {
-    const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+    const dpr = (window.devicePixelRatio || 1) * uiZoom(), w = c.clientWidth, h = c.clientHeight;   // sharp when scaled down
     if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
     const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return { ctx, w, h };
@@ -446,7 +446,7 @@
     if (!speedBadge || speedBadge.hidden) return;
     const bar = speedBadge.offsetParent || speedBadge.parentElement;
     const tr = tcDisplay.getBoundingClientRect(), br = bar.getBoundingClientRect();
-    speedBadge.style.right = 'auto'; speedBadge.style.left = Math.round(tr.right - br.left + 10) + 'px';
+    speedBadge.style.right = 'auto'; speedBadge.style.left = Math.round((tr.right - br.left) / uiZoom() + 10) + 'px';
   }
   window.addEventListener('resize', placeSpeedBadge);
   // Stepped reverse keeps its own steady position (seeks may land a little earlier, on a keyframe);
@@ -679,33 +679,31 @@
   const BOTTOM_PAD = 4;
   function layoutQC() {
     if (document.body.dataset.tab !== 'player' || !qcGrid) return;
-    const top = Math.round(qcGrid.getBoundingClientRect().top + window.scrollY);
-    const avail = Math.max(420, window.innerHeight - top - BOTTOM_PAD);
+    const top = Math.round(qcGrid.getBoundingClientRect().top / uiZoom() + window.scrollY);
+    const avail = Math.max(420, viewH() - top - BOTTOM_PAD);
     const left = document.querySelector('.qcleft'), side = document.getElementById('sidebar');
     left.style.height = (avail + BOTTOM_PAD) + 'px'; side.style.height = (avail + BOTTOM_PAD) + 'px';
     const tl = document.getElementById('timeline');
     const tlH = tl.offsetHeight;
     const fullH = avail - tlH;
-    // The file panel has one fixed width. The event list (collapsed) grows only when the window is wide
-    // enough that the player would otherwise have grey space at its sides, so the player stays 16:9.
-    const LEFT_W = 270, RIGHT_MIN = 370;
-    const total = qcGrid.clientWidth, want = Math.floor(fullH * 16 / 9);
-    let rw = RIGHT_MIN;
-    const spare = total - LEFT_W - RIGHT_MIN - want;
-    if (window.innerWidth >= 1100 && spare > 0 && spare <= 48) rw = RIGHT_MIN + spare;
-    // Expanded event table: a fixed 640 px. The black area shrinks to the picture's own 16:9 height, and
-    // the selected event's details fill the space under the bar. Animated via expandT.
-    // The details panel needs DETAIL_H (two rows, never a scroll bar). If the window is too short for a
-    // full-width 16:9 picture above it, the picture narrows and the table takes the spare width.
-    const DETAIL_H = 152;
-    let midW = total - LEFT_W - 640;
-    let picH = Math.min(Math.round(midW * 9 / 16), fullH - DETAIL_H);
-    if (picH < midW * 9 / 16) midW = Math.round(picH * 16 / 9);
-    const xw = total - LEFT_W - midW;
-    rw = Math.round(rw + (xw - rw) * expandT);
-    qcGrid.style.gridTemplateColumns = window.innerWidth >= 1100 ? `${LEFT_W}px minmax(0,1fr) ${rw}px` : '';
-    picH = Math.max(160, picH);
-    const stageH = Math.round(fullH + (picH - fullH) * expandT);
+    // Base layout (the 1640 x 840 design): file panel 270 px, event table 664 px, player in between.
+    // Extra height makes the picture bigger (16:9, so it then takes width too). Width the picture can't
+    // use, because the window isn't tall enough for it, is shared out in proportion between the file
+    // panel and the table (and the table shares it among its columns). The details panel under the bar
+    // always gets DETAIL_H, so it never scrolls.
+    const LEFT_W = 270, RIGHT_W = EV_TABLE_W, DETAIL_H = 152;
+    const total = qcGrid.clientWidth;
+    const maxPicH = fullH - DETAIL_H;
+    let midW = total - LEFT_W - RIGHT_W, lw = LEFT_W, rw = RIGHT_W;
+    if (midW * 9 / 16 > maxPicH) {
+      const pictureW = Math.round(maxPicH * 16 / 9), f = (total - pictureW) / (LEFT_W + RIGHT_W);
+      lw = Math.round(LEFT_W * f); rw = total - lw - pictureW; midW = pictureW;
+    }
+    const wide = viewW() >= 1100;
+    qcGrid.style.gridTemplateColumns = wide ? `${lw}px minmax(0,1fr) ${rw}px` : '';
+    document.documentElement.style.setProperty('--left-w', lw + 'px');
+    const picH = Math.max(160, Math.min(maxPicH, Math.round(midW * 9 / 16)));
+    const stageH = picH;
     stage.parentElement.style.height = (avail + BOTTOM_PAD) + 'px';
     tlDirty = true;   // the bar's width changed: redraw it at its new size (otherwise it looks stretched)
     const vp = document.querySelector('.qcleft .vpanel'), sp = document.querySelector('.qcleft .spanel');

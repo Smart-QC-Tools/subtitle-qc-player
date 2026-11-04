@@ -65,6 +65,11 @@
       const loadMs = await until(() => V() && (V().readyState >= 1 || V().error), 30000);
       if (V().error) { problem('video failed to open', { file: v.name, err: V().error.message }); continue; }
       const tcMs = await until(() => ws().tc && !/^-/.test(ws().tc), 3000);
+      { // the native picture must sit exactly under the page's video element (with the page zoomed)
+        await sleep(300); const s = await stats(false), r = V().getBoundingClientRect(), z = s.zoom || 1;
+        const want = [r.left, r.top, r.width, r.height].map(x => x * z), off = s.layer ? Math.max(...s.layer.map((x, i) => Math.abs(x - want[i]))) : null;
+        step('picture position', { file: v.name, zoom: round(z, 3), window: s.window, layer: s.layer && s.layer.map(x => round(x, 1)), page: want.map(x => round(x, 1)), offPt: round(off, 1) });
+        if (off == null || off > 2) problem('picture not under the page video', { file: v.name, off }); }
       step('opened', { file: v.name, loadMs: round(loadMs, 0), totalMs: round(now() - t, 0), duration: round(V().duration, 2), w: V().videoWidth, h: V().videoHeight, offset: document.getElementById('offsetInput').value, sub: Player.currentSubtitle() });
       if (loadMs == null || loadMs > 3000) problem('slow to open', { file: v.name, loadMs: round(loadMs, 0) });
 

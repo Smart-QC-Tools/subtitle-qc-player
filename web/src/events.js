@@ -11,6 +11,14 @@
   let expanded = true, evDirty = true, evRows = [], evDetailIdx = -2;
   const expandT = 1;
   const evSort = { key: 'begin', dir: 1 };
+  // Column widths at the table's base width (Text 280 px); a wider table widens every column in proportion.
+  const EV_COLS = [98, 74, 280, 38, 45, 59, 70];
+  const EV_TABLE_W = EV_COLS.reduce((a, b) => a + b, 0);
+  if (evTable) {
+    const cg = document.createElement('colgroup');
+    for (const w of EV_COLS) { const col = document.createElement('col'); col.style.width = (w / EV_TABLE_W * 100).toFixed(3) + '%'; cg.appendChild(col); }
+    evTable.insertBefore(cg, evTable.firstChild);
+  }
 
   const placeRank = p => !p ? 0 : (p.h === 'mixed' ? 4 : 0) + (p.v === 'raised' ? 2 + (p.lift || 0) / 100 : 0) + (p.h === 'left' || p.h === 'right' ? 1 : 0) + (p.v === 'top' ? 0.5 : 0);
   const EV_SORT = {

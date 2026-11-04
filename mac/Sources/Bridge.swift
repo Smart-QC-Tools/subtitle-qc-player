@@ -104,7 +104,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         #if SELFTEST
         case "selftestStats":
             guard let v = view?.video else { replyHandler(nil, "no video"); return }
-            let d = v.testStats()
+            var d = v.testStats()
+            if let mv = view {
+                d["zoom"] = Double(mv.webView.pageZoom)
+                let f = mv.playerHost.convert(v.layer.frame, to: mv)   // video layer in window points (top-left origin)
+                d["layer"] = [f.origin.x, f.origin.y, f.size.width, f.size.height].map { Double($0) }
+                d["window"] = [Double(mv.bounds.width), Double(mv.bounds.height)]
+            }
             if body["reset"] as? Bool == true { v.frameCounter.reset() }
             replyHandler(d, nil)
         case "selftestDone":

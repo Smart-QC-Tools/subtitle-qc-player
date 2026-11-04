@@ -54,9 +54,20 @@ final class MainView: NSView {
         }
         addSubview(webView)
         video.bridge = bridge
+        setFrameSize(frame.size)   // apply the zoom for the starting size
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// The interface is designed for 1640 x 840 points. In a smaller window the whole page is zoomed out
+    /// (fonts, controls, player), down to 80%; bigger windows stay at 100% and the page uses the space.
+    static let designSize = NSSize(width: 1640, height: 840)
+    static let minZoom: CGFloat = 0.8
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        let z = max(MainView.minZoom, min(1, newSize.width / MainView.designSize.width, newSize.height / MainView.designSize.height))
+        if let w = webView, abs(w.pageZoom - z) > 0.001 { w.pageZoom = z }
+    }
 
     private var networkBlocked = false
     func load() {
@@ -82,6 +93,9 @@ final class MainView: NSView {
         CATransaction.begin(); CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         guard visible, let s = stage, s.count == 4, let v = videoRect, v.count == 4 else { playerHost.isHidden = true; return }
+        // The page measures in its own (zoomed) units: convert to points.
+        let z = Double(webView.pageZoom)
+        let s = s.map { $0 * z }, v = v.map { $0 * z }
         playerHost.frame = NSRect(x: s[0], y: s[1], width: s[2], height: s[3])
         // playerHost is not flipped: convert the video's top-left based rect.
         let x = v[0] - s[0], yTop = v[1] - s[1]

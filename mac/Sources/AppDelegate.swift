@@ -10,16 +10,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         buildMenu()
 
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1512, height: 900)
-        let size = NSSize(width: min(1600, screen.width * 0.92), height: min(1000, screen.height * 0.92))
+        // First launch: the design size (1640 x 840), or as much of the screen as allows.
+        let size = NSSize(width: min(MainView.designSize.width, screen.width * 0.96), height: min(MainView.designSize.height, screen.height * 0.96))
         let rect = NSRect(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2, width: size.width, height: size.height)
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Subtitle QC Player"
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = MainView.panelColor
-        window.contentMinSize = NSSize(width: 1200, height: 720)
+        window.contentMinSize = NSSize(width: MainView.designSize.width * MainView.minZoom, height: MainView.designSize.height * MainView.minZoom)
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.setFrameAutosaveName("SubtitleQCMainWindow")
+        window.setFrameAutosaveName("SubtitleQCMainWindow2")   // (new name: everyone starts once at the new default size)
 
         mainView = MainView(frame: NSRect(origin: .zero, size: rect.size))
         window.contentView = mainView
