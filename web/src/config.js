@@ -65,8 +65,9 @@ const FILENAME_WORDS = {
 /* Compact codes seen in file names without a separator. */
 // Three-letter codes used by dubbing / subtitling vendors. strong = distinctive enough to trust anywhere.
 const VENDOR_LANG_CODES = Object.fromEntries(Object.entries({
-  'es-ES': ['csp:1', 'cas', 'spe:1'], 'es-419': ['lsp:1', 'las', 'lat', 'lam:1', 'spl:1'],
-  'pt-BR': ['bpt:1', 'ptb:1', 'brp:1', 'pob:1'], 'pt-PT': ['ept:1', 'ptp:1', 'ppt'],
+  'es-ES': ['csp:1', 'cas', 'spe:1', 'esp'], 'es-419': ['lsp:1', 'las', 'lat', 'lam:1', 'spl:1'], 'es-MX': ['esm:1', 'mxs:1'],
+  'pt-BR': ['bpt:1', 'ptb:1', 'brp:1', 'pob:1', 'bpo:1'], 'pt-PT': ['ept:1', 'ptp:1', 'ppt', 'epo:1', 'ptg:1'],
+  'ja': ['jap:1'], 'ro': ['rom'], 'gl': ['glg:1'], 'yue': ['can'],
   'fr-CA': ['cfr:1', 'frc:1', 'fca:1'], 'fr-FR': ['pfr:1', 'frp:1'],
   'zh-Hans': ['zhs:1', 'sch:1', 'cmn'], 'zh-Hant': ['zht:1', 'tch:1'], 'nl-BE': ['fle:1', 'vls:1'],
 }).flatMap(([code, list]) => list.map(x => { const [k, st] = x.split(':'); return [k, { code, strong: !!st }]; })));
@@ -74,4 +75,17 @@ const FILENAME_COMPACT = {
   ptbr:'pt-BR', ptpt:'pt-PT', esla:'es-419', eslat:'es-419', eslatam:'es-419', es419:'es-419', eses:'es-ES',
   esmx:'es-MX', frca:'fr-CA', frfr:'fr-FR', enus:'en-US', engb:'en-GB', zhcn:'zh-Hans', zhtw:'zh-Hant',
   zhhk:'zh-Hant', zhhans:'zh-Hans', zhhant:'zh-Hant', chs:'zh-Hans', cht:'zh-Hant'
+};
+
+// How list names are shown: regional variants read the way people say them ("Brazilian Portuguese").
+const NAME_DISPLAY = {
+  PORTUGUESE_BRAZIL: 'Brazilian Portuguese', PORTUGUESE_PORTUGAL: 'European Portuguese',
+  SPANISH_LATIN: 'Latin Spanish', SPANISH_CASTILLIAN: 'Castilian Spanish', SPANISH_MEXICAN: 'Mexican Spanish',
+  SPANISH_ARGENTINEAN: 'Argentinean Spanish', SPANISH_CHILEAN: 'Chilean Spanish', SPANISH_COLOMBIAN: 'Colombian Spanish',
+  SPANISH_PERUVIAN: 'Peruvian Spanish', SPANISH_CATALAN: 'Catalan',
+  FRENCH_CANADIAN: 'Canadian French', FRENCH_PARISIAN: 'Parisian French', FLEMISH_DUTCH: 'Flemish',
+  CHINESE_MANDARIN_MNLAND: 'Mainland Mandarin', CHINESE_MANDARIN_TAIWAN: 'Taiwanese Mandarin',
+  CHINESE_MANDARIN_SINGAPORE: 'Singaporean Mandarin', CHINESE_CANTONESE: 'Cantonese',
+  FARSI_IRANIAN: 'Iranian Farsi', GAELIC_IRELAND: 'Irish Gaelic', BAHASA_INDONESIAN: 'Indonesian', BAHASA_MALAY: 'Malay',
+  TAMIL_INDIA: 'Tamil', TELUGU_INDIA: 'Telugu', URDU_PAKISTAN: 'Urdu', YU_SERBIAN: 'Serbian', UKRANIAN: 'Ukrainian',
 };

@@ -14,7 +14,7 @@ for (const [name, code] of REFERENCE_LIST) {
   REF_BY_CODE.get(k).names.push(name);
   REF_BASES.add(k.split('-')[0]);
 }
-const prettyName = n => n.toLowerCase().replace(/_/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase()).replace(/\bMnland\b/, 'Mainland');
+const prettyName = n => NAME_DISPLAY[n] || n.toLowerCase().replace(/_/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase()).replace(/\bMnland\b/, 'Mainland');
 const langName = code => Detector.LANG_NAMES[code] || code;
 
 // ------------------------------------------------------------ BCP-47 helpers
@@ -79,6 +79,14 @@ function matchReference(raw) {
 const NAME_MAP = (() => {
   const m = { ...FILENAME_WORDS };
   for (const [name, code] of REFERENCE_LIST) m[name.toLowerCase()] = code;
+  // Natural word order too: BRAZILIAN_PORTUGUESE as well as PORTUGUESE_BRAZIL.
+  Object.assign(m, {
+    brazilian_portuguese: 'pt-BR', european_portuguese: 'pt-PT', latin_spanish: 'es-419', latin_american_spanish: 'es-419',
+    latinamerican_spanish: 'es-419', castilian_spanish: 'es-ES', european_spanish: 'es-ES', mexican_spanish: 'es-MX',
+    canadian_french: 'fr-CA', parisian_french: 'fr-FR', european_french: 'fr-FR', simplified_chinese: 'zh-Hans',
+    traditional_chinese: 'zh-Hant', chinese_simplified: 'zh-Hans', chinese_traditional: 'zh-Hant',
+    mainland_mandarin: 'zh-Hans', taiwanese_mandarin: 'zh-Hant', flemish: 'nl-BE',
+  });
   return m;
 })();
 const ISO3 = new Set(Object.keys(BASE_ALIASES).filter(k => k.length === 3));

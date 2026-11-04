@@ -12,7 +12,31 @@
   const expandT = 1;
   const evSort = { key: 'begin', dir: 1 };
   // Column widths at the table's base width (Text 280 px); a wider table widens every column in proportion.
-  const EV_COLS = [91, 67, 280, 31, 38, 52, 63];
+  // Every column except Text is as wide as its widest value (or header, with the sort arrow) in the font
+  // actually in use: measured once here, so a wider system font (macOS) never cuts a header short.
+  const EV_TEXT_W = 280;
+  const EV_COLS = (() => {
+    const fallback = [91, 67, EV_TEXT_W, 31, 38, 52, 63];
+    if (!evTable) return fallback;
+    try {
+      const t = document.createElement('table');
+      t.className = 'ev-table';
+      t.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;width:auto;table-layout:auto';
+      t.appendChild(evTable.tHead.cloneNode(true));
+      const b = t.createTBody().insertRow();
+      const samples = [['00:00:00:00', '00:00:00:00'], ['1:05:12m'], null, ['4'], ['60'], ['107.9'], ['Raised']];
+      samples.forEach(v => {
+        const c = b.insertCell();
+        if (!v) { c.style.cssText = `width:${EV_TEXT_W}px;min-width:${EV_TEXT_W}px;box-sizing:border-box`; return; }
+        if (v.length === 2) c.className = 'ev-io';
+        for (const x of v) { const s = document.createElement('span'); s.className = 'bad'; s.textContent = x; c.appendChild(s); }
+      });
+      document.body.appendChild(t);
+      const w = [...t.tHead.rows[0].cells].map((th, i) => i === 2 ? EV_TEXT_W : Math.ceil(Math.max(th.getBoundingClientRect().width, b.cells[i].getBoundingClientRect().width) / uiZoom()) + 2);
+      t.remove();
+      return w.every(x => x > 10) ? w : fallback;
+    } catch (e) { return fallback; }
+  })();
   const EV_TABLE_W = EV_COLS.reduce((a, b) => a + b, 0);
   if (evTable) {
     const cg = document.createElement('colgroup');
