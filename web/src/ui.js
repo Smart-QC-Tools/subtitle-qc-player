@@ -290,10 +290,14 @@ function setTab(t) {
 }
 function renderHeader() {
   const fold = (el, name, n, extra) => {
+    const kind = el.id === 'subFolderName' ? 'subs' : 'videos', box = el.parentElement;
     el.classList.toggle('unset', !name);
-    el.textContent = name ? `${name} · ${n} file${n === 1 ? '' : 's'}${extra || ''}` : 'none selected';
-    const h = HandleStore.cache[el.id === 'subFolderName' ? 'subs' : 'videos'];
-    el.title = name ? (NATIVE && h && h.path ? h.path : `${name}\nBrowsers only reveal the folder's name, not its full path.`) : '';
+    box.classList.toggle('empty', !name);
+    el.textContent = name ? `${name} · ${n} file${n === 1 ? '' : 's'}${extra || ''}` : 'Choose folder…';
+    const h = HandleStore.cache[kind];
+    const what = kind === 'subs' ? 'subtitles' : 'videos';
+    el.title = '';
+    box.title = name ? (NATIVE && h && h.path ? h.path : `${name}\nBrowsers only reveal the folder's name, not its full path.`) + `\nClick to choose another ${what} folder.` : `Choose the ${what} folder (or drop it on the window)`;
   };
   for (const [kind, id, cur] of [['subs', '#subReopen', state.subFolder], ['videos', '#vidReopen', state.vidFolder]]) {
     const h = HandleStore.cache[kind], el = $(id);
@@ -376,7 +380,9 @@ function renderLangFilter(list) {
   for (const k of [...state.langSel]) if (!groups.has(k)) state.langSel.delete(k);   // languages no longer present
   const items = [...groups.values()].sort((a, b) => (a.k === '~') - (b.k === '~') || a.name.localeCompare(b.name));
   host.hidden = items.length < 2;
-  host.innerHTML = items.map(g => `<button type="button" class="lchip${state.langSel.has(g.k) ? ' on' : ''}${g.k === '~' ? ' lnone' : ''}" data-k="${esc(g.k)}">${esc(g.name)} <span>${g.n}</span></button>`).join('')
+  // Long names shortened: every word but the last becomes an initial (Brazilian Portuguese → B. Portuguese).
+  const short = g => g.k === '~' ? 'No language' : g.name.split(/\s+/).map((w, i, a) => i < a.length - 1 ? w[0] + '.' : w).join(' ');
+  host.innerHTML = items.map(g => `<button type="button" class="lchip${state.langSel.has(g.k) ? ' on' : ''}${g.k === '~' ? ' lnone' : ''}" data-k="${esc(g.k)}" title="${esc(g.name)}">${esc(short(g))} <span>${g.n}</span></button>`).join('')
     + (state.langSel.size ? `<button type="button" class="linkbtn lclear">Show all</button>` : '');
 }
 
@@ -555,6 +561,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   $('#pickSubs').onclick = () => pick('subs');
   $('#pickVids').onclick = () => pick('videos');
+  // The folder fields themselves are the buttons (Reopen inside them keeps its own action).
+  document.querySelectorAll('.folder[data-kind]').forEach(box => {
+    box.addEventListener('click', e => { if (!e.target.closest('#subReopen, #vidReopen')) pick(box.dataset.kind); });
+    box.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === box) { e.preventDefault(); pick(box.dataset.kind); } });
+  });
   $('#subDirInput').onchange = e => onDirInput('subs', e);
   $('#vidDirInput').onchange = e => onDirInput('videos', e);
   $('#rescan').onclick = rescan;
