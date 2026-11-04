@@ -1,0 +1,31 @@
+== StressTest_S1_T2001_Hr0_HD_2398_ProResHQ_8trk_V1-R0.mov 1625920518 bytes
+stream_group|stream|index=0|codec_name=prores|profile=HQ|width=1920|height=1080|pix_fmt=yuv422p10le|r_frame_rate=24000/1001
+stream|index=9|codec_name=unknown|profile=unknown|r_frame_rate=0/0
+
+stream|index=0|codec_name=prores|profile=HQ|width=1920|height=1080|pix_fmt=yuv422p10le|r_frame_rate=24000/1001
+stream|index=1|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=2|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=3|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=4|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=5|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=6|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=7|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=8|codec_name=pcm_s24le|profile=unknown|channels=1|r_frame_rate=0/0
+stream|index=9|codec_name=unknown|profile=unknown|r_frame_rate=0/0
+format|duration=180.013167
+== StressTest_S1_T2002_Hr0_HD_2398_H264_V1-R0.mp4 149746483 bytes
+stream_group|stream|index=0|codec_name=h264|profile=High|width=1920|height=1080|pix_fmt=yuv420p|r_frame_rate=24000/1001
+stream|index=2|codec_name=unknown|profile=unknown|r_frame_rate=0/0
+
+stream|index=0|codec_name=h264|profile=High|width=1920|height=1080|pix_fmt=yuv420p|r_frame_rate=24000/1001
+stream|index=1|codec_name=aac|profile=LC|channels=2|r_frame_rate=0/0
+stream|index=2|codec_name=unknown|profile=unknown|r_frame_rate=0/0
+format|duration=180.013167
+== StressTest_S1_T2003_Hr0_UHD_2398_HEVC10_V1-R0.mov 189762412 bytes
+stream_group|stream|index=0|codec_name=hevc|profile=Main 10|width=3840|height=2160|pix_fmt=yuv420p10le|r_frame_rate=24000/1001
+stream|index=2|codec_name=unknown|profile=unknown|r_frame_rate=0/0
+
+stream|index=0|codec_name=hevc|profile=Main 10|width=3840|height=2160|pix_fmt=yuv420p10le|r_frame_rate=24000/1001
+stream|index=1|codec_name=pcm_s24le|profile=unknown|channels=8|r_frame_rate=0/0
+stream|index=2|codec_name=unknown|profile=unknown|r_frame_rate=0/0
+format|duration=70.028292
