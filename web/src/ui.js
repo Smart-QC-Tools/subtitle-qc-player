@@ -547,7 +547,12 @@ async function playFromQC(name) {
 // ------------------------------------------------------------ wiring
 document.addEventListener('DOMContentLoaded', () => {
   document.body.dataset.tab = 'qc';
-  $('#appVersion').textContent = 'Version ' + APP_VERSION + (NATIVE ? ' · Mac app' : '');
+  $('#appVersion').textContent = `Subtitle QC Player Version ${APP_VERSION}` + (NATIVE ? ' (Mac app)' : '');
+  $('#helpNav').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#helpNav button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.help-pages section').forEach(s => { s.hidden = s.dataset.h !== b.dataset.h; });
+  };
   $('#pickSubs').onclick = () => pick('subs');
   $('#pickVids').onclick = () => pick('videos');
   $('#subDirInput').onchange = e => onDirInput('subs', e);

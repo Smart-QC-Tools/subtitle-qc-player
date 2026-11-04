@@ -119,6 +119,22 @@ body[data-tab=player] main{padding:0}
 .modal-bg[hidden]{display:none}
 .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:1080px;width:100%;max-height:84vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .modal-h{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);font-size:15px}
+.modal.help{max-width:900px;height:min(640px,84vh);display:flex;flex-direction:column;overflow:hidden}
+.modal-h .spacer{flex:1}
+.help-body{display:flex;flex:1 1 auto;min-height:0}
+.help-nav{flex:none;width:200px;display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--border);background:var(--panel2)}
+.help-nav button{font:inherit;font-size:13.5px;text-align:left;padding:8px 12px;border-radius:7px;border:0;background:none;color:var(--dim);cursor:pointer}
+.help-nav button:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.help-nav button.on{color:var(--text);background:rgba(111,168,255,.15)}
+.help-pages{flex:1 1 auto;overflow:auto;padding:6px 26px 22px}
+.help-pages h4{margin:16px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
+.help-pages h4#appVersion{font-size:15px;text-transform:none;letter-spacing:0;color:var(--text)}
+.help-pages ul{margin:0 0 10px;padding-left:16px;font-size:13px;line-height:1.55;color:var(--text)}
+.help-pages ul li{margin:4px 0}
+.help-pages .qtag{margin:0 4px 0 0}
+.native-only{display:none}
+html.native .native-only{display:list-item}
+html.native .web-only{display:none}
 .modal-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px;padding:14px 20px 20px}
 @media (max-width:900px){.modal-cols{grid-template-columns:1fr}}
 .modal-cols h4{margin:8px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
@@ -540,63 +556,99 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
   </section>
 </main>
 <div class="modal-bg" id="helpModal" hidden>
-  <div class="modal" role="dialog" aria-label="Shortcuts and help">
-    <div class="modal-h"><b>Shortcuts &amp; help</b><span class="muted small" id="appVersion" style="margin-left:10px;margin-right:auto"></span><button class="btn sm" id="helpClose">Close</button></div>
-    <div class="modal-cols">
-      <section>
-        <h4>Keyboard (QC tab)</h4>
-        <ul class="keys">
-          <li><span class="k"><kbd>Space</kbd></span><span>Play / pause (always back to normal speed)</span></li>
-          <li><span class="k"><kbd>K</kbd></span><span>Pause</span></li>
-          <li><span class="k"><kbd>←</kbd> <kbd>→</kbd></span><span>Back / forward one frame</span></li>
-          <li><span class="k"><kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd></span><span>Jump 5 seconds</span></li>
-          <li><span class="k"><kbd>⌥ Option</kbd>+<kbd>←</kbd> <kbd>→</kbd></span><span>Jump 5 minutes</span></li>
-          <li><span class="k"><kbd>↑</kbd> <kbd>↓</kbd></span><span>Previous / next subtitle event (follows the filter, search and the table's sort order)</span></li>
-          <li><span class="k"><kbd>L</kbd></span><span>Play; press again for 2× → 4× → 6×. From reverse, one step back towards normal play</span></li>
-          <li><span class="k"><kbd>J</kbd></span><span>Reverse at 2×; press again for 4× → 6×. While playing forward, one step slower (1× → ◀◀ 2×). <span class="web-only">Reverse has no sound</span></span></li>
-          <li><span class="k"><kbd>Ctrl/⌘</kbd>+scroll</span><span>Zoom the waveform bar</span></li>
-          <li><span class="k"><kbd>Shift</kbd>+scroll</span><span>Move along the waveform bar</span></li>
-        </ul>
-      </section>
-      <section>
-        <h4>Waveform bar</h4>
-        <ul>
-          <li>Press or drag on the bar to move the playhead.</li>
-          <li>Click a subtitle block to select it in the event list; clicking an event in the list jumps there.</li>
-          <li>The handle underneath shows the visible part of the video: drag it to move (the playhead follows), drag its ends to zoom between 5 seconds and the whole video.</li>
-          <li>The channel menu picks which audio is drawn (Auto: stereo summed, channel 3 for 6/8 channels).</li>
-        </ul>
-        <h4>Colours</h4>
-        <ul>
-          <li><span class="qtag q-issue" style="margin:0">Red</span> breaks a rule: over the line-length limit, more lines than allowed, overlap, too short / too long, very short with a long line, odd characters, mixed alignment.</li>
-          <li><span class="qtag q-warn" style="margin:0">Amber</span> worth a look: reading speed over the CPS limit, unusual placement (raised, or left / right-aligned), or a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine). <span class="qtag q-neutral" style="margin:0">Grey</span> placed at the top.</li>
-          <li>CPS counts every character, spaces included, over the time on screen. The CPS and line-length limits are set above the event table and apply everywhere.</li>
-        </ul>
-        <h4>Event table</h4>
-        <ul>
-          <li>In / Out turn red where events overlap, Out turns amber before a 1-frame gap. Duration is seconds:frames. Placement is blank for the usual bottom-centre; raised shows how far above the bottom of the picture the text sits.</li>
-          <li>Hover a row for the characters on each line and every flag in words. Click a column to sort (again to reverse).</li>
-        </ul>
-        <h4>Matching</h4>
-        <ul>
-          <li>Selecting a video lists the subtitle files whose names match it (production code, season/episode or episode title).</li>
-          <li>“Matched only / All files” (top right) hides or shows files without a match, on both tabs.</li>
-          <li>Switching subtitle files keeps the playback position; switching episodes keeps the same language when available.</li>
-        </ul>
-      </section>
-      <section>
-        <h4>Offset &amp; timing</h4>
-        <ul>
-          <li>The offset is the timecode of the video's first frame. It's filled in automatically when the video has a timecode track; otherwise type the burned-in start timecode (hh:mm:ss:ff).</li>
-          <li>A typed offset is remembered for that video. ± flips the sign.</li>
-          <li>The offset is converted with the subtitle file's own frame rate; check it against the video's frame rate shown below the player.</li>
-        </ul>
-        <h4>Other</h4>
-        <ul>
-          <li>Translate uses Chrome's on-device translator (Chrome 138+); a small model downloads the first time a language is used.</li>
-          <li>Everything runs locally; nothing is uploaded.</li>
-        </ul>
-      </section>
+  <div class="modal help" role="dialog" aria-label="Help">
+    <div class="modal-h"><b>Help</b><span class="spacer"></span><button class="btn sm" id="helpClose">Close</button></div>
+    <div class="help-body">
+      <nav class="help-nav" id="helpNav">
+        <button type="button" data-h="keys" class="on">Keyboard</button>
+        <button type="button" data-h="timing">Waveform &amp; timing</button>
+        <button type="button" data-h="checks">Subtitle checks</button>
+        <button type="button" data-h="conform">Conform page</button>
+        <button type="button" data-h="about">About</button>
+      </nav>
+      <div class="help-pages">
+        <section data-h="keys">
+          <h4>Keyboard</h4>
+          <ul class="keys">
+            <li><span class="k"><kbd>Space</kbd></span><span>Play / pause (always back to normal speed)</span></li>
+            <li><span class="k"><kbd>K</kbd></span><span>Pause</span></li>
+            <li><span class="k"><kbd>←</kbd> <kbd>→</kbd></span><span>Back / forward one frame</span></li>
+            <li><span class="k"><kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd></span><span>Jump 5 seconds</span></li>
+            <li><span class="k"><kbd>⌥ Option</kbd>+<kbd>←</kbd> <kbd>→</kbd></span><span>Jump 5 minutes</span></li>
+            <li><span class="k"><kbd>↑</kbd> <kbd>↓</kbd></span><span>Previous / next subtitle event (follows the filter, search and the table's sort order)</span></li>
+            <li><span class="k"><kbd>L</kbd></span><span>Play; press again for 2× → 4× → 6×. From reverse, one step back towards normal play</span></li>
+            <li><span class="k"><kbd>J</kbd></span><span>Reverse at 2×; press again for 4× → 6×. While playing forward, one step slower (1× → ◀◀ 2×). <span class="web-only">Reverse has no sound</span></span></li>
+            <li><span class="k"><kbd>Ctrl/⌘</kbd>+scroll</span><span>Zoom the waveform bar</span></li>
+            <li><span class="k"><kbd>Shift</kbd>+scroll</span><span>Move along the waveform bar</span></li>
+          </ul>
+        </section>
+        <section data-h="timing" hidden>
+          <h4>Waveform bar</h4>
+          <ul>
+            <li>Press or drag on the bar to move the playhead. Click a subtitle block to select that event in the table.</li>
+            <li>The handle underneath shows the visible part of the video: drag it to move, drag its ends to zoom between 5 seconds and the whole video.</li>
+            <li>The channel menu picks which audio channels are drawn. It doesn't change what you hear.</li>
+          </ul>
+          <h4>Offset &amp; timing</h4>
+          <ul>
+            <li>The offset is the timecode of the video's first frame. It's filled in automatically when the video has a timecode track; otherwise type the burned-in start timecode (hh:mm:ss:ff). ± flips the sign.</li>
+            <li>A typed offset is remembered for that video.</li>
+            <li>Timecodes in the player and the table count from 00:00:00:00 at the first frame of the video.</li>
+            <li>The frame rates of the video and the subtitle file are shown beside the volume. A difference is marked (except SCC, which is always 29.97).</li>
+          </ul>
+        </section>
+        <section data-h="checks" hidden>
+          <h4>Colours</h4>
+          <ul>
+            <li><span class="qtag q-issue">Red</span> breaks a rule: over the line-length (CPL) limit, more lines than allowed, overlap, too short or too long on screen, very short with a long line, odd (invisible / control) characters, mixed alignment.</li>
+            <li><span class="qtag q-warn">Amber</span> worth a look: reading speed over the CPS limit, unusual placement (raised, or left / right-aligned), a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine).</li>
+            <li><span class="qtag q-neutral">Grey</span> placed at the top.</li>
+          </ul>
+          <h4>Event table</h4>
+          <ul>
+            <li>In / Out turn red where events overlap; Out turns amber before a 1-frame gap. Duration is seconds:frames (2:13s), or minutes:seconds:frames from a minute up (1:05:12m).</li>
+            <li>Pos (placement) is blank for the usual bottom-centre. L / R: left / right-aligned · Mix: lines aligned differently · Raised · Top.</li>
+            <li>Click a row to jump there; click a column heading to sort (again to reverse). Hover a row for the characters on each line and every flag in words.</li>
+            <li>Under the player: the selected event (or the one playing) in detail, with the characters on each line.</li>
+          </ul>
+          <h4>Limits, filters, search</h4>
+          <ul>
+            <li>Lines, CPS and CPL limits are set above the table and apply everywhere, including the Conform page. CPS counts every character, spaces included, over the time on screen.</li>
+            <li>Filters show only the events with that flag; click the active one again to show everything.</li>
+            <li>Search is not case-sensitive. Paste an odd character to find more of it.</li>
+            <li class="web-only">Translate (Chrome 138+) puts an English translation under the events in view, using Chrome's on-device translator.</li>
+          </ul>
+        </section>
+        <section data-h="conform" hidden>
+          <h4>Folders &amp; files</h4>
+          <ul>
+            <li>Choose the videos folder and the subtitles folder at the top (or drop them on the window). Next time they come back by themselves in the Mac app, or with one click (Reopen) in the browser.</li>
+            <li>Subtitle formats: TTML, IMSC, iTT, DFXP, WebVTT, SRT and SCC. Videos: whatever the player can play (ProRes and more in the Mac app).</li>
+            <li>Audio-only files, dubcards and clips under a minute are set aside under “Ignored” in the videos list.</li>
+          </ul>
+          <h4>What's checked</h4>
+          <ul>
+            <li><b>Label</b>: the language code inside the file, checked against the reference language list (<b>Expected</b>).</li>
+            <li><b>Detected</b>: the language the text is actually in, and any <b>other languages</b> found in it.</li>
+            <li><b>Cue checks</b>: how many events have each flag (same as the player). <b>Checks</b>: anything else worth knowing, such as the file name saying a different language, or a season / episode that doesn't match the video or the folder.</li>
+            <li>Click a row for details; ▶ opens the file in the player.</li>
+          </ul>
+          <h4>Grouping &amp; matching</h4>
+          <ul>
+            <li>Group by the language in the file names, or by episode. The language buttons show only the languages you pick (any number); “Show all” clears them.</li>
+            <li>Subtitle files are matched to videos by production code, season / episode or episode title. “Matched only” hides files without a match, on both tabs.</li>
+            <li>In the player, switching episodes keeps the same language when there is one; switching subtitle files keeps the playback position.</li>
+          </ul>
+        </section>
+        <section data-h="about" hidden>
+          <h4 id="appVersion">Subtitle QC Player</h4>
+          <ul>
+            <li>Everything runs on this computer; no file or subtitle is uploaded anywhere.</li>
+            <li class="native-only">Problems are written to a log file: Help ▸ Show Log File in the menu bar. Sending it along helps when something goes wrong.</li>
+            <li class="web-only">The Mac app plays more video formats (ProRes and others) and keeps its settings between sessions on its own.</li>
+          </ul>
+        </section>
+      </div>
     </div>
   </div>
 </div>
