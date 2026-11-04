@@ -25,8 +25,8 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "pickFolder":
             let panel = NSOpenPanel()
             panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
-            panel.prompt = "Choose"
-            panel.message = str("kind") == "subs" ? "Choose the subtitles folder" : "Choose the videos folder"
+            panel.prompt = "Select"
+            panel.message = str("kind") == "subs" ? "Select the subtitles folder" : "Select the videos folder"
             let start = str("start")
             if !start.isEmpty {
                 let u = URL(fileURLWithPath: start)

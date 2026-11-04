@@ -293,11 +293,11 @@ function renderHeader() {
     const kind = el.id === 'subFolderName' ? 'subs' : 'videos', box = el.parentElement;
     el.classList.toggle('unset', !name);
     box.classList.toggle('empty', !name);
-    el.textContent = name ? `${name} · ${n} file${n === 1 ? '' : 's'}${extra || ''}` : 'Choose folder…';
+    el.textContent = name ? `${name} · ${n} file${n === 1 ? '' : 's'}${extra || ''}` : 'Select folder…';
     const h = HandleStore.cache[kind];
     const what = kind === 'subs' ? 'subtitles' : 'videos';
     el.title = '';
-    box.title = name ? (NATIVE && h && h.path ? h.path : `${name}\nBrowsers only reveal the folder's name, not its full path.`) + `\nClick to choose another ${what} folder.` : `Choose the ${what} folder (or drop it on the window)`;
+    box.title = name ? (NATIVE && h && h.path ? h.path : `${name}\nBrowsers only reveal the folder's name, not its full path.`) + `\nClick to select another ${what} folder.` : `Select the ${what} folder (or drop it on the window)`;
   };
   for (const [kind, id, cur] of [['subs', '#subReopen', state.subFolder], ['videos', '#vidReopen', state.vidFolder]]) {
     const h = HandleStore.cache[kind], el = $(id);
