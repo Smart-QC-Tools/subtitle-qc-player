@@ -12,7 +12,7 @@
   const expandT = 1;
   const evSort = { key: 'begin', dir: 1 };
   // Column widths at the table's base width (Text 280 px); a wider table widens every column in proportion.
-  const EV_COLS = [98, 74, 280, 38, 45, 59, 70];
+  const EV_COLS = [91, 67, 280, 31, 38, 52, 63];
   const EV_TABLE_W = EV_COLS.reduce((a, b) => a + b, 0);
   if (evTable) {
     const cg = document.createElement('colgroup');
