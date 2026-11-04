@@ -138,7 +138,6 @@
   function cueIssues(c) {
     const out = [];
     const add = (key, text, title) => out.push({ key, text, title, kind: 'issue' });
-    if (c.cpsOver) add('cps', `CPS ${c.cps.toFixed(1)}`, `Reading speed ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`);
     if (c.charLimitExceeded) add('chars', `CPL ${c.maxLineLength}`, `Longest line has ${c.maxLineLength} characters (limit ${CHAR_LIMIT})`);
     if (c.lineCount >= LINE_COUNT_THRESHOLD) add('lines', `${c.lineCount} lines`, `${c.lineCount} lines on screen`);
     if (c.overlap) add('overlap', 'Overlap', 'Overlaps another event');
@@ -149,9 +148,12 @@
     if (c.mixedAlign) add('mixed', 'Mixed align', 'Lines of this event are aligned differently');
     return out;
   }
+  // Amber: worth a look, not a broken rule. Reading speed over the limit is often still readable.
   function cueWarns(c) {
-    if (!c.gapWarn) return [];
-    return [{ key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (${formatVideoTC(c.gapNext)}): the subtitle blinks off for a single frame`, kind: 'warn' }];
+    const out = [];
+    if (c.cpsOver) out.push({ key: 'cps', text: `CPS ${c.cps.toFixed(1)}`, title: `Fast: ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`, kind: 'warn' });
+    if (!c.gapWarn) return out;
+    return [...out, { key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (${formatVideoTC(c.gapNext)}): the subtitle blinks off for a single frame`, kind: 'warn' }];
   }
   function cuePlaceTags(c) {
     const p = c.placement, out = [];
@@ -179,7 +181,6 @@
   FILTERS.splice(0, FILTERS.length,
     { key: 'all', label: 'All', cls: null, test: () => true },
     { key: 'issues', label: 'Issues', cls: 'f-issue', title: 'Every event with a red flag', test: c => !!(c.issues && c.issues.length) },
-    { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-issue', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'chars', get label() { return `CPL > ${CHAR_LIMIT}`; }, cls: 'f-issue', get title() { return `A line longer than ${CHAR_LIMIT} characters`; }, test: c => !!c.charLimitExceeded },
     { key: 'lines', get label() { return `Lines > ${LINE_COUNT_THRESHOLD - 1}`; }, cls: 'f-issue', get title() { return `More than ${LINE_COUNT_THRESHOLD - 1} lines`; }, test: c => c.lineCount >= LINE_COUNT_THRESHOLD },
     { key: 'overlap', label: 'Overlaps', cls: 'f-issue', test: c => !!c.overlap },
@@ -187,6 +188,7 @@
     { key: 'durationCritical', label: 'Critical', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s with a line of ${SHORT_DURATION_CRITICAL_CHARS}+ characters`, test: c => !!c.tooShortCritical },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
     { key: 'mixed', label: 'Mixed align', cls: 'f-issue', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
+    { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'gaps', label: 'Gaps', cls: 'f-warn', title: '1-frame gaps (the subtitle blinks off for a frame)', test: c => !!c.gapWarn },
     { key: 'placement', label: 'Placement', cls: 'f-place', title: 'Raised, or left / right-aligned', test: c => !!(c.placement && (c.placement.v === 'raised' || c.placement.h === 'left' || c.placement.h === 'right')) },
     { key: 'top', label: 'Top', cls: 'f-neutral', title: 'Placed at the top', test: c => !!(c.placement && c.placement.v === 'top') },

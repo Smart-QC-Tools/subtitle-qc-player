@@ -115,7 +115,7 @@
       tr.appendChild(t);
       tr.appendChild(cell('ev-num' + (c.lineCount >= LINE_COUNT_THRESHOLD ? ' bad' : ''), String(c.lineCount)));
       tr.appendChild(cell('ev-num' + (c.charLimitExceeded ? ' bad' : ''), String(c.maxLineLength)));
-      tr.appendChild(cell('ev-num' + (c.cpsOver ? ' bad' : ''), c.cps != null ? c.cps.toFixed(1) : ''));
+      tr.appendChild(cell('ev-num' + (c.cpsOver ? ' warn' : ''), c.cps != null ? c.cps.toFixed(1) : ''));
       const [pt, pc] = placeText(c.placement);
       const pcell = cell(pc, pt);
       if (pt) pcell.title = placeText(c.placement, true)[0];
@@ -227,7 +227,7 @@
     const meta = row();
     item(meta, 'Lines', String(c.lineCount), c.lineCount >= LINE_COUNT_THRESHOLD ? 'bad' : '');
     item(meta, 'Characters', String(c.chars));
-    item(meta, 'CPS', c.cps != null ? c.cps.toFixed(1) : '—', c.cpsOver ? 'bad' : '');
+    item(meta, 'CPS', c.cps != null ? c.cps.toFixed(1) : '—', c.cpsOver ? 'warn' : '');
     const [pt, pc] = placeText(p, true);
     item(meta, 'Placement', pt || 'Bottom · centre', pc);
     item(meta, 'Gap after', c.gap != null ? (Math.round(c.gap * fps()) < 100 ? `${Math.round(c.gap * fps())}f` : `${c.gap.toFixed(1)}s`) : '—', c.gap != null && c.gap < -0.001 ? 'bad' : c.gapWarn ? 'warn' : '');

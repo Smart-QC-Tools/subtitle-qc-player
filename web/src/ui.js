@@ -5,7 +5,7 @@ const state = {
   subs: [], videos: [],
   subFolder: '', vidFolder: '', subHandle: null, vidHandle: null,
   groupBy: Store.get('groupBy') === 'episode' ? 'episode' : 'name', issuesOnly: false,
-  open: new Set(), expanded: new Set(),   // groups start collapsed; these are the ones opened
+  open: new Set(), langSel: new Set(),   // langSel: languages picked with the filter buttons (none = all)
   selectedVideo: null, busy: false, matchedOnly: Store.get('matchedOnly') !== 'all', ignoredVideos: [], subCount: 0, vidCount: 0,
 };
 const STATUS_OPTS = [['', 'Not reviewed'], ['progress', 'In progress'], ['done', 'Done'], ['issues', 'Has issues']];
@@ -331,22 +331,23 @@ function renderQC() {
   $('#qcResults').hidden = empty && !state.videos.length;
   const host = $('#groups');
   if (empty && !state.videos.length) { host.innerHTML = ''; return; }
-  const list = filterActive() ? state.subs.filter(r => r.video) : state.subs;
-  const hiddenSubs = state.subs.length - list.length;
+  const matched = filterActive() ? state.subs.filter(r => r.video) : state.subs;
+  renderLangFilter(matched);
+  const list = state.langSel.size ? matched.filter(r => state.langSel.has(langKey(r))) : matched;
+  const hiddenSubs = state.subs.length - matched.length;
   $('#commonHead').innerHTML = state.common ? `<span class="common-l">${esc(state.common.label)}</span>` : '';
   $('#hiddenNote').textContent = hiddenSubs ? `${hiddenSubs} unmatched subtitle file${hiddenSubs === 1 ? '' : 's'} hidden` : '';
   let html = '';
   for (const g of groupsFor(list)) {
     if (filterActive() && state.groupBy === 'episode' && (!g.video || !g.rows.length)) continue;
+    if (state.langSel.size && !g.rows.length) continue;
     const rows = state.issuesOnly ? g.rows.filter(r => r.severity === 'error' || r.severity === 'warn') : g.rows;
     if (state.issuesOnly && !rows.length) continue;
     const e = g.rows.filter(r => r.severity === 'error').length, w = g.rows.filter(r => r.severity === 'warn').length;
-    const col = !state.expanded.has(g.key);
     const status = Store.get('status:' + g.key) || '';
     const meta = g.video ? `<span class="muted small" title="${esc(g.video)}">🎬 ${esc(g.video)}</span>` : g.noVideo ? `<span class="tag-novideo">no matching video</span>` : '';
     html += `<section class="card st-${status || 'none'}" data-g="${esc(g.key)}">
       <div class="card-h">
-        <span class="caret">${col ? '▸' : '▾'}</span>
         <div class="ct"><div class="title">${esc(g.title)} ${g.code ? `<code>${esc(g.code)}</code>` : ''}</div>${meta}</div>
         <span class="muted small">${g.rows.length} file${g.rows.length === 1 ? '' : 's'}</span>
         ${e ? `<span class="chip sev-error sm">${e} error${e === 1 ? '' : 's'}</span>` : ''}${w ? `<span class="chip sev-warn sm">${w} warning${w === 1 ? '' : 's'}</span>` : ''}
@@ -354,16 +355,29 @@ function renderQC() {
         ${state.groupBy === 'episode' ? `<select class="rstatus" data-g="${esc(g.key)}" title="Review status">${STATUS_OPTS.map(([v, l]) => `<option value="${v}"${v === status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}
         ${g.video ? `<button class="ghost open-video" data-v="${esc(g.video)}">▶ Open in player</button>` : ''}
       </div>`;
-    if (!col) {
-      if (!g.rows.length) html += `<div class="card-empty">No subtitle files matched this video.</div>`;
-      else html += `<table>${COLS}${THEAD}<tbody>${rows.map(r => rowHtml(r) + (state.open.has(r.name) ? detailHtml(r) : '')).join('')}</tbody></table>`;
-    }
+    if (!g.rows.length) html += `<div class="card-empty">No subtitle files matched this video.</div>`;
+    else html += `<table>${COLS}${THEAD}<tbody>${rows.map(r => rowHtml(r) + (state.open.has(r.name) ? detailHtml(r) : '')).join('')}</tbody></table>`;
     html += `</section>`;
   }
-  const keys = [...groupsFor(list)].map(g => g.key);
-  const eb = $('#expandAll');
-  if (eb) { eb.textContent = keys.length && keys.every(k => state.expanded.has(k)) ? 'Collapse all' : 'Expand all'; eb.hidden = !keys.length; }
   host.innerHTML = html || `<div class="none">No issues found.</div>`;
+}
+
+// Language filter buttons: one per language found in the file names (plus "no language"), any number on.
+const langKey = r => (r.fileLang && r.fileLang.code) ? r.fileLang.code.toLowerCase() : '~';
+function renderLangFilter(list) {
+  const host = $('#langFilter');
+  if (!host) return;
+  const groups = new Map();
+  for (const r of list) {
+    const k = langKey(r);
+    if (!groups.has(k)) groups.set(k, { k, n: 0, name: k === '~' ? 'No language in file name' : (langLabel({ fileLang: r.fileLang }) || r.fileLang.code) });
+    groups.get(k).n++;
+  }
+  for (const k of [...state.langSel]) if (!groups.has(k)) state.langSel.delete(k);   // languages no longer present
+  const items = [...groups.values()].sort((a, b) => (a.k === '~') - (b.k === '~') || a.name.localeCompare(b.name));
+  host.hidden = items.length < 2;
+  host.innerHTML = items.map(g => `<button type="button" class="lchip${state.langSel.has(g.k) ? ' on' : ''}${g.k === '~' ? ' lnone' : ''}" data-k="${esc(g.k)}">${esc(g.name)} <span>${g.n}</span></button>`).join('')
+    + (state.langSel.size ? `<button type="button" class="linkbtn lclear">Show all</button>` : '');
 }
 
 function cueChecksHtml(c) {
@@ -373,7 +387,7 @@ function cueChecksHtml(c) {
     ['odd', '#', 'Invisible / odd characters'], ['mixed', 'M', 'Lines aligned differently within an event'],
     ['gaps', 'G', '1-frame gaps (the subtitle blinks off for a frame)'],
     ['raised', '↑', 'Raised'], ['side', '↔', 'Left / right-aligned']]
-    .filter(([k]) => c[k]).map(([k, t, title]) => `<span class="ft ${k === 'raised' || k === 'side' ? 'ft-place' : k === 'gaps' ? 'ft-warn' : 'ft-issue'}" title="${esc(title)}: ${c[k]}">${t}<b>${c[k]}</b></span>`);
+    .filter(([k]) => c[k]).map(([k, t, title]) => `<span class="ft ${k === 'raised' || k === 'side' ? 'ft-place' : k === 'gaps' || k === 'cps' ? 'ft-warn' : 'ft-issue'}" title="${esc(title)}: ${c[k]}">${t}<b>${c[k]}</b></span>`);
   return items.length ? items.join('') : '<span class="ok small">clean</span>';
 }
 
@@ -571,11 +585,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   $('#groupBy').value = state.groupBy;
-  $('#groupBy').onchange = e => { state.groupBy = e.target.value; Store.set('groupBy', state.groupBy); state.expanded.clear(); renderQC(); };
-  $('#expandAll').onclick = () => {
-    const keys = [...document.querySelectorAll('#groups section.card')].map(c => c.dataset.g);
-    const allOpen = keys.length && keys.every(k => state.expanded.has(k));
-    if (allOpen) state.expanded.clear(); else keys.forEach(k => state.expanded.add(k));
+  $('#groupBy').onchange = e => { state.groupBy = e.target.value; Store.set('groupBy', state.groupBy); renderQC(); };
+  $('#langFilter').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('lclear')) state.langSel.clear();
+    else { const k = b.dataset.k; state.langSel.has(k) ? state.langSel.delete(k) : state.langSel.add(k); }
     renderQC();
   };
   $('#issuesOnly').onchange = e => { state.issuesOnly = e.target.checked; renderQC(); };
@@ -592,8 +606,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (play) { e.stopPropagation(); return playFromQC(play.dataset.f); }
     const ov = e.target.closest('button.open-video');
     if (ov) { setTab('player'); return selectVideo(ov.dataset.v); }
-    const head = e.target.closest('.card-h');
-    if (head) { const k = head.parentElement.dataset.g; state.expanded.has(k) ? state.expanded.delete(k) : state.expanded.add(k); return renderQC(); }
     const row = e.target.closest('tr.row');
     if (row) { const f = row.dataset.f; state.open.has(f) ? state.open.delete(f) : state.open.add(f); renderQC(); }
   });
