@@ -433,7 +433,18 @@ function cueChecks(r, parsed, flag) {
   if (nameFps && eff && !sccNtsc && Math.abs(nameFps - eff) > 0.01)
     flag('warn', `Frame rate: name says ${nameFps}, file declares ${+eff.toFixed(3)}`, `ttp:frameRate="${declared}"${r.fileFps !== Number(declared) ? ' with frameRateMultiplier' : ''}.`);
 
-  // Same checks as the player's sidebar filters.
+  // Encoding damage: text that went through the wrong character encoding somewhere. Either "�"
+  // (characters that couldn't be decoded) or UTF-8 read as Latin-1 ("Ã©" for "é", "â€™" for "’").
+  {
+    const body = String(parsed.text || '').replace(/<[^>]*>/g, '');
+    const repl = (body.match(/\uFFFD/g) || []).length;
+    const moji = (body.match(/[ÃÂ][\u0080-\u00BF]|â€[\u0080-\u00BF™œ\u201A-\u201E\u2020-\u2022\u2026\u2030\u2039\u203A]/g) || []).length;
+    r.encodingDamage = { repl, moji };
+    if (repl) flag('error', `Encoding damage: ${repl} “�” character${repl === 1 ? '' : 's'}`, 'Characters that could not be decoded: the text went through the wrong encoding before this file was made.');
+    if (moji) flag('error', `Encoding damage: ${moji} garbled character${moji === 1 ? '' : 's'} (like “Ã©” for “é”)`, 'UTF-8 text that was read as Latin-1 / Windows-1252 somewhere along the way.');
+  }
+
+  // Same checks as the player's filters (counted for the QC tab's limits).
   r.checks = null;
   if (typeof CueCheck === 'undefined') return;
   let list = null;
@@ -444,6 +455,5 @@ function cueChecks(r, parsed, flag) {
   r.cueList = list;                                   // kept so a change of CPS/CPL limit can re-count
   countChecks(r);
   const c = r.checks;
-  if (c.critical) flag('warn', `${c.critical} very short cue${c.critical === 1 ? '' : 's'} with long lines`, `Under ${CueCheck.SHORT_DURATION_SECONDS}s with ${CueCheck.SHORT_DURATION_CRITICAL_CHARS}+ characters. Open in the player and use the “Critical” filter.`);
-  if (c.odd) flag('warn', `${c.odd} cue${c.odd === 1 ? '' : 's'} with invisible/odd characters`, 'Zero-width, control or replacement characters. Use the “Odd Chars” filter in the player.');
+  // (Per-event checks live in the QC tab; the Conform page is about names, labels and languages.)
 }

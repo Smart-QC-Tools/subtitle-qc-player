@@ -204,7 +204,7 @@ body.drag main{outline:3px dashed var(--accent);outline-offset:-12px}
 .tag-novideo{font-size:11.5px;color:var(--warn)}
 table{border-collapse:collapse;width:100%;table-layout:fixed}
 col.c-dot{width:30px} col.c-file{width:27%} col.c-type{width:76px} col.c-label{width:86px} col.c-exp{width:12%}
-col.c-det{width:10%} col.c-oth{width:8%} col.c-cue{width:120px} col.c-flags{width:auto} col.c-play{width:46px}
+col.c-det{width:11%} col.c-oth{width:10%} col.c-flags{width:auto} col.c-play{width:46px}
 thead th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 td{padding:11px 10px;border-bottom:1px solid var(--border);vertical-align:top;overflow-wrap:anywhere}
 tbody tr:last-child td{border-bottom:0}
@@ -321,6 +321,10 @@ ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul
 .vrow.sel .vt{white-space:normal}
 button.toggle{border-color:var(--border)} button.toggle.on{background:rgba(111,168,255,.15);border-color:var(--accent);color:var(--text)}
 .common-l{font-weight:650;color:var(--text);font-size:14px;margin-right:6px}
+#commonHead{display:flex;flex-direction:column;justify-content:center;margin-right:8px}
+.title-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:1px}
+select:focus{outline:none}
+select:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:1px}
 .lph .common-l{font-size:12.5px;text-transform:none;letter-spacing:0}
 .vinfo{padding:8px 14px;border-bottom:1px solid var(--border);min-height:52px;background:rgba(0,0,0,.15)}
 .vi-name{font-size:12px;overflow-wrap:anywhere;font-weight:600}
@@ -480,7 +484,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
       <div id="langFilter" class="langfilter" hidden></div>
       <div id="progress" hidden></div>
       <div id="groups"></div>
-      <div class="foot">Click a row for details · ▶ opens it in the player · Cue checks <span class="ft ft-issue">red</span> C over the line-length limit · L too many lines · O overlaps · D duration · ! very short with long line · # odd characters · M mixed alignment · <span class="ft ft-warn">amber</span> S over the CPS limit · G 1-frame gaps · ↑ raised · ↔ left/right</div>
+      <div class="foot">Click a row for details · ▶ opens it in the player</div>
     </div>
   </section>
 
@@ -637,12 +641,13 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
           <ul>
             <li><b>Label</b>: the language code inside the file, checked against the reference language list (<b>Expected</b>).</li>
             <li><b>Detected</b>: the language the text is actually in, and any <b>other languages</b> found in it.</li>
-            <li><b>Cue checks</b>: how many events have each flag (same as the player). <b>Checks</b>: anything else worth knowing, such as the file name saying a different language, or a season / episode that doesn't match the video or the folder.</li>
+            <li><b>Checks</b>: anything else worth knowing, such as the file name saying a different language, a season / episode that doesn't match the video or the folder, or encoding damage (“�” or garbled characters like “Ã©”).</li>
+            <li>Per-event checks (reading speed, line length, overlaps …) are on the QC tab.</li>
             <li>Click a row for details; ▶ opens the file in the player.</li>
           </ul>
           <h4>Grouping &amp; matching</h4>
           <ul>
-            <li>Group by the language in the file names, or by episode. The language buttons show only the languages you pick (any number); “Show all” clears them.</li>
+            <li>Group by the language in the file names, or by episode. The language buttons show one language at a time; All shows everything.</li>
             <li>Subtitle files are matched to videos by production code, season / episode or episode title. “Matched only” hides files without a match, on both tabs.</li>
             <li>In the player, switching episodes keeps the same language when there is one; switching subtitle files keeps the playback position.</li>
           </ul>

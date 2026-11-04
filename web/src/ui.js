@@ -5,7 +5,7 @@ const state = {
   subs: [], videos: [],
   subFolder: '', vidFolder: '', subHandle: null, vidHandle: null,
   groupBy: Store.get('groupBy') === 'episode' ? 'episode' : 'name', issuesOnly: false,
-  open: new Set(), langSel: new Set(),   // langSel: languages picked with the filter buttons (none = all)
+  open: new Set(), lang: '',   // language picked with the filter buttons ('' = all)
   selectedVideo: null, busy: false, matchedOnly: Store.get('matchedOnly') !== 'all', ignoredVideos: [], subCount: 0, vidCount: 0,
 };
 const STATUS_OPTS = [['', 'Not reviewed'], ['progress', 'In progress'], ['done', 'Done'], ['issues', 'Has issues']];
@@ -272,6 +272,30 @@ function videoTitle(v, opts) { return Match.episodeTitle(videoInfo(v), opts || (
 // "Matched only" applies once both folders are loaded.
 function filterActive() { return state.matchedOnly && state.videos.length > 0 && state.subs.length > 0; }
 function visibleVideos() { return filterActive() ? state.videos.filter(v => subsForVideo(v.name).length) : state.videos; }
+// The title for the top of the Conform page, from the video names and the subtitle names. A short
+// abbreviation ("OGZ") gives way to a real name ("LawOrderOrganizedCrime" → Law Order Organized Crime);
+// otherwise the fuller name wins (videos when equal).
+function showTitle() {
+  const pick = infos => {
+    const n = new Map();
+    for (const i of infos) { if (!i || !i.showWords || !i.showWords.length) continue; const k = i.showWords.join(' '); const e = n.get(k) || { i, c: 0 }; e.c++; n.set(k, e); }
+    const best = [...n.values()].sort((a, b) => b.c - a.c)[0];
+    return best && best.c >= infos.length / 2 ? best.i : null;   // the name most files share
+  };
+  const seasonOf = infos => { const s = infos.filter(Boolean).map(i => i.season); return s.length && s[0] != null && s.every(x => x === s[0]) ? s[0] : null; };
+  const vInfos = visibleVideos().map(videoInfo), sInfos = state.subs.map(r => r.nameInfo).filter(Boolean);
+  const v = pick(vInfos), s = pick(sInfos);
+  const abbrev = i => i.showWords.length === 1 && i.showWords[0].length <= 4;
+  let best = v || s;
+  if (v && s && v.showWords.join('') !== s.showWords.join('')) {
+    if (abbrev(v) && !abbrev(s)) best = s;
+    else if (abbrev(s) && !abbrev(v)) best = v;
+    else best = s.showWords.length > v.showWords.length ? s : v;
+  }
+  if (!best) return '';
+  const season = seasonOf(vInfos.length ? vInfos : sInfos);
+  return Match.showName(best) + (season != null ? ` · Season ${season}` : '');
+}
 function computeCommon() {
   const vids = visibleVideos();
   const infos = vids.length ? vids.map(videoInfo) : state.subs.map(r => r.nameInfo).filter(Boolean);
@@ -309,12 +333,10 @@ function renderHeader() {
   $('#rescan').hidden = !(state.subHandle || state.vidHandle);
   renderToggle();
   const res = state.subs, n = s => res.filter(r => r.severity === s).length;
-  $('#summary').innerHTML = res.length ? `
-    <span class="chip">${res.length} subtitle file${res.length === 1 ? '' : 's'}</span>
+  // Counts only (videos first); errors / warnings / OK are shown on each group.
+  $('#summary').innerHTML = (state.videos.length || res.length) ? `
     ${state.videos.length ? `<span class="chip">${state.videos.length} video${state.videos.length === 1 ? '' : 's'}</span>` : ''}
-    <span class="chip sev-error">${n('error')} error${n('error') === 1 ? '' : 's'}</span>
-    <span class="chip sev-warn">${n('warn')} warning${n('warn') === 1 ? '' : 's'}</span>
-    <span class="chip sev-ok">${n('ok') + n('info')} OK</span>` : '';
+    ${res.length ? `<span class="chip">${res.length} subtitle file${res.length === 1 ? '' : 's'}</span>` : ''}` : '';
 }
 function renderAll() { computeCommon(); renderHeader(); renderQC(); if (document.body.dataset.tab === 'player') renderLibrary(); }
 function renderToggle() {
@@ -326,8 +348,8 @@ function renderToggle() {
 }
 
 // ------------------------------------------------------------ render: QC tab
-const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-exp"><col class="c-det"><col class="c-oth"><col class="c-cue"><col class="c-flags"><col class="c-play"></colgroup>`;
-const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Expected (list)</th><th>Detected</th><th>Other languages</th><th>Cue checks</th><th>Checks</th><th></th></tr></thead>`;
+const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-exp"><col class="c-det"><col class="c-oth"><col class="c-flags"><col class="c-play"></colgroup>`;
+const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Expected (list)</th><th>Detected</th><th>Other languages</th><th>Checks</th><th></th></tr></thead>`;
 
 function renderQC() {
   const empty = !state.subs.length && !state.busy;
@@ -337,24 +359,25 @@ function renderQC() {
   if (empty && !state.videos.length) { host.innerHTML = ''; return; }
   const matched = filterActive() ? state.subs.filter(r => r.video) : state.subs;
   renderLangFilter(matched);
-  const list = state.langSel.size ? matched.filter(r => state.langSel.has(langKey(r))) : matched;
+  const list = state.lang ? matched.filter(r => langKey(r) === state.lang) : matched;
   const hiddenSubs = state.subs.length - matched.length;
-  $('#commonHead').innerHTML = state.common ? `<span class="common-l">${esc(state.common.label)}</span>` : '';
+  const tl = showTitle();
+  $('#commonHead').innerHTML = tl ? `<div class="title-l">Title</div><span class="common-l">${esc(tl)}</span>` : '';
   $('#hiddenNote').textContent = hiddenSubs ? `${hiddenSubs} unmatched subtitle file${hiddenSubs === 1 ? '' : 's'} hidden` : '';
   let html = '';
   for (const g of groupsFor(list)) {
     if (filterActive() && state.groupBy === 'episode' && (!g.video || !g.rows.length)) continue;
-    if (state.langSel.size && !g.rows.length) continue;
+    if (state.lang && !g.rows.length) continue;
     const rows = state.issuesOnly ? g.rows.filter(r => r.severity === 'error' || r.severity === 'warn') : g.rows;
     if (state.issuesOnly && !rows.length) continue;
-    const e = g.rows.filter(r => r.severity === 'error').length, w = g.rows.filter(r => r.severity === 'warn').length;
+    const e = g.rows.filter(r => r.severity === 'error').length, w = g.rows.filter(r => r.severity === 'warn').length, ok = g.rows.length - e - w;
     const status = Store.get('status:' + g.key) || '';
     const meta = g.video ? `<span class="muted small" title="${esc(g.video)}">🎬 ${esc(g.video)}</span>` : g.noVideo ? `<span class="tag-novideo">no matching video</span>` : '';
     html += `<section class="card st-${status || 'none'}" data-g="${esc(g.key)}">
       <div class="card-h">
         <div class="ct"><div class="title">${esc(g.title)} ${g.code ? `<code>${esc(g.code)}</code>` : ''}</div>${meta}</div>
         <span class="muted small">${g.rows.length} file${g.rows.length === 1 ? '' : 's'}</span>
-        ${e ? `<span class="chip sev-error sm">${e} error${e === 1 ? '' : 's'}</span>` : ''}${w ? `<span class="chip sev-warn sm">${w} warning${w === 1 ? '' : 's'}</span>` : ''}
+        ${e ? `<span class="chip sev-error sm">${e} error${e === 1 ? '' : 's'}</span>` : ''}${w ? `<span class="chip sev-warn sm">${w} warning${w === 1 ? '' : 's'}</span>` : ''}${ok ? `<span class="chip sev-ok sm">${ok} OK</span>` : ''}
         <span class="spacer"></span>
         ${state.groupBy === 'episode' ? `<select class="rstatus" data-g="${esc(g.key)}" title="Review status">${STATUS_OPTS.map(([v, l]) => `<option value="${v}"${v === status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}
         ${g.video ? `<button class="ghost open-video" data-v="${esc(g.video)}">▶ Open in player</button>` : ''}
@@ -366,7 +389,7 @@ function renderQC() {
   host.innerHTML = html || `<div class="none">No issues found.</div>`;
 }
 
-// Language filter buttons: one per language found in the file names (plus "no language"), any number on.
+// Language filter buttons: All, then one per language found in the file names (plus "no language"). One at a time.
 const langKey = r => (r.fileLang && r.fileLang.code) ? r.fileLang.code.toLowerCase() : '~';
 function renderLangFilter(list) {
   const host = $('#langFilter');
@@ -377,13 +400,13 @@ function renderLangFilter(list) {
     if (!groups.has(k)) groups.set(k, { k, n: 0, name: k === '~' ? 'No language in file name' : (langLabel({ fileLang: r.fileLang }) || r.fileLang.code) });
     groups.get(k).n++;
   }
-  for (const k of [...state.langSel]) if (!groups.has(k)) state.langSel.delete(k);   // languages no longer present
+  if (state.lang && !groups.has(state.lang)) state.lang = '';   // that language is no longer present
   const items = [...groups.values()].sort((a, b) => (a.k === '~') - (b.k === '~') || a.name.localeCompare(b.name));
   host.hidden = items.length < 2;
   // Long names shortened: every word but the last becomes an initial (Brazilian Portuguese → B. Portuguese).
   const short = g => g.k === '~' ? 'No language' : g.name.split(/\s+/).map((w, i, a) => i < a.length - 1 ? w[0] + '.' : w).join(' ');
-  host.innerHTML = items.map(g => `<button type="button" class="lchip${state.langSel.has(g.k) ? ' on' : ''}${g.k === '~' ? ' lnone' : ''}" data-k="${esc(g.k)}" title="${esc(g.name)}">${esc(short(g))} <span>${g.n}</span></button>`).join('')
-    + (state.langSel.size ? `<button type="button" class="linkbtn lclear">Show all</button>` : '');
+  host.innerHTML = `<button type="button" class="lchip${state.lang ? '' : ' on'}" data-k="">All <span>${list.length}</span></button>`
+    + items.map(g => `<button type="button" class="lchip${state.lang === g.k ? ' on' : ''}${g.k === '~' ? ' lnone' : ''}" data-k="${esc(g.k)}" title="${esc(g.name)}">${esc(short(g))} <span>${g.n}</span></button>`).join('');
 }
 
 function cueChecksHtml(c) {
@@ -423,7 +446,6 @@ function rowHtml(r) {
     <td class="${expCls}">${exp}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list code: ${esc(r.match.ref.code)}</div>` : ''}</td>
     <td class="${detErr ? 'hl-error' : detWarn ? 'hl-warn' : ''}">${det}</td>
     <td>${other}</td>
-    <td class="cue">${cueChecksHtml(r.checks)}</td>
     <td class="flags">${flags || '<span class="ok">✓ OK</span>'}</td>
     <td><button class="play" data-f="${esc(r.name)}" title="Open in player">▶</button></td></tr>`;
 }
@@ -440,11 +462,11 @@ function detailHtml(r) {
   const rm = r.regionMarkers ? Object.entries(r.regionMarkers).map(([k, g]) => `<div><b>${k}</b>: ${g.total} <span class="muted">${esc(topMarkers(g))}</span></div>`).join('') : '';
   const hz = r.han && r.han.total ? `<div class="muted small">Chinese chars: ${r.han.total} · Simplified-only ${r.han.simp} · Traditional-only ${r.han.trad} · Cantonese markers ${r.han.cantonese}</div>` : '';
   const ni = r.nameInfo || {};
-  const nameBits = [ni.showWords && ni.showWords.length ? `show “${ni.showWords.join(' ')}”` : '', ni.season != null ? `season ${ni.season}` : '', ni.episode != null ? `episode ${ni.episode}` : '',
-    ni.titleWords && ni.titleWords.length ? `title “${ni.titleWords.join(' ')}”` : '', ni.codes && ni.codes.length ? `code ${ni.codes.join(', ')}` : ''].filter(Boolean).join(' · ');
-  return `<tr class="detail"><td></td><td colspan="9"><div class="dgrid">
+  const nameBits = [ni.showWords && ni.showWords.length ? `show “${Match.titleCase(ni.showWords)}”` : '', ni.season != null ? `season ${ni.season}` : '', ni.episode != null ? `episode ${ni.episode}` : '',
+    ni.titleWords && ni.titleWords.length ? `title “${Match.titleCase(ni.titleWords)}”` : '', ni.codes && ni.codes.length ? `code ${ni.codes.join(', ')}` : ''].filter(Boolean).join(' · ');
+  return `<tr class="detail"><td></td><td colspan="8"><div class="dgrid">
     <div><h4>Checks</h4><ul class="fl">${flags}</ul>
-      <h4>File</h4><div class="kv"><span>Full name</span><code class="full">${esc(r.name)}</code> <button class="mini copy" data-copy="${esc(r.name)}">Copy</button></div>
+      <h4>File</h4><div class="kv"><span>Full name</span><code class="full">${esc(r.name)}</code></div>
       <div class="kv"><span>Format</span>${esc(r.format || '—')}${r.cueCount != null ? ` · ${r.cueCount} cue${r.cueCount === 1 ? '' : 's'}` : ''}</div>
       <h4>Labels &amp; name</h4>
       <div class="kv"><span>xml:lang on &lt;tt&gt;</span><code>${esc(r.rawLabel ?? '(none)')}</code></div>
@@ -467,7 +489,7 @@ function renderLibrary() {
   const vl = $('#videoList'), sl = $('#subList');
   const vids = visibleVideos();
   const hiddenV = state.videos.length - vids.length;
-  $('#videoCount').innerHTML = (state.common ? `<span class="common-l">${esc(state.common.label)}</span> ` : '') +
+  $('#videoCount').innerHTML = (showTitle() ? `<span class="common-l">${esc(showTitle())}</span> ` : '') +
     (state.videos.length ? `<span class="muted">${vids.length}${hiddenV ? ` of ${state.videos.length}` : ''}</span>` : '');
   // fixed info line for the selected video
   const sv = state.videos.find(v => v.name === state.selectedVideo);
@@ -601,11 +623,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   $('#groupBy').value = state.groupBy;
-  $('#groupBy').onchange = e => { state.groupBy = e.target.value; Store.set('groupBy', state.groupBy); renderQC(); };
+  $('#groupBy').onchange = e => { e.target.blur(); state.groupBy = e.target.value; Store.set('groupBy', state.groupBy); renderQC(); };
   $('#langFilter').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.classList.contains('lclear')) state.langSel.clear();
-    else { const k = b.dataset.k; state.langSel.has(k) ? state.langSel.delete(k) : state.langSel.add(k); }
+    state.lang = b.dataset.k;   // one language at a time; All = ''
     renderQC();
   };
   $('#issuesOnly').onchange = e => { state.issuesOnly = e.target.checked; renderQC(); };
