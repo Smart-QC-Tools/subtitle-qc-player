@@ -92,10 +92,10 @@ final class MainView: NSView {
     func layoutPlayer(visible: Bool, stage: [Double]?, videoRect: [Double]?) {
         CATransaction.begin(); CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
-        guard visible, let s = stage, s.count == 4, let v = videoRect, v.count == 4 else { playerHost.isHidden = true; return }
+        guard visible, let st = stage, st.count == 4, let vr = videoRect, vr.count == 4 else { playerHost.isHidden = true; return }
         // The page measures in its own (zoomed) units: convert to points.
         let z = Double(webView.pageZoom)
-        let s = s.map { $0 * z }, v = v.map { $0 * z }
+        let s = st.map { $0 * z }, v = vr.map { $0 * z }
         playerHost.frame = NSRect(x: s[0], y: s[1], width: s[2], height: s[3])
         // playerHost is not flipped: convert the video's top-left based rect.
         let x = v[0] - s[0], yTop = v[1] - s[1]
