@@ -251,6 +251,12 @@
     showLimits();
   });
   document.addEventListener('qc-limits', () => { showLimits(); renderFilterBar(); applyFilterVisibility(); });
+  // Scrolling over a limit changes it by one (no need to click into it first).
+  for (const el of [limCps, limCpl, limLines]) if (el) el.addEventListener('wheel', e => {
+    e.preventDefault();
+    const v = Math.min(+el.max, Math.max(+el.min, Math.round(Number(el.value) || 0) + (e.deltaY < 0 ? 1 : -1)));
+    if (String(v) !== el.value) { el.value = v; el.dispatchEvent(new Event('change')); }
+  }, { passive: false });
 
   document.body.classList.add('ev-expanded');
   // Translate sits next to the search box (it translates the rows in view).

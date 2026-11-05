@@ -9,7 +9,7 @@
 /*__PLAYER_CSS__*/
 /* ---------------- app shell (dark) ---------------- */
 :root{
-  --bg:#0b0c0e; --panel:#111215; --panel2:#16181c; --border:#25282e; --text:#e8e9ec; --dim:#8a8f99; --accent:#6fa8ff;
+  --bg:#0b0c0e; --panel:#111215; --panel2:#16181c; --border:#25282e; --text:#e8e9ec; --dim:#8a8f99; --accent:#6fa8ff; --ctl:#4f86e8; --ctl-hi:#6d9cf0; --val:#b7a6ff; --val-bg:rgba(183,166,255,.14);
   --err:#ff7b7b; --err-bg:rgba(255,90,90,.13); --warn:#ffc15c; --warn-bg:rgba(255,179,71,.13);
   --ok:#7ad78e; --ok-bg:rgba(122,215,142,.12); --info:#8fb3ff; --info-bg:rgba(111,168,255,.13);
 }
@@ -23,7 +23,7 @@ header.top{position:sticky;top:0;z-index:20;background:var(--panel);backdrop-fil
 .sw-wrap{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim);cursor:pointer;user-select:none}
 .sw{position:relative;width:34px;height:18px;border-radius:999px;border:1px solid var(--border);background:#2a2d34;cursor:pointer;padding:0;transition:background .15s}
 .sw .knob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#c9ccd3;transition:left .15s}
-.sw.on{background:var(--accent);border-color:var(--accent)} .sw.on .knob{left:18px;background:#fff}
+.sw.on{background:var(--ctl);border-color:var(--ctl)} .sw.on .knob{left:18px;background:#fff}
 .textbtn{background:none;border:0;color:var(--dim);font:inherit;font-size:13px;font-weight:500;cursor:pointer;padding:4px 2px;letter-spacing:.2px}
 .textbtn:hover{color:var(--text)}
 .vol-ic{display:inline-flex;color:var(--dim);margin-left:2px}
@@ -42,7 +42,7 @@ header.top{padding:0 28px!important;height:68px;box-sizing:border-box;flex-wrap:
 .tabs{gap:0!important;padding:0!important;border-radius:7px!important;overflow:hidden}
 .tab{border-radius:0!important;padding:5px 15px!important}
 .tab + .tab{border-left:1px solid var(--border)!important}
-.tab.active{background:#4f86e8!important;color:#fff!important}
+.tab.active{background:var(--ctl)!important;color:#fff!important}
 .tabs{border:1px solid #5a6273!important;background:#1c1f26!important;box-shadow:0 1px 6px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)}
 .tab{color:#c3c9d4!important}
 .hdr-left{width:calc(var(--left-w, 270px) - 40px);flex:none;display:flex;align-items:center}
@@ -95,9 +95,9 @@ header.top{padding-left:40px!important}
 .pb-play:hover{color:#fff}
 .pb-play svg{width:20px;height:20px}
 .tc{border:0!important;background:none!important;padding:0!important;margin:0!important;color:#7fb0ff!important;font-size:22px!important}
-#tcDisplay{outline:none!important;box-shadow:none!important;cursor:pointer;caret-color:#7fb0ff;white-space:nowrap}
+#tcDisplay{outline:none!important;box-shadow:none!important;cursor:pointer;caret-color:var(--val);white-space:nowrap;color:var(--val)!important}
 #tcDisplay:empty::before{content:'\200b'}
-#tcDisplay::selection,#offsetInput::selection{background:rgba(127,176,255,.35);color:#fff}
+#tcDisplay::selection,#offsetInput::selection{background:rgba(183,166,255,.35);color:#fff}
 #tab-player .qcgrid{gap:0;margin:0}
 #tab-player .lpanel,#tab-player .field,#tab-player .sidebar,#tab-player .timeline,#tab-player .stage{border:0;border-radius:0;margin:0}
 #tab-player .qcleft{gap:6px;border-right:1px solid var(--border);background:var(--bg)}
@@ -246,6 +246,17 @@ td.hl-error code,td.hl-warn code{background:transparent}
 .q-place{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)}
 .q-warn{background:rgba(240,168,48,.16);color:#f5bd5c;box-shadow:inset 0 0 0 1px rgba(240,168,48,.45)}
 .filter-chip.f-warn.active{border-color:#f0a830;background:rgba(240,168,48,.15)}
+#filterBar .filter-chip{font-size:12px;padding:4px 11px 4px 10px;color:#c3c9d4;background:var(--panel2);border-color:#30343c;display:inline-flex;align-items:center;gap:6px;line-height:1.3}
+#filterBar .filter-chip:hover{color:#fff;border-color:#454b55}
+#filterBar .filter-chip::before{content:'';width:7px;height:7px;border-radius:50%;flex:none;background:#8a8f99}
+#filterBar .filter-chip.f-issue::before{background:#ff6b6b}
+#filterBar .filter-chip.f-warn::before,#filterBar .filter-chip.f-place::before{background:#f0a830}
+#filterBar .filter-chip.active{color:#fff}
+#filterBar .filter-chip.empty{opacity:.4}
+/* the filters as an even grid: issues (red) on the first two rows, worth-a-look (amber) and top (grey) on the third */
+#filterBar{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px!important}
+#filterBar .fb-break{display:none!important}
+#filterBar .filter-chip{justify-content:flex-start;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0!important}
 .filter-chip.empty{opacity:.45}
 .q-neutral{background:rgba(255,255,255,.06);color:#aab0ba;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 .cue-item.has-issue,.cue-item.has-issue.active{border-left:3px solid #ff5c5c;padding-left:11px}
@@ -292,12 +303,12 @@ ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul
 .pbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .pb-btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;min-width:32px;height:26px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
 .pb-btn:hover{border-color:var(--accent)} .pb-btn.sm{min-width:26px;height:24px;padding:0}
-#volSlider{width:90px;-webkit-appearance:none;appearance:none;height:14px;background:transparent;cursor:default;--v:100%;--fill:#5f93e0;--rest:#3a3f48;--thumb:#c9ccd2}
+#volSlider{width:90px;-webkit-appearance:none;appearance:none;height:14px;background:transparent;cursor:default;--v:100%;--fill:var(--ctl);--rest:#3a3f48;--thumb:#c9ccd2}
 #volSlider::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--fill) 0 var(--v),var(--rest) var(--v) 100%)}
 #volSlider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--thumb);margin-top:-4px;border:0}
 #volSlider::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--fill) 0 var(--v),var(--rest) var(--v) 100%)}
 #volSlider::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--thumb);border:0}
-#volSlider:hover,#volSlider:active{--fill:#7fb0ff;--rest:#4a505a}
+#volSlider:hover,#volSlider:active{--fill:var(--ctl-hi);--rest:#4a505a}
 #volSlider::-webkit-slider-thumb:hover,#volSlider:active::-webkit-slider-thumb{background:#ffffff}
 #volSlider::-moz-range-thumb:hover,#volSlider:active::-moz-range-thumb{background:#ffffff}
 #overviewCanvas{display:block;width:100%;height:16px;margin-top:5px;border-radius:4px;cursor:default}
@@ -372,7 +383,7 @@ select:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:1px}
 #subtitleOverlay span,#subtitleOverlay .fallback-line{text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 3px rgba(0,0,0,.9),0 2px 4px rgba(0,0,0,.6)}
 #sidebar .cue-time{font-size:12px}
 #tab-player .pbar{position:relative}
-.speed-badge{position:absolute;top:50%;transform:translateY(-50%);font:600 12.5px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#7fb0ff;background:rgba(127,176,255,.12);border-radius:4px;padding:2px 6px;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
+.speed-badge{position:absolute;top:50%;transform:translateY(-50%);font:600 12.5px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--val);background:var(--val-bg);border-radius:4px;padding:2px 6px;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
 /* ---- Mac app: the picture is drawn natively underneath the page, so the stage is see-through there */
 html.native, html.native body[data-tab=player]{background:transparent!important}
 html.native.has-native-video body[data-tab=player] .qcgrid .stage{background:transparent!important}
@@ -391,8 +402,10 @@ html.native .web-only{display:none}
 .exp-btn svg{width:14px;height:14px}
 .ev-lim{display:none;align-items:center;gap:10px}
 .ev-lim label{display:flex;align-items:center;gap:4px;font-size:11px;letter-spacing:.4px;color:var(--dim)}
-.ev-lim #limLines{width:40px}
-.ev-lim input{width:50px;font-size:12px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;text-transform:none}
+.ev-lim input{width:2.6ch;font-family:inherit;font-size:13px;font-weight:600;padding:1px 2px;background:none;border:0;border-bottom:1px solid transparent;border-radius:0;color:var(--val);text-align:center;cursor:ns-resize;-moz-appearance:textfield;appearance:textfield;font-variant-numeric:tabular-nums}
+.ev-lim input::-webkit-outer-spin-button,.ev-lim input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ev-lim input:hover{border-bottom-color:rgba(183,166,255,.45)}
+.ev-lim input:focus{outline:none;border-bottom-color:var(--val);cursor:text}
 .ev-wrap{display:none}
 html.native .translate-btn{display:none}   /* Chrome-only feature */
 body.ev-expanded #sidebar{overflow:hidden;flex-direction:column}
@@ -535,9 +548,9 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         <div class="sidebar-sticky">
           <div class="sidebar-header"><span>Subtitle events</span><span class="sh-count" id="evCount"></span><span class="spacer"></span>
             <span class="ev-lim" title="Limits for the red flags, here and on the Conform page">
-              <label title="Most lines allowed on screen (2–4)">Lines <input type="number" id="limLines" min="2" max="4" step="1"></label>
-              <label title="Characters per second limit (3–40)">CPS <input type="number" id="limCps" min="3" max="40" step="1"></label>
-              <label title="Characters per line limit (10–60)">CPL <input type="number" id="limCpl" min="10" max="60" step="1"></label></span>
+              <label title="Most lines allowed on screen (2–4). Scroll, use ↑ ↓, or click and type">Lines <input type="number" id="limLines" min="2" max="4" step="1"></label>
+              <label title="Characters per second limit (3–40). Scroll, use ↑ ↓, or click and type">CPS <input type="number" id="limCps" min="3" max="40" step="1"></label>
+              <label title="Characters per line limit (10–60). Scroll, use ↑ ↓, or click and type">CPL <input type="number" id="limCpl" min="10" max="60" step="1"></label></span>
 </div>
           <div class="search-bar">
             <input type="text" id="searchInput" placeholder="Search cue text — paste a character to find more of it" />
