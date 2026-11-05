@@ -325,17 +325,17 @@ function renderHeader() {
     const kind = el.id === 'subFolderName' ? 'subs' : 'videos', box = el.parentElement;
     el.classList.toggle('unset', !name);
     box.classList.toggle('empty', !name);
-    el.textContent = name ? `${name} · ${n} file${n === 1 ? '' : 's'}${extra || ''}` : 'Select folder…';
     const h = HandleStore.cache[kind];
     const what = kind === 'subs' ? 'subtitles' : 'videos';
+    // A folder from last time that the browser needs a click to open again: the field offers it.
+    const canReopen = !name && !!h && !!(window.showDirectoryPicker || NATIVE);
+    box.dataset.reopen = canReopen ? '1' : '';
+    $(kind === 'subs' ? '#subReopen' : '#vidReopen').hidden = !canReopen;
+    el.textContent = name ? `${name} · ${n} file${n === 1 ? '' : 's'}${extra || ''}` : canReopen ? `↺ Reopen “${h.name}”` : 'Select folder…';
     el.title = '';
-    box.title = name ? (NATIVE && h && h.path ? h.path : `${name}\nBrowsers only reveal the folder's name, not its full path.`) + `\nClick to select another ${what} folder.` : `Select the ${what} folder (or drop it on the window)`;
+    box.title = name ? (NATIVE && h && h.path ? h.path : `${name}\nBrowsers only reveal the folder's name, not its full path.`) + `\nClick to select another ${what} folder.`
+      : canReopen ? `Reopen the ${what} folder used last time (“${h.name}”)` : `Select the ${what} folder (or drop it on the window)`;
   };
-  for (const [kind, id, cur] of [['subs', '#subReopen', state.subFolder], ['videos', '#vidReopen', state.vidFolder]]) {
-    const h = HandleStore.cache[kind], el = $(id);
-    el.hidden = !(h && !cur && (window.showDirectoryPicker || NATIVE));
-    if (h) el.textContent = `↺ Reopen “${h.name}”`;
-  }
   fold($('#subFolderName'), state.subFolder, state.subCount);
   fold($('#vidFolderName'), state.vidFolder, state.videos.length, state.ignoredVideos.length ? ` (+${state.ignoredVideos.length} ignored)` : '');
   $('#rescan').hidden = !(state.subHandle || state.vidHandle);
@@ -591,22 +591,21 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#pickVids').onclick = () => pick('videos');
   // The folder fields themselves are the buttons (Reopen inside them keeps its own action).
   document.querySelectorAll('.folder[data-kind]').forEach(box => {
-    box.addEventListener('click', e => { if (!e.target.closest('#subReopen, #vidReopen')) pick(box.dataset.kind); });
-    box.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === box) { e.preventDefault(); pick(box.dataset.kind); } });
+    const act = e => (box.dataset.reopen && !e.target.closest('.fl-other')) ? reopen(box.dataset.kind) : pick(box.dataset.kind);
+    box.addEventListener('click', act);
+    box.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === box) { e.preventDefault(); act(e); } });
   });
   $('#subDirInput').onchange = e => onDirInput('subs', e);
   $('#vidDirInput').onchange = e => onDirInput('videos', e);
   $('#rescan').onclick = rescan;
   // New CPS / line-length limits: re-count the Conform page too.
   document.addEventListener('qc-limits', () => { state.subs.forEach(countChecks); renderQC(); });
-  $('#subReopen').onclick = () => reopen('subs');
   $('#helpBtn').onclick = () => { $('#helpModal').hidden = false; };
   $('#helpClose').onclick = () => { $('#helpModal').hidden = true; };
   $('#helpModal').addEventListener('click', e => { if (e.target.id === 'helpModal') $('#helpModal').hidden = true; });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#helpModal').hidden = true; });
   $('#matchToggle').onclick = () => { state.matchedOnly = !state.matchedOnly; Store.set('matchedOnly', state.matchedOnly ? 'matched' : 'all'); renderAll(); };
   $('#vidInfo').addEventListener('click', e => { const exc = e.target.closest('button.excl'); if (exc) includeVideo(exc.dataset.n, false); });
-  $('#vidReopen').onclick = () => reopen('videos');
   Promise.all([HandleStore.load('subs'), HandleStore.load('videos')]).then(async () => {
     renderHeader();
     // The app can reopen the last folders straight away (a browser needs a click for permission).

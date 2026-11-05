@@ -59,8 +59,13 @@ header.top{padding-left:40px!important}
 .folder .fl-ic{flex:none;color:var(--dim)}
 .folder.empty{background:rgba(111,168,255,.08)!important;border-color:rgba(111,168,255,.35)!important}
 .folder.empty:hover{background:rgba(111,168,255,.14)!important;border-color:rgba(111,168,255,.6)!important}
-.reopen{margin-left:8px;font:inherit;font-size:12px;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--dim);cursor:pointer;white-space:nowrap}
-.reopen:hover{color:var(--text);border-color:#4a5568}
+/* Fixed width, so nothing beside the fields moves whatever they say; long names end in "…". */
+.folder{width:228px;flex:none}
+.folder .fl-n{flex:1 1 auto;min-width:0;max-width:none!important}
+/* A folder to reopen (browser): the field reopens it; the small folder icon picks a different one. */
+.fl-other{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:22px;margin:-2px -6px -2px 0;padding:0;border:0;border-radius:5px;background:none;color:#7fb0ff;cursor:pointer}
+.fl-other:hover{background:rgba(111,168,255,.2);color:#cfe0ff}
+.fl-other[hidden]{display:none}
 .folder.empty .fl-ic,.folder.empty .fl-n.unset{color:#7fb0ff!important;font-weight:500}
 .folder .fl-n{color:#f0f2f5!important;font-weight:550}
 .folder .fl-n.unset{color:var(--dim)!important;font-weight:400}
@@ -465,9 +470,9 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
 <header class="top">
   <div class="hdr-left"><nav class="tabs"><button class="tab active" data-tab="qc">Conform</button><button class="tab" data-tab="player">QC</button></nav></div>
   <span class="fl-lab"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor" stroke="none"/></svg>Videos</span>
-  <div class="folder empty" data-kind="videos" role="button" tabindex="0"><svg class="fl-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span class="fl-n unset" id="vidFolderName">Select folder…</span><button class="btn sm" id="pickVids" hidden>Choose…</button></div><button type="button" class="reopen" id="vidReopen" hidden></button>
+  <div class="folder empty" data-kind="videos" role="button" tabindex="0"><svg class="fl-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span class="fl-n unset" id="vidFolderName">Select folder…</span><button class="btn sm" id="pickVids" hidden>Choose…</button><button type="button" class="fl-other" id="vidReopen" hidden title="Select a different folder"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M12 11v5M9.5 13.5h5"/></svg></button></div>
   <span class="fl-lab sub"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17h-9l-4.5 3.5V17H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"/><path d="M7 9.5h10M7 13h6"/></svg>Subtitles</span>
-  <div class="folder empty" data-kind="subs" role="button" tabindex="0"><svg class="fl-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span class="fl-n unset" id="subFolderName">Select folder…</span><button class="btn sm" id="pickSubs" hidden>Choose…</button></div><button type="button" class="reopen" id="subReopen" hidden></button>
+  <div class="folder empty" data-kind="subs" role="button" tabindex="0"><svg class="fl-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span class="fl-n unset" id="subFolderName">Select folder…</span><button class="btn sm" id="pickSubs" hidden>Choose…</button><button type="button" class="fl-other" id="subReopen" hidden title="Select a different folder"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M12 11v5M9.5 13.5h5"/></svg></button></div>
   <label class="sw-wrap" for="matchToggle"><span>Matched only</span><button class="sw" id="matchToggle" role="switch" aria-checked="true"><span class="knob"></span></button></label>
   <button class="btn sm" id="rescan" hidden title="Re-read both folders">↻ Rescan</button>
   <span class="spacer"></span>
