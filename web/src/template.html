@@ -9,7 +9,7 @@
 /*__PLAYER_CSS__*/
 /* ---------------- app shell (dark) ---------------- */
 :root{
-  --bg:#0b0c0e; --panel:#111215; --panel2:#16181c; --border:#25282e; --text:#e8e9ec; --dim:#8a8f99; --accent:#6fa8ff; --ctl:#4f86e8; --ctl-hi:#6d9cf0; --val:#b7a6ff; --val-bg:rgba(183,166,255,.14);
+  --bg:#0b0c0e; --panel:#111215; --panel2:#16181c; --border:#25282e; --text:#e8e9ec; --dim:#8a8f99; --accent:#6fa8ff; --ctl:#4f86e8; --ctl-hi:#6d9cf0; --val:#7fb0ff; --val-bg:rgba(127,176,255,.12);
   --err:#ff7b7b; --err-bg:rgba(255,90,90,.13); --warn:#ffc15c; --warn-bg:rgba(255,179,71,.13);
   --ok:#7ad78e; --ok-bg:rgba(122,215,142,.12); --info:#8fb3ff; --info-bg:rgba(111,168,255,.13);
 }
@@ -97,7 +97,7 @@ header.top{padding-left:40px!important}
 .tc{border:0!important;background:none!important;padding:0!important;margin:0!important;color:#7fb0ff!important;font-size:22px!important}
 #tcDisplay{outline:none!important;box-shadow:none!important;cursor:pointer;caret-color:var(--val);white-space:nowrap;color:var(--val)!important}
 #tcDisplay:empty::before{content:'\200b'}
-#tcDisplay::selection,#offsetInput::selection{background:rgba(183,166,255,.35);color:#fff}
+#tcDisplay::selection,#offsetInput::selection{background:rgba(127,176,255,.35);color:#fff}
 #tab-player .qcgrid{gap:0;margin:0}
 #tab-player .lpanel,#tab-player .field,#tab-player .sidebar,#tab-player .timeline,#tab-player .stage{border:0;border-radius:0;margin:0}
 #tab-player .qcleft{gap:6px;border-right:1px solid var(--border);background:var(--bg)}
@@ -404,8 +404,12 @@ html.native .web-only{display:none}
 .ev-lim label{display:flex;align-items:center;gap:4px;font-size:11px;letter-spacing:.4px;color:var(--dim)}
 .ev-lim input{width:2.6ch;font-family:inherit;font-size:13px;font-weight:600;padding:1px 2px;background:none;border:0;border-bottom:1px solid transparent;border-radius:0;color:var(--val);text-align:center;cursor:ns-resize;-moz-appearance:textfield;appearance:textfield;font-variant-numeric:tabular-nums}
 .ev-lim input::-webkit-outer-spin-button,.ev-lim input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.ev-lim input:hover{border-bottom-color:rgba(183,166,255,.45)}
-.ev-lim input:focus{outline:none;border-bottom-color:var(--val);cursor:text}
+.ev-lim input{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='24' viewBox='0 0 26 24'%3E%3Cpath d='M7 2.5c.8 0 1.5.7 1.5 1.5v6.2c.2 0 .4-.1.6-.1.9 0 1.6.5 1.8 1.2.4-.3.9-.5 1.4-.5.8 0 1.5.5 1.7 1.2.3-.2.7-.3 1.1-.3 1 0 1.9.8 1.9 1.9V18c0 2.5-2 4.5-4.5 4.5H10c-1.3 0-2.5-.6-3.3-1.6L3.5 17c-.6-.7-.5-1.7.2-2.3.7-.5 1.6-.4 2.2.2l-.4-.5V4c0-.8.7-1.5 1.5-1.5z' fill='white' stroke='black' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M22 3.2l2.9 4H19.1z' fill='white' stroke='black' stroke-width='.9' stroke-linejoin='round'/%3E%3Cpath d='M22 14.8l2.9-4H19.1z' fill='white' stroke='black' stroke-width='.9' stroke-linejoin='round'/%3E%3C/svg%3E") 7 3,ns-resize;border-radius:3px;border-bottom:0}
+.ev-lim input::selection{background:rgba(127,176,255,.35);color:#fff}
+.ev-lim input:hover{background:rgba(127,176,255,.08)}
+.ev-lim input.editing{outline:none;cursor:text;background:rgba(127,176,255,.14);color:#fff}
+.ev-lim input:focus{outline:none}
+body.lim-dragging,body.lim-dragging *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='24' viewBox='0 0 26 24'%3E%3Cpath d='M7 2.5c.8 0 1.5.7 1.5 1.5v6.2c.2 0 .4-.1.6-.1.9 0 1.6.5 1.8 1.2.4-.3.9-.5 1.4-.5.8 0 1.5.5 1.7 1.2.3-.2.7-.3 1.1-.3 1 0 1.9.8 1.9 1.9V18c0 2.5-2 4.5-4.5 4.5H10c-1.3 0-2.5-.6-3.3-1.6L3.5 17c-.6-.7-.5-1.7.2-2.3.7-.5 1.6-.4 2.2.2l-.4-.5V4c0-.8.7-1.5 1.5-1.5z' fill='white' stroke='black' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M22 3.2l2.9 4H19.1z' fill='white' stroke='black' stroke-width='.9' stroke-linejoin='round'/%3E%3Cpath d='M22 14.8l2.9-4H19.1z' fill='white' stroke='black' stroke-width='.9' stroke-linejoin='round'/%3E%3C/svg%3E") 7 3,ns-resize!important;user-select:none}
 .ev-wrap{display:none}
 html.native .translate-btn{display:none}   /* Chrome-only feature */
 body.ev-expanded #sidebar{overflow:hidden;flex-direction:column}
@@ -548,9 +552,9 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         <div class="sidebar-sticky">
           <div class="sidebar-header"><span>Subtitle events</span><span class="sh-count" id="evCount"></span><span class="spacer"></span>
             <span class="ev-lim" title="Limits for the red flags, here and on the Conform page">
-              <label title="Most lines allowed on screen (2–4). Scroll, use ↑ ↓, or click and type">Lines <input type="number" id="limLines" min="2" max="4" step="1"></label>
-              <label title="Characters per second limit (3–40). Scroll, use ↑ ↓, or click and type">CPS <input type="number" id="limCps" min="3" max="40" step="1"></label>
-              <label title="Characters per line limit (10–60). Scroll, use ↑ ↓, or click and type">CPL <input type="number" id="limCpl" min="10" max="60" step="1"></label></span>
+              <label title="Most lines allowed on screen (2–4). Drag up / down, or click and type">Lines <input type="text" inputmode="numeric" id="limLines" min="2" max="4" readonly></label>
+              <label title="Characters per second limit (3–40). Drag up / down, or click and type">CPS <input type="text" inputmode="numeric" id="limCps" min="3" max="40" readonly></label>
+              <label title="Characters per line limit (10–60). Drag up / down, or click and type">CPL <input type="text" inputmode="numeric" id="limCpl" min="10" max="60" readonly></label></span>
 </div>
           <div class="search-bar">
             <input type="text" id="searchInput" placeholder="Search cue text — paste a character to find more of it" />

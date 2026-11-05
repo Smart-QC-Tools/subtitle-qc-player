@@ -244,18 +244,65 @@
   const limCps = document.getElementById('limCps'), limCpl = document.getElementById('limCpl'), limLines = document.getElementById('limLines');
   function showLimits() { if (limCps) limCps.value = CPS_LIMIT; if (limCpl) limCpl.value = CHAR_LIMIT; if (limLines) limLines.value = String(LINE_COUNT_THRESHOLD - 1); }
   showLimits();
-  for (const el of [limCps, limCpl, limLines]) if (el) el.addEventListener('change', () => {
-    // Out-of-range values snap to the nearest allowed one; anything that isn't a number is ignored.
-    const val = (inp, cur) => { const v = Number(inp.value); if (!inp.value.trim() || !isFinite(v)) return cur; return Math.min(+inp.max, Math.max(+inp.min, Math.round(v))); };
-    setLimits({ cps: val(limCps, CPS_LIMIT), cpl: val(limCpl, CHAR_LIMIT), lines: val(limLines, LINE_COUNT_THRESHOLD - 1) });
+  // Each limit is a value you can drag (press and move up / down) or click to type into, like the timecode:
+  // click and release selects it for typing; Enter applies, Esc or clicking elsewhere cancels.
+  const lo = el => +el.getAttribute('min'), hi = el => +el.getAttribute('max');
+  const clamp = (el, v) => Math.min(hi(el), Math.max(lo(el), Math.round(v)));
+  function applyLimits() {
+    const num = (el, cur) => { const v = Number(String(el.value).trim()); return el.value.trim() && isFinite(v) ? clamp(el, v) : cur; };
+    setLimits({ cps: num(limCps, CPS_LIMIT), cpl: num(limCpl, CHAR_LIMIT), lines: num(limLines, LINE_COUNT_THRESHOLD - 1) });
     showLimits();
-  });
+  }
+  function stopEditing(el, apply) {
+    if (!el.classList.contains('editing')) return;
+    el.classList.remove('editing');
+    el.readOnly = true;
+    if (apply) applyLimits(); else showLimits();
+    if (document.activeElement === el) el.blur();
+  }
+  for (const el of [limCps, limCpl, limLines]) if (el) {
+    el.addEventListener('pointerdown', e => {
+      if (el.classList.contains('editing') || e.button !== 0) return;
+      e.preventDefault();
+      const y0 = e.clientY, v0 = Number(el.value);
+      let dragged = false;
+      el.setPointerCapture(e.pointerId);
+      const move = ev => {
+        const steps = Math.trunc((y0 - ev.clientY) / 6);   // 6 px per step, up = more
+        if (!dragged && Math.abs(y0 - ev.clientY) < 3) return;
+        if (!dragged) { dragged = true; document.body.classList.add('lim-dragging'); }
+        const v = clamp(el, v0 + steps);
+        if (String(v) !== el.value) { el.value = v; applyLimits(); }
+      };
+      const up = () => {
+        el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+        document.body.classList.remove('lim-dragging');
+        if (!dragged) {   // a click: type a new value
+          el.readOnly = false; el.classList.add('editing'); el.focus(); el.select();
+        }
+      };
+      el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    });
+    el.addEventListener('keydown', e => {
+      if (!el.classList.contains('editing')) return;
+      if (e.key === 'Enter') { e.preventDefault(); stopEditing(el, true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); stopEditing(el, false); }
+      else if (e.key.length === 1 && !/\d/.test(e.key) && !e.metaKey && !e.ctrlKey) e.preventDefault();   // digits only
+      e.stopPropagation();   // typing here doesn't reach the player's shortcuts
+    });
+    el.addEventListener('blur', () => stopEditing(el, false));
+  }
+  // A click anywhere else cancels typing (some areas, like the player, keep the focus where it is).
+  document.addEventListener('pointerdown', e => {
+    for (const el of [limCps, limCpl, limLines]) if (el && el.classList.contains('editing') && e.target !== el) stopEditing(el, false);
+  }, true);
   document.addEventListener('qc-limits', () => { showLimits(); renderFilterBar(); applyFilterVisibility(); });
   // Scrolling over a limit changes it by one (no need to click into it first).
   for (const el of [limCps, limCpl, limLines]) if (el) el.addEventListener('wheel', e => {
     e.preventDefault();
-    const v = Math.min(+el.max, Math.max(+el.min, Math.round(Number(el.value) || 0) + (e.deltaY < 0 ? 1 : -1)));
-    if (String(v) !== el.value) { el.value = v; el.dispatchEvent(new Event('change')); }
+    if (el.classList.contains('editing')) return;
+    const v = clamp(el, (Number(el.value) || 0) + (e.deltaY < 0 ? 1 : -1));
+    if (String(v) !== el.value) { el.value = v; applyLimits(); }
   }, { passive: false });
 
   document.body.classList.add('ev-expanded');
