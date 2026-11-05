@@ -310,7 +310,15 @@ function setTab(t) {
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   $('#tab-qc').hidden = t !== 'qc';
   $('#tab-player').hidden = t !== 'player';
-  if (t === 'player') { renderLibrary(); Player.onShow(); }
+  if (t === 'player') {
+    renderLibrary(); Player.onShow();
+    // Nothing open yet: start with the first video in the list and its first subtitle file.
+    if (!state.selectedVideo && !Player.currentSubtitle()) {
+      const v = visibleVideos()[0];
+      if (v) selectVideo(v.name);
+      else if (state.subs.length) openSubtitle([...state.subs].sort((a, b) => langSortKey(a).localeCompare(langSortKey(b)))[0]);
+    }
+  }
 }
 function renderHeader() {
   const fold = (el, name, n, extra) => {
@@ -333,10 +341,8 @@ function renderHeader() {
   $('#rescan').hidden = !(state.subHandle || state.vidHandle);
   renderToggle();
   const res = state.subs, n = s => res.filter(r => r.severity === s).length;
-  // Counts only (videos first); errors / warnings / OK are shown on each group.
-  $('#summary').innerHTML = (state.videos.length || res.length) ? `
-    ${state.videos.length ? `<span class="chip">${state.videos.length} video${state.videos.length === 1 ? '' : 's'}</span>` : ''}
-    ${res.length ? `<span class="chip">${res.length} subtitle file${res.length === 1 ? '' : 's'}</span>` : ''}` : '';
+  // (File counts are in the folder fields; errors / warnings / OK are on each group.)
+  $('#summary').innerHTML = '';
 }
 function renderAll() { computeCommon(); renderHeader(); renderQC(); if (document.body.dataset.tab === 'player') renderLibrary(); }
 function renderToggle() {
@@ -543,7 +549,7 @@ async function selectVideo(name, { autoSub = true } = {}) {
   state.selectedVideo = name;
   if (Player.currentVideoFile() !== v.file) await Player.loadVideoFile(v.file, v.codec, v.probe);
   if (autoSub) {
-    const matched = subsForVideo(name);
+    const matched = subsForVideo(name).sort((a, b) => langSortKey(a).localeCompare(langSortKey(b)));   // same order as the list
     const curName = Player.currentSubtitle();
     if (matched.length && !matched.some(r => r.name === curName)) {
       // Keep the same language/type as the current subtitle when switching episodes.
