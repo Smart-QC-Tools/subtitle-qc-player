@@ -262,6 +262,11 @@ td.hl-error code,td.hl-warn code{background:transparent}
 #filterBar .filter-chip.f-warn.active,#filterBar .filter-chip.f-place.active{background:#e8a33a;border-color:#e8a33a;color:#1b1406}
 #filterBar .filter-chip.f-neutral.active{background:#9aa1ad;border-color:#9aa1ad;color:#15171b}
 #filterBar .filter-chip.active:hover{filter:brightness(1.08)}
+/* "All issues": every red + amber flag; set apart by a divider and a split red/amber dot */
+#filterBar .filter-chip.f-all{border-color:#5a5f69;color:#e6e9ee;font-weight:600}
+#filterBar .filter-chip.f-all::before{background:linear-gradient(90deg,#ff6b6b 50%,#f0a830 50%)}
+#filterBar .filter-chip.f-all.active{background:#e6e9ee;border-color:#e6e9ee;color:#15171b}
+#filterBar .fb-div{width:1px;align-self:stretch;margin:3px 3px;background:#3a3f48}
 #filterBar .filter-chip.active.empty{opacity:1}
 #filterBar .fb-clean{flex-basis:100%;font-size:11.5px;color:#8a909b;line-height:1.5;padding:1px 2px 0}
 #filterBar .fb-clean::before{content:'✓';color:#4cc38a;font-weight:700;margin-right:6px}
@@ -644,21 +649,22 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         <section data-h="checks" hidden>
           <h4>Colours</h4>
           <ul>
-            <li><span class="qtag q-issue">Red</span> breaks a rule: over the line-length (CPL) limit, more lines than allowed, overlap, too short or too long on screen, very short with a long line, odd (invisible / control) characters, mixed alignment.</li>
-            <li><span class="qtag q-warn">Amber</span> worth a look: reading speed over the CPS limit, unusual placement (raised, or left / right-aligned), a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine).</li>
+            <li><span class="qtag q-issue">Red</span> breaks a rule: over the line-length (CPL) limit, more lines than allowed, overlap, too short or too long on screen, odd (invisible / control) characters.</li>
+            <li><span class="qtag q-warn">Amber</span> worth a look: reading speed over the CPS limit, lines of one event aligned differently, unusual placement (raised, or left / right-aligned), a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine).</li>
             <li><span class="qtag q-neutral">Grey</span> placed at the top.</li>
           </ul>
           <h4>Event table</h4>
           <ul>
             <li>In / Out turn red where events overlap; Out turns amber before a 1-frame gap. Duration is seconds:frames (2:13s), or minutes:seconds:frames from a minute up (1:05:12m).</li>
-            <li>Pos (placement) is blank for the usual bottom-centre. L / R: left / right-aligned · Mix: lines aligned differently · Raised · Top.</li>
+            <li>Pos (placement) is blank for the usual bottom-centre. L / R: left / right-aligned · Mix: lines aligned differently (amber) · Raised · Top. A very short event with a long line has its duration in a stronger red.</li>
             <li>Click a row to jump there; click a column heading to sort (again to reverse). Hover a row for the characters on each line and every flag in words.</li>
             <li>Under the player: the selected event (or the one playing) in detail, with the characters on each line.</li>
           </ul>
           <h4>Limits, filters, search</h4>
           <ul>
             <li>Lines, CPS and CPL limits are set above the table and apply everywhere, including the Conform page. CPS counts every character, spaces included, over the time on screen.</li>
-            <li>Filters show only the events with that flag; click the active one again to show everything.</li>
+            <li>Filters show only the events with that flag; click the active one again to show everything. Only checks that found something get a button; the rest are listed as clean underneath.</li>
+            <li>All issues shows every event with a red or amber flag (placement and top are not included).</li>
             <li>Search is not case-sensitive. Paste an odd character to find more of it.</li>
             <li class="web-only">Translate (Chrome 138+) puts an English translation under the events in view, using Chrome's on-device translator.</li>
           </ul>

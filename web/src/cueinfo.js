@@ -180,12 +180,11 @@
   // Filters for the event list and the table (one shared state). All are always shown, dimmed when empty.
   FILTERS.splice(0, FILTERS.length,
     { key: 'all', label: 'All', cls: null, test: () => true },
-    { key: 'issues', label: 'Issues', cls: 'f-issue', title: 'Every event with a red flag', test: c => !!(c.issues && c.issues.length) },
+    { key: 'issues', label: 'All issues', cls: 'f-all', title: 'Every event with a red or amber flag (placement and top not included)', test: c => !!((c.issues && c.issues.length) || (c.warns && c.warns.length)) },
     { key: 'chars', get label() { return `CPL > ${CHAR_LIMIT}`; }, cls: 'f-issue', get title() { return `A line longer than ${CHAR_LIMIT} characters`; }, test: c => !!c.charLimitExceeded },
     { key: 'lines', get label() { return `Lines > ${LINE_COUNT_THRESHOLD - 1}`; }, cls: 'f-issue', get title() { return `More than ${LINE_COUNT_THRESHOLD - 1} lines`; }, test: c => c.lineCount >= LINE_COUNT_THRESHOLD },
     { key: 'overlap', label: 'Overlaps', cls: 'f-issue', test: c => !!c.overlap },
     { key: 'duration', label: 'Duration', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s or over ${MAX_DURATION_SECONDS}s on screen`, test: c => !!(c.tooShort || c.tooLong) },
-    { key: 'durationCritical', label: 'Critical', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s with a line of ${SHORT_DURATION_CRITICAL_CHARS}+ characters`, test: c => !!c.tooShortCritical },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'mixed', label: 'Mixed align', cls: 'f-warn', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },

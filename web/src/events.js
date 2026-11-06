@@ -307,7 +307,7 @@
 
   // ---- Filter bar: a button only for checks that found something (an active filter keeps its button even
   // when it drops to 0); the checks that found nothing are listed on one quiet line with a green tick.
-  const FB_SHORT = { chars: 'CPL', lines: 'Lines', overlap: 'Overlaps', duration: 'Duration', durationCritical: 'Critical',
+  const FB_SHORT = { chars: 'CPL', lines: 'Lines', overlap: 'Overlaps', duration: 'Duration', 
     suspicious: 'Odd chars', mixed: 'Mixed align', cps: 'CPS', gaps: 'Gaps' };
   function evDecorateFilters(bar, current) {
     const chips = [...bar.querySelectorAll('.filter-chip')];
@@ -319,6 +319,8 @@
       b.remove();
       if (FB_SHORT[k]) clean.push(FB_SHORT[k]);
     }
+    const all = bar.querySelector('.filter-chip[data-key="issues"]');
+    if (all && all.nextElementSibling) { const d = document.createElement('span'); d.className = 'fb-div'; all.after(d); }
     if (!clean.length) return;
     const searching = !!(document.getElementById('searchInput') || {}).value;
     const line = document.createElement('div');
