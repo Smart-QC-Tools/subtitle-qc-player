@@ -145,12 +145,12 @@
     else if (c.tooShort) add('duration', `Short ${secs(c.duration)}s`, `Under ${SHORT_DURATION_SECONDS}s on screen (${c.duration.toFixed(3)}s)`);
     else if (c.tooLong) add('duration', `Long ${secs(c.duration)}s`, `Over ${MAX_DURATION_SECONDS}s on screen (${c.duration.toFixed(3)}s)`);
     if (c.hasSuspiciousChars) add('suspicious', 'Odd char', 'Contains an invisible / control / replacement character');
-    if (c.mixedAlign) add('mixed', 'Mixed align', 'Lines of this event are aligned differently');
     return out;
   }
   // Amber: worth a look, not a broken rule. Reading speed over the limit is often still readable.
   function cueWarns(c) {
     const out = [];
+    if (c.mixedAlign) out.push({ key: 'mixed', text: 'Mixed align', title: 'Lines of this event are aligned differently', kind: 'warn' });
     if (c.cpsOver) out.push({ key: 'cps', text: `CPS ${c.cps.toFixed(1)}`, title: `Fast: ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`, kind: 'warn' });
     if (!c.gapWarn) return out;
     return [...out, { key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (${formatVideoTC(c.gapNext)}): the subtitle blinks off for a single frame`, kind: 'warn' }];
@@ -187,8 +187,8 @@
     { key: 'duration', label: 'Duration', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s or over ${MAX_DURATION_SECONDS}s on screen`, test: c => !!(c.tooShort || c.tooLong) },
     { key: 'durationCritical', label: 'Critical', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s with a line of ${SHORT_DURATION_CRITICAL_CHARS}+ characters`, test: c => !!c.tooShortCritical },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
-    { key: 'mixed', label: 'Mixed align', cls: 'f-issue', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
+    { key: 'mixed', label: 'Mixed align', cls: 'f-warn', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
     { key: 'gaps', label: 'Gaps', cls: 'f-warn', title: '1-frame gaps (the subtitle blinks off for a frame)', test: c => !!c.gapWarn },
     { key: 'placement', label: 'Placement', cls: 'f-place', title: 'Raised, or left / right-aligned', test: c => !!(c.placement && (c.placement.v === 'raised' || c.placement.h === 'left' || c.placement.h === 'right')) },
     { key: 'top', label: 'Top', cls: 'f-neutral', title: 'Placed at the top', test: c => !!(c.placement && c.placement.v === 'top') },

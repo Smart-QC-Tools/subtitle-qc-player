@@ -266,17 +266,13 @@ td.hl-error code,td.hl-warn code{background:transparent}
 #filterBar .fb-clean{flex-basis:100%;font-size:11.5px;color:#8a909b;line-height:1.5;padding:1px 2px 0}
 #filterBar .fb-clean::before{content:'✓';color:#4cc38a;font-weight:700;margin-right:6px}
 #filterBar .fb-clean b{font-weight:600;color:#a3a9b3}
-/* TEMPORARY row-tint slider */
-.tint-try{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#8a909b;font-weight:400;margin-right:10px}
-.tint-try input{width:80px;accent-color:#e8a33a;margin:0}
-.tint-try span{min-width:30px;color:var(--val);font-variant-numeric:tabular-nums}
 .filter-chip.empty{opacity:.45}
 .q-neutral{background:rgba(255,255,255,.06);color:#aab0ba;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 .cue-item.has-issue,.cue-item.has-issue.active{border-left:3px solid #ff5c5c;padding-left:11px}
-.cue-item.has-issue,.cue-item.has-issue.active{background:rgba(255,120,120,var(--tint-a,.3))}
+.cue-item.has-issue,.cue-item.has-issue.active{background:rgba(255,120,120,.45)}
 .cue-item.has-warn,.cue-item.has-warn.active{border-left:3px solid #f0a830;padding-left:11px}
-.cue-item.has-warn,.cue-item.has-warn.active{background:rgba(250,190,80,var(--tint-a,.3))}
-.cue-item.has-place,.cue-item.has-place.active{background:rgba(250,190,80,var(--tint-a,.3))}
+.cue-item.has-warn,.cue-item.has-warn.active{background:rgba(250,190,80,.45)}
+.cue-item.has-place,.cue-item.has-place.active{background:rgba(250,190,80,.45)}
 .cue-item.active.has-issue,.cue-item.active.has-warn,.cue-item.active.has-place{box-shadow:inset 0 0 0 2px rgba(111,168,255,.75)}
 .cue-item.tl-sel.has-issue,.cue-item.tl-sel.has-warn,.cue-item.tl-sel.has-place{box-shadow:inset 0 0 0 2px #fff}
 .cue-item.has-place,.cue-item.has-place.active{border-left:3px solid #f0a830;padding-left:11px}
@@ -444,12 +440,14 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table tr.has-issue td:first-child{box-shadow:inset 3px 0 0 #ff5c5c}
 .ev-table tr.has-warn td:first-child{box-shadow:inset 3px 0 0 #f0a830}
 .ev-table tr.has-place td:first-child{box-shadow:inset 3px 0 0 #f0a830}
-.ev-table tr.has-issue td{background-color:rgba(255,120,120,var(--tint-a,.3))}
-.ev-table tr.has-warn td{background-color:rgba(250,190,80,var(--tint-a,.3))}
-.ev-table tr.has-place td{background-color:rgba(250,190,80,var(--tint-a,.3))}
+.ev-table tr.has-issue td{background-color:rgba(255,120,120,.45)}
+.ev-table tr.has-warn td{background-color:rgba(250,190,80,.45)}
+.ev-table tr.has-place td{background-color:rgba(250,190,80,.45)}
 /* selected / playing: outlines only, so the row's own colour stays visible */
 .ev-table tr.active{outline:2px solid rgba(111,168,255,.75);outline-offset:-2px}
 .ev-table tr.sel{outline:2px solid #fff;outline-offset:-2px}
+/* a selected event without a flag gets a blue fill as well; flagged rows keep their red / amber */
+.ev-table tr.sel:not(.has-issue):not(.has-warn):not(.has-place) td{background-color:rgba(111,168,255,.24)}
 .ev-table th small{display:block;font-size:9px;letter-spacing:.2px;text-transform:none;color:var(--dim);font-weight:500;margin-top:1px}
 .ev-n{color:var(--dim);text-align:right}
 .ev-io{line-height:1.45}
@@ -561,7 +559,6 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
       <div class="sidebar" id="sidebar">
         <div class="sidebar-sticky">
           <div class="sidebar-header"><span>Subtitle events</span><span class="sh-count" id="evCount"></span><span class="spacer"></span>
-            <label class="tint-try" title="Temporary: try different strengths for the red / amber row highlights">Row tint <input type="range" id="tintRange" min="0" max="100" step="1"><span id="tintVal"></span></label>
             <span class="ev-lim" title="Limits for the red flags, here and on the Conform page">
               <label title="Most lines allowed on screen (2–4). Drag up / down, or click and type">Lines <input type="text" inputmode="numeric" id="limLines" min="2" max="4" readonly></label>
               <label title="Characters per second limit (3–40). Drag up / down, or click and type">CPS <input type="text" inputmode="numeric" id="limCps" min="3" max="40" readonly></label>

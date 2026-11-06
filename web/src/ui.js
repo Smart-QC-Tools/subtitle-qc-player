@@ -422,7 +422,7 @@ function cueChecksHtml(c) {
     ['odd', '#', 'Invisible / odd characters'], ['mixed', 'M', 'Lines aligned differently within an event'],
     ['gaps', 'G', '1-frame gaps (the subtitle blinks off for a frame)'],
     ['raised', '↑', 'Raised'], ['side', '↔', 'Left / right-aligned']]
-    .filter(([k]) => c[k]).map(([k, t, title]) => `<span class="ft ${k === 'raised' || k === 'side' ? 'ft-place' : k === 'gaps' || k === 'cps' ? 'ft-warn' : 'ft-issue'}" title="${esc(title)}: ${c[k]}">${t}<b>${c[k]}</b></span>`);
+    .filter(([k]) => c[k]).map(([k, t, title]) => `<span class="ft ${k === 'raised' || k === 'side' ? 'ft-place' : k === 'gaps' || k === 'cps' || k === 'mixed' ? 'ft-warn' : 'ft-issue'}" title="${esc(title)}: ${c[k]}">${t}<b>${c[k]}</b></span>`);
   return items.length ? items.join('') : '<span class="ok small">clean</span>';
 }
 

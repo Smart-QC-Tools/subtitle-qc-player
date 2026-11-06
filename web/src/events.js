@@ -70,7 +70,7 @@
     if (p.v === 'top') parts.push('Top');
     if (p.v === 'vertical') parts.push(long ? 'Vertical' : 'Vert');
     const unusual = p.v === 'raised' || p.h === 'left' || p.h === 'right';
-    return [parts.join(long ? ' · ' : ' '), p.h === 'mixed' ? 'bad' : unusual ? 'place' : parts.length ? 'neutral' : ''];
+    return [parts.join(long ? ' · ' : ' '), p.h === 'mixed' ? 'warn' : unusual ? 'place' : parts.length ? 'neutral' : ''];
   }
   // Hover text for a row: characters per line, then every flag in words.
   function rowTitle(c) {
@@ -327,15 +327,6 @@
     else line.innerHTML = '<b>' + (searching ? 'None in search:' : 'Clean:') + '</b> ' + clean.map(esc).join(' · ');
     line.title = searching ? 'Checks with no hits among the events matching the search' : 'Checks that found nothing in this file';
     bar.appendChild(line);
-  }
-
-  // ---- TEMPORARY: row tint strength, to try out different brightness levels for highlighted rows.
-  {
-    const r = document.getElementById('tintRange'), v = document.getElementById('tintVal');
-    const set = pct => { document.documentElement.style.setProperty('--tint-a', (pct / 100).toFixed(2)); if (v) v.textContent = pct + '%'; };
-    let pct = Number(Store.get('qc:rowTint')); if (!isFinite(pct) || Store.get('qc:rowTint') == null) pct = 30;
-    if (r) { r.value = pct; r.addEventListener('input', () => { set(+r.value); Store.set('qc:rowTint', r.value); }); r.addEventListener('change', () => r.blur()); }
-    set(pct);
   }
 
   document.body.classList.add('ev-expanded');
