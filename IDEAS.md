@@ -52,3 +52,15 @@ Estimate (unmeasured): ~1,000 frames looked at, ~20–60 s on SSD, ~1–2 min on
   fingerprint (size + duration + fps + hash of a few sampled chunks; matched by fingerprint, not name),
   start timecode, cards {in/out frames + TC, boxes normalised, text, confidence}, runs, Directed-by card.
   Auto-loaded when the video opens; the web version can read it too (check without analysing).
+
+### Further notes (2026-11-05)
+- Main-title-sequence credits (before the opening credits) are picked up as their own run; harmless,
+  few subtitles there. Animated/stylised title text may be partly missed: acceptable.
+- One search, 0 -> "Directed by" (+ ~1 min), hard limit 20 min. Start-in-the-middle (e.g. 6 min,
+  alternating) considered: finds "Directed by" sooner, but the whole stretch before it must be scanned
+  anyway to collect every card, so total work is the same or more. Scan from 0, show results as found.
+- Non-English credits: rare (some features). English "Directed by" + a short list of other forms;
+  otherwise the "unconfirmed" fallback.
+- Results files go in a dedicated, visible folder inside the selected video folder, e.g.
+  "Subtitle QC Data/<video>.credits.json" (copies along with the videos); ask for a location if the
+  folder is read-only.
