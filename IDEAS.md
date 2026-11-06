@@ -34,3 +34,21 @@ Proposed search (not built):
 5. Compare credit boxes with the rendered subtitle box (from the player): overlap or within ~5% of
    picture height -> red / amber. Raised subtitles more than 30 s from any credit -> amber.
 Estimate (unmeasured): ~1,000 frames looked at, ~20–60 s on SSD, ~1–2 min on network storage.
+
+### Revisions after user feedback (2026-11-05)
+- Window: 10 min covers ~92%, 20 min ~99.9%. Search for "Directed by" first: coarse scan from 0, read
+  text only on credit-like hits, stop once "Directed by" is found (+ ~1 min forward for stragglers),
+  then collect the whole credits sequence back to the start. Not found by 10 min -> continue to 20;
+  still not found -> report credit-like runs as "unconfirmed". Consider other-language forms
+  (Réalisé par, Regie, Dirigido por, Diretto da …).
+- Static test: check +0.5 s; if empty there, check -0.5 s (landed near the end of a card).
+- Margin: fixed default; optional Advanced setting later. Very-top credits rare; still compare top subs.
+- Raised-for-no-reason window: 20 s (Advanced setting candidate).
+- Stage 1 is video-only: every card found with exact in/out frames and text boxes, regardless of
+  subtitles (subs may be 1–2 s out of sync). Stage 2 (instant, any number of subtitle files) compares.
+  Consider a time margin too (subtitle a few frames before / after a card counts).
+- Results saved as a shareable sidecar file, e.g. "<video>.credits.json", next to the video when the
+  folder is writable, else saved where the user chooses. Contents: app version, settings, video
+  fingerprint (size + duration + fps + hash of a few sampled chunks; matched by fingerprint, not name),
+  start timecode, cards {in/out frames + TC, boxes normalised, text, confidence}, runs, Directed-by card.
+  Auto-loaded when the video opens; the web version can read it too (check without analysing).
