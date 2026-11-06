@@ -19,3 +19,18 @@
   under them; on-screen text with no subtitle (possible missing forced narrative).
 - Estimate 45 min (unmeasured): ~2–4 min on SSD.
 - Could share one "Analyze video" pass with black detection.
+
+### Refined focus: opening credits vs subtitle placement (discussed 2026-11-05)
+User's main concern: subtitles overlapping / nearly overlapping opening-credit text. Credits: 1–6 min,
+sometimes in several runs, start anywhere in roughly the first 2–15 min, almost always end with
+"Directed by"; neatly aligned text (italic at most). Raised subtitles within ~30 s of credits are fine.
+Proposed search (not built):
+1. Coarse scan of the first ~20 min every ~4 s, text boxes only (fast). Keep "credit-like" hits:
+   horizontal, aligned, few short lines, and static (same boxes 0.5 s later; scene text moves).
+2. Group hits into runs (gaps <= 30 s join). Densify inside runs to 1 s to catch short cards.
+3. Read text only a few frames per run: confirm credit vocabulary, find "Directed by" (end of credits).
+   If nothing found in 20 min, extend to 30 min.
+4. Card in/out by bisection (~7 frame checks per edge), only where a subtitle event is nearby.
+5. Compare credit boxes with the rendered subtitle box (from the player): overlap or within ~5% of
+   picture height -> red / amber. Raised subtitles more than 30 s from any credit -> amber.
+Estimate (unmeasured): ~1,000 frames looked at, ~20–60 s on SSD, ~1–2 min on network storage.
