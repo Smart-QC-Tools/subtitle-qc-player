@@ -210,8 +210,8 @@ body.drag main{outline:3px dashed var(--accent);outline-offset:-12px}
 .card-empty{padding:14px 18px;color:var(--dim);font-size:13px}
 .tag-novideo{font-size:11.5px;color:var(--warn)}
 table{border-collapse:collapse;width:100%;table-layout:fixed}
-col.c-dot{width:30px} col.c-file{width:27%} col.c-type{width:76px} col.c-label{width:86px} col.c-exp{width:12%}
-col.c-det{width:11%} col.c-oth{width:10%} col.c-flags{width:auto} col.c-play{width:46px}
+col.c-dot{width:30px} col.c-file{width:24%} col.c-type{width:76px} col.c-label{width:86px} col.c-exp{width:11%}
+col.c-det{width:10%} col.c-oth{width:9%} col.c-flags{width:auto} col.c-notes{width:14%} col.c-play{width:46px}
 thead th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 td{padding:11px 10px;border-bottom:1px solid var(--border);vertical-align:top;overflow-wrap:anywhere}
 tbody tr:last-child td{border-bottom:0}
@@ -291,6 +291,13 @@ tr.detail td{background:rgba(0,0,0,.18)}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:6px 6px 14px}
 @media (max-width:1000px){.dgrid{grid-template-columns:1fr}}
 .dgrid h4{margin:12px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
+.dchecks{padding:6px 6px 0}
+.dchecks h4,.dgrid h4{margin:12px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700}
+.dchecks h4.h-checks{color:#e6e9ee}
+.dgrid h4.h-file{color:#7fb0ff}
+.dgrid h4.h-name{color:#5ccfc0}
+.dgrid h4.h-lang{color:#b9a2f0}
+td.notes .note{display:block;font-size:12px;line-height:1.35;color:var(--info);opacity:.85;margin:1px 0 4px;cursor:default}
 ul.fl{margin:0;padding-left:18px} ul.fl li{margin:3px 0}
 ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul.fl li.sev-info b{color:var(--info)} ul.fl li.sev-ok{color:var(--ok)}
 .kv{margin:3px 0} .kv>span:first-child{display:inline-block;min-width:140px;color:var(--dim)}

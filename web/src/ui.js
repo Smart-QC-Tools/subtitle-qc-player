@@ -354,8 +354,8 @@ function renderToggle() {
 }
 
 // ------------------------------------------------------------ render: QC tab
-const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-exp"><col class="c-det"><col class="c-oth"><col class="c-flags"><col class="c-play"></colgroup>`;
-const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Expected (list)</th><th>Detected</th><th>Other languages</th><th>Checks</th><th></th></tr></thead>`;
+const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-exp"><col class="c-det"><col class="c-oth"><col class="c-flags"><col class="c-notes"><col class="c-play"></colgroup>`;
+const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Expected (list)</th><th>Detected</th><th>Other languages</th><th>Checks</th><th>Notes</th><th></th></tr></thead>`;
 
 function renderQC() {
   const empty = !state.subs.length && !state.busy;
@@ -441,8 +441,10 @@ function rowHtml(r) {
   const detWarn = r.flags.some(f => f.sev === 'warn' && /^(Text looks like|Written Cantonese|Mixed Simplified|Possibly)/.test(f.text));
   const fnWarn = r.flags.some(f => /^File name says/.test(f.text));
   const other = r.secondary && r.secondary.length ? r.secondary.map(s => `${esc(langName(s.lang))} <span class="muted">${fmtPct(s.pct)}</span>`).join('<br>') : '<span class="muted">—</span>';
-  const flags = r.flags.filter(f => f.sev !== 'info' || (/^(Mixed|Region|Cantonese|Inner|Image|Low|.* close variants)/.test(f.text) && !/markers consistent/.test(f.text)))
-    .map(f => `<span class="flag sev-${f.sev}">${esc(f.text)}</span>`).join('');
+  // Checks: errors and warnings (or OK). Notes: things worth knowing that are not problems.
+  const flags = r.flags.filter(f => f.sev !== 'info').map(f => `<span class="flag sev-${f.sev}">${esc(f.text)}</span>`).join('');
+  const notes = r.flags.filter(f => f.sev === 'info' && /^(Region|Cantonese|Inner|Image|Low|.* close variants|.* has no language label)/.test(f.text) && !/markers consistent/.test(f.text))
+    .map(f => `<span class="note" title="${esc(f.detail || '')}">${esc(f.text)}</span>`).join('');
   const typeCls = r.type === 'Forced' ? 'ty-forced' : r.type === 'CC/SDH' ? 'ty-cc' : 'ty-full';
   return `<tr class="row sev-row-${r.severity}${state.open.has(r.name) ? ' open' : ''}" data-f="${esc(r.name)}">
     <td class="dot"><span class="sd sd-${r.severity}" title="${r.severity}"></span></td>
@@ -453,6 +455,7 @@ function rowHtml(r) {
     <td class="${detErr ? 'hl-error' : detWarn ? 'hl-warn' : ''}">${det}</td>
     <td>${other}</td>
     <td class="flags">${flags || '<span class="ok">✓ OK</span>'}</td>
+    <td class="notes">${notes}</td>
     <td><button class="play" data-f="${esc(r.name)}" title="Open in player">▶</button></td></tr>`;
 }
 
@@ -470,20 +473,20 @@ function detailHtml(r) {
   const ni = r.nameInfo || {};
   const nameBits = [ni.showWords && ni.showWords.length ? `show “${Match.titleCase(ni.showWords)}”` : '', ni.season != null ? `season ${ni.season}` : '', ni.episode != null ? `episode ${ni.episode}` : '',
     ni.titleWords && ni.titleWords.length ? `title “${Match.titleCase(ni.titleWords)}”` : '', ni.codes && ni.codes.length ? `code ${ni.codes.join(', ')}` : ''].filter(Boolean).join(' · ');
-  return `<tr class="detail"><td></td><td colspan="8"><div class="dgrid">
-    <div><h4>Checks</h4><ul class="fl">${flags}</ul>
-      <h4>File</h4><div class="kv"><span>Full name</span><code class="full">${esc(r.name)}</code></div>
+  return `<tr class="detail"><td></td><td colspan="9"><div class="dchecks"><h4 class="h-checks">Checks</h4><ul class="fl">${flags}</ul></div><div class="dgrid">
+    <div><h4 class="h-file">File</h4><div class="kv"><span>Full name</span><code class="full">${esc(r.name)}</code></div>
       <div class="kv"><span>Format</span>${esc(r.format || '—')}${r.cueCount != null ? ` · ${r.cueCount} cue${r.cueCount === 1 ? '' : 's'}` : ''}</div>
-      <h4>Labels &amp; name</h4>
-      <div class="kv"><span>xml:lang on &lt;tt&gt;</span><code>${esc(r.rawLabel ?? '(none)')}</code></div>
-      <div class="kv"><span>List match</span>${r.match ? esc({ exact: 'exact', regional: 'regional variant of a list code', equivalent: 'equivalent code', base: 'base language only', unknown: 'not in list', missing: '—' }[r.match.status]) : '—'}${r.expected ? ` → <code>${esc(r.expected.code)}</code> ${esc(r.expected.names.join(', '))}` : ''}</div>
+      <div class="kv"><span>Frame rate</span>${r.fileFps ? `${+r.fileFps.toFixed(3)} fps declared` : '<span class="muted">not declared</span>'}${r.nameFps ? ` · name says ${r.nameFps}` : ''}</div>
+      <div class="kv"><span>Encoding</span>${esc(r.encoding || '—')}</div>
+      <h4 class="h-name">Name &amp; video</h4>
       <div class="kv"><span>Language in name</span>${r.fileLang ? `<code>${esc(r.fileLang.src)}</code> → ${esc(r.fileLang.code)}` : '<span class="muted">none found</span>'}</div>
       <div class="kv"><span>Episode in name</span>${esc(nameBits || '—')}</div>
-      <div class="kv"><span>Video</span>${r.video ? `${esc(r.video)} <span class="muted">(matched on ${esc(r.matchReasons.join(', '))})</span>` : `<span class="muted">${state.videos.length ? 'no match' : 'no videos folder'}</span>`}</div>
+      <div class="kv"><span>Video</span>${r.video ? esc(r.video) : `<span class="muted">${state.videos.length ? 'no match' : 'no videos folder'}</span>`}</div></div>
+    <div><h4 class="h-lang">Language label</h4>
+      <div class="kv"><span>xml:lang on &lt;tt&gt;</span><code>${esc(r.rawLabel ?? '(none)')}</code></div>
+      <div class="kv"><span>List match</span>${r.match ? esc({ exact: 'exact', regional: 'regional variant of a list code', equivalent: 'equivalent code', base: 'base language only', unknown: 'not in list', missing: '—' }[r.match.status]) : '—'}${r.expected ? ` → <code>${esc(r.expected.code)}</code> ${esc(r.expected.names.join(', '))}` : ''}</div>
       ${r.innerLangs && r.innerLangs.length ? `<div class="kv"><span>Inner tags</span>${r.innerLangs.map(([l, n]) => `<code>${esc(l)}</code>×${n}`).join(' ')}</div>` : ''}
-      <div class="kv"><span>Frame rate</span>${r.fileFps ? `${+r.fileFps.toFixed(3)} fps declared` : '<span class="muted">not declared</span>'}${r.nameFps ? ` · name says ${r.nameFps}` : ''}</div>
-      <div class="kv"><span>Encoding</span>${esc(r.encoding || '—')}</div></div>
-    <div><h4>Detected language by cue <span class="muted small">(${r.classified || 0} of ${r.cueCount || 0} cues had enough text)</span></h4>${bars || '<span class="muted">—</span>'}
+    <h4 class="h-lang">Detected language by cue <span class="muted small">(${r.classified || 0} of ${r.cueCount || 0} cues had enough text)</span></h4>${bars || '<span class="muted">—</span>'}
       ${d.lang ? `<div class="muted small">Primary: ${esc(langName(d.lang))} · script ${esc(Detector.SCRIPT_NAMES[d.script] || d.script || '')} · confidence ${esc(d.conf)}${d.alt ? ` · runner-up ${esc(langName(d.alt))}` : ''}</div>` : ''}
       ${hz}${rm ? `<h4>Regional markers</h4>${rm}` : ''}
       ${samples ? `<h4>Cues in other languages</h4>${samples}` : ''}</div>
