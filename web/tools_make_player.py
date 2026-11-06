@@ -182,12 +182,13 @@ rep("""      filterEmptyMsg.style.display = 'none';
     sidebarEmpty.style.display = 'none';""")
 
 
-# Expanded view: filter chips in two even rows.
+# Filter bar: buttons only for checks with hits, the rest listed on one line (events.js).
 rep("""      filterBarEl.appendChild(btn);
     });""", """      filterBarEl.appendChild(btn);
     });
-    const chips = filterBarEl.querySelectorAll('.filter-chip');
-    if (chips.length > 4) { const br = document.createElement('span'); br.className = 'fb-break'; chips[Math.ceil(chips.length / 2) - 1].after(br); }""")
+    if (typeof evDecorateFilters === 'function') evDecorateFilters(filterBarEl, currentFilter);""")
+rep("""      if (f.title) btn.title = f.title;""", """      if (f.title) btn.title = f.title;
+      btn.dataset.key = f.key; btn.dataset.count = count;""")
 
 
 # Translate (Chrome only) works on the table: the rows in view that pass the filter / search.

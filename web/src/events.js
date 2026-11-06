@@ -305,6 +305,39 @@
     if (String(v) !== el.value) { el.value = v; applyLimits(); }
   }, { passive: false });
 
+  // ---- Filter bar: a button only for checks that found something (an active filter keeps its button even
+  // when it drops to 0); the checks that found nothing are listed on one quiet line with a green tick.
+  const FB_SHORT = { chars: 'CPL', lines: 'Lines', overlap: 'Overlaps', duration: 'Duration', durationCritical: 'Critical',
+    suspicious: 'Odd chars', mixed: 'Mixed align', cps: 'CPS', gaps: 'Gaps' };
+  function evDecorateFilters(bar, current) {
+    const chips = [...bar.querySelectorAll('.filter-chip')];
+    const clean = [];
+    let shown = 0;
+    for (const b of chips) {
+      const n = +b.dataset.count, k = b.dataset.key;
+      if (n || k === current) { shown++; continue; }
+      b.remove();
+      if (FB_SHORT[k]) clean.push(FB_SHORT[k]);
+    }
+    if (!clean.length) return;
+    const searching = !!(document.getElementById('searchInput') || {}).value;
+    const line = document.createElement('div');
+    line.className = 'fb-clean';
+    if (!shown && !searching) line.textContent = 'No issues found — all checks passed';
+    else line.innerHTML = '<b>' + (searching ? 'None in search:' : 'Clean:') + '</b> ' + clean.map(esc).join(' · ');
+    line.title = searching ? 'Checks with no hits among the events matching the search' : 'Checks that found nothing in this file';
+    bar.appendChild(line);
+  }
+
+  // ---- TEMPORARY: row tint strength, to try out different brightness levels for highlighted rows.
+  {
+    const r = document.getElementById('tintRange'), v = document.getElementById('tintVal');
+    const set = pct => { document.documentElement.style.setProperty('--tint-a', (pct / 100).toFixed(2)); if (v) v.textContent = pct + '%'; };
+    let pct = Number(Store.get('qc:rowTint')); if (!isFinite(pct) || Store.get('qc:rowTint') == null) pct = 30;
+    if (r) { r.value = pct; r.addEventListener('input', () => { set(+r.value); Store.set('qc:rowTint', r.value); }); r.addEventListener('change', () => r.blur()); }
+    set(pct);
+  }
+
   document.body.classList.add('ev-expanded');
   // Translate sits next to the search box (it translates the rows in view).
   { const tb = document.getElementById('translateBtn'), bar = document.querySelector('#sidebar .search-bar'); if (tb && bar) bar.appendChild(tb); }
