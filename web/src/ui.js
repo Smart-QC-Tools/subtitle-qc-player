@@ -393,8 +393,6 @@ function renderQC() {
     html += `</section>`;
   }
   host.innerHTML = html || `<div class="none">No issues found.</div>`;
-  { const tb = document.querySelector('header.top'); if (tb) document.documentElement.style.setProperty('--top-h', tb.offsetHeight + 'px'); }
-  for (const c of host.querySelectorAll('section.card')) { const h = c.querySelector('.card-h'); if (h) c.style.setProperty('--ch-h', h.offsetHeight + 'px'); }
 }
 
 // Language filter buttons: All, then one per language found in the file names (plus "no language"). One at a time.

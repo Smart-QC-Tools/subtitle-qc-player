@@ -210,13 +210,12 @@ body.drag main{outline:3px dashed var(--accent);outline-offset:-12px}
 .card-empty{padding:14px 18px;color:var(--dim);font-size:13px}
 .tag-novideo{font-size:11.5px;color:var(--warn)}
 table{border-collapse:collapse;width:100%;table-layout:fixed}
-col.c-dot{width:30px} col.c-file{width:28%} col.c-type{width:76px} col.c-label{width:96px}
-col.c-det{width:14%} col.c-flags{width:auto} col.c-notes{width:16%} col.c-play{width:46px}
+/* the table stops at a comfortable width on wide windows instead of spreading out */
+.card table{max-width:1560px}
+col.c-dot{width:30px} col.c-file{width:30%} col.c-type{width:6.5%} col.c-label{width:8.5%}
+col.c-det{width:13%} col.c-flags{width:25%} col.c-notes{width:17%} col.c-play{width:46px}
 td .pct{color:var(--dim);margin-left:2px} td .det-o{margin-top:3px;font-size:12.5px}
-/* group header and column titles stay in view while scrolling a long group */
-.card{overflow:clip}
-.card-h{position:sticky;top:var(--top-h,68px);z-index:3}
-.card thead th{position:sticky;top:calc(var(--top-h,68px) + var(--ch-h,47px));z-index:2;background:var(--panel)}
+
 thead th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 td{padding:11px 10px;border-bottom:1px solid var(--border);vertical-align:top;overflow-wrap:anywhere}
 tbody tr:last-child td{border-bottom:0}
@@ -303,7 +302,7 @@ td.notes .note{display:block;font-size:12px;line-height:1.35;color:var(--info);o
 ul.fl{margin:0;padding-left:18px} ul.fl li{margin:3px 0}
 ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul.fl li.sev-info b{color:var(--info)} ul.fl li.sev-ok{color:var(--ok)}
 .kv{margin:3px 0} .kv>span:first-child{display:inline-block;min-width:140px;color:var(--dim)}
-.bar{display:grid;grid-template-columns:110px 1fr 90px;gap:8px;align-items:center;margin:3px 0}
+.bar{display:grid;grid-template-columns:110px minmax(0,260px) 90px;gap:8px;align-items:center;margin:3px 0}
 .bt{height:8px;background:var(--border);border-radius:5px;overflow:hidden}
 .bf{display:block;height:100%} .bf.main{background:var(--accent)} .bf.alt{background:#f0a45a}
 .bn{font-size:12px;color:var(--dim)}
