@@ -372,7 +372,7 @@
   }
   cueListContainer.addEventListener('click', (e) => {
     const row = e.target.closest('.cue-item');
-    if (row) selectCue(Number(row.dataset.index), { seek: false, scrollList: false });
+    if (row) selectCue(Number(row.dataset.index), { seek: true, scrollList: false });
   });
 
   // ---------------------------------------------------------------- mouse on the bar

@@ -178,6 +178,10 @@
   function evSyncActive() {
     updateEvDetail();
     if (!evRows.length) return;
+    // One selection: the event under the playhead becomes the selected one (playing, stepping or
+    // scrubbing). In a gap the last one stays selected; of overlapping events, a selected one is kept.
+    const act = [...activeCueIndices];
+    if (act.length && !act.includes(tlSelected)) { tlSelected = Math.min(...act); reapplyTlSel(); tlDirty = true; }
     for (const r of evBody.querySelectorAll('tr.active')) r.classList.remove('active');
     let first = null;
     activeCueIndices.forEach(i => { const r = evRows[i]; if (r) { r.classList.add('active'); if (!first) first = r; } });
