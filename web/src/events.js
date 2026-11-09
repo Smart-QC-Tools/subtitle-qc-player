@@ -166,6 +166,7 @@
     const f = FILTERS.find(x => x.key === currentFilter) || FILTERS[0];
     let n = 0;
     cueList.forEach((c, i) => { const show = f.test(c) && cueMatchesSearch(c); if (evRows[i]) evRows[i].hidden = !show; if (show) n++; });
+    evMarkPreSel();
     if (evCount) evCount.textContent = !cueList.length ? '' : n === cueList.length ? `· ${n}` : `· ${n} of ${cueList.length}`;
   }
   function evSyncSel() {
@@ -174,6 +175,16 @@
     for (const r of evBody.querySelectorAll('tr.sel')) r.classList.remove('sel');
     const r = evRows[tlSelected];
     if (r) r.classList.add('sel');
+    evMarkPreSel();
+  }
+  // The visible row just above the selected one: its bottom line is the selection frame's top edge.
+  function evMarkPreSel() {
+    for (const p of evBody.querySelectorAll('tr.pre-sel')) p.classList.remove('pre-sel');
+    const r = evBody.querySelector('tr.sel');
+    if (!r || r.hidden) return;
+    let p = r.previousElementSibling;
+    while (p && p.hidden) p = p.previousElementSibling;
+    if (p) p.classList.add('pre-sel');
   }
   function evSyncActive() {
     updateEvDetail();
