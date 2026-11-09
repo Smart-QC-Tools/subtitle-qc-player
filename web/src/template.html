@@ -212,8 +212,9 @@ body.drag main{outline:3px dashed var(--accent);outline-offset:-12px}
 table{border-collapse:collapse;width:100%;table-layout:fixed}
 /* the table stops at a comfortable width on wide windows instead of spreading out */
 /* fixed content columns; the spare width goes to the gap before the play button */
-col.c-dot{width:30px} col.c-file{width:440px} col.c-type{width:96px} col.c-label{width:124px}
-col.c-det{width:190px} col.c-flags{width:370px} col.c-notes{width:230px} col.c-sp{width:auto} col.c-play{width:46px}
+col.c-dot{width:30px} col.c-file{width:440px} col.c-type{width:110px} col.c-label{width:140px}
+col.c-det{width:210px} col.c-flags{width:320px} col.c-notes{width:230px} col.c-sp{width:auto} col.c-play{width:46px}
+td.lbl code{font-size:13.5px}
 .no-label{color:var(--warn);font-weight:600;font-size:12.5px}
 td .pct{color:var(--dim);margin-left:2px} td .det-o{margin-top:3px;font-size:12.5px}
 
@@ -454,19 +455,19 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table tr.has-issue td:first-child{box-shadow:inset 3px 0 0 #ff5c5c}
 .ev-table tr.has-warn td:first-child{box-shadow:inset 3px 0 0 #f0a830}
 .ev-table tr.has-place td:first-child{box-shadow:inset 3px 0 0 #f0a830}
-.ev-table tr.has-issue td{background-color:rgba(255,120,120,.4)}
-.ev-table tr.has-warn td{background-color:rgba(250,190,80,.4)}
-.ev-table tr.has-place td{background-color:rgba(250,190,80,.4)}
+.ev-table tr.has-issue td{background-color:rgba(255,120,120,.35)}
+.ev-table tr.has-warn td{background-color:rgba(250,190,80,.35)}
+.ev-table tr.has-place td{background-color:rgba(250,190,80,.35)}
 .ev-table tr.sel.has-issue td{background-color:rgba(255,120,120,.6)}
 .ev-table tr.sel.has-warn td,.ev-table tr.sel.has-place td{background-color:rgba(250,190,80,.6)}
 /* selected / playing: outlines only, so the row's own colour stays visible */
 .ev-table tr.active{outline:2px solid rgba(111,168,255,.75);outline-offset:-2px}
-body:not(.no-selborder) .ev-table tr.sel{outline:2px solid #fff;outline-offset:-2px}
+/* selected row: blue border; on a flagged row, a lighter shade of its colour */
+.ev-table tr.sel{outline:2px solid #6fa8ff;outline-offset:-2px}
+.ev-table tr.sel.has-issue{outline-color:#ffb3b3}
+.ev-table tr.sel.has-warn,.ev-table tr.sel.has-place{outline-color:#ffd98a}
 /* a selected event without a flag gets a blue fill as well; flagged rows keep their red / amber */
-.ev-table tr.sel:not(.has-issue):not(.has-warn):not(.has-place) td{background-color:rgba(255,255,255,.09)}
-/* TEMPORARY selection-border toggle */
-.selb-try{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#8a909b;margin-right:12px;cursor:pointer;text-transform:none;letter-spacing:0}
-.selb-try input{margin:0;accent-color:#7fb0ff}
+.ev-table tr.sel:not(.has-issue):not(.has-warn):not(.has-place) td{background-color:rgba(255,255,255,.12)}
 .ev-table th small{display:block;font-size:9px;letter-spacing:.2px;text-transform:none;color:var(--dim);font-weight:500;margin-top:1px}
 .ev-n{color:var(--dim);text-align:right}
 .ev-io{line-height:1.45}
@@ -578,7 +579,6 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
       <div class="sidebar" id="sidebar">
         <div class="sidebar-sticky">
           <div class="sidebar-header"><span>Subtitle events</span><span class="sh-count" id="evCount"></span><span class="spacer"></span>
-            <label class="selb-try" title="Temporary: compare selected rows with and without the white border"><input type="checkbox" id="selBorder" checked> White border</label>
             <span class="ev-lim" title="Limits for the red flags, here and on the Conform page">
               <label title="Most lines allowed on screen (2–4). Drag up / down, or click and type">Lines <input type="text" inputmode="numeric" id="limLines" min="2" max="4" readonly></label>
               <label title="Characters per second limit (3–40). Drag up / down, or click and type">CPS <input type="text" inputmode="numeric" id="limCps" min="3" max="40" readonly></label>

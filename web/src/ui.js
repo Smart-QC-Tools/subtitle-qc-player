@@ -457,7 +457,7 @@ function rowHtml(r) {
     <td class="dot"><span class="sd sd-${r.severity}" title="${r.severity}"></span></td>
     <td class="fname"><div class="dn fn" title="${esc(r.name)}">${esc(r.name)}</div>${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}</td>
     <td><span class="ty ${typeCls}">${esc(r.type)}</span></td>
-    <td class="${r.rawLabel ? expCls : ''}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}">${r.rawLabel ? `<code>${esc(r.rawLabel)}</code>` : '<span class="no-label">No label</span>'}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
+    <td class="lbl ${r.rawLabel ? expCls : ''}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}">${r.rawLabel ? `<code>${esc(r.rawLabel)}</code>` : '<span class="no-label">No label</span>'}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
     <td class="${detErr ? 'hl-error' : detWarn ? 'hl-warn' : ''}">${det}</td>
     <td class="flags">${flags || '<span class="ok">✓ OK</span>'}</td>
     <td class="notes">${notes}</td>
