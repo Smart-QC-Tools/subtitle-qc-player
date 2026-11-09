@@ -179,12 +179,12 @@
   }
   // The visible row just above the selected one: its bottom line is the selection frame's top edge.
   function evMarkPreSel() {
-    for (const p of evBody.querySelectorAll('tr.pre-sel')) p.classList.remove('pre-sel');
+    for (const p of evBody.querySelectorAll('tr.pre-sel,tr.sel-top')) p.classList.remove('pre-sel', 'sel-top');
     const r = evBody.querySelector('tr.sel');
     if (!r || r.hidden) return;
     let p = r.previousElementSibling;
     while (p && p.hidden) p = p.previousElementSibling;
-    if (p) p.classList.add('pre-sel');
+    if (p) p.classList.add('pre-sel'); else r.classList.add('sel-top');
   }
   function evSyncActive() {
     updateEvDetail();

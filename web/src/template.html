@@ -466,10 +466,14 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table{--sel-line:#6b7079}
 .ev-table tr.sel td{border-bottom-color:var(--sel-line)}
 .ev-table tr.pre-sel td{border-bottom-color:var(--sel-line)}
-.ev-table tr.sel td:first-child{box-shadow:inset 1px 0 0 var(--sel-line)}
-.ev-table tr.sel.has-issue td:first-child{box-shadow:inset 3px 0 0 #ff5c5c}
-.ev-table tr.sel.has-warn td:first-child,.ev-table tr.sel.has-place td:first-child{box-shadow:inset 3px 0 0 #f0a830}
-.ev-table tr.sel td:last-child{box-shadow:inset -1px 0 0 var(--sel-line)}
+/* top edge when there is no row above (first row), bottom edge on the last row (which has no line) */
+.ev-table tr.sel td{--st:0 0 0 transparent;--sb:0 0 0 transparent;box-shadow:var(--st),var(--sb)}
+.ev-table tr.sel.sel-top td{--st:inset 0 1px 0 var(--sel-line)}
+.ev-table tr.sel:last-child td{--sb:inset 0 -1px 0 var(--sel-line)}
+.ev-table tr.sel td:first-child{box-shadow:var(--st),var(--sb),inset 1px 0 0 var(--sel-line)}
+.ev-table tr.sel.has-issue td:first-child{box-shadow:var(--st),var(--sb),inset 3px 0 0 #ff5c5c}
+.ev-table tr.sel.has-warn td:first-child,.ev-table tr.sel.has-place td:first-child{box-shadow:var(--st),var(--sb),inset 3px 0 0 #f0a830}
+.ev-table tr.sel td:last-child{box-shadow:var(--st),var(--sb),inset -1px 0 0 var(--sel-line)}
 /* a selected event without a flag gets a blue fill as well; flagged rows keep their red / amber */
 .ev-table tr.sel:not(.has-issue):not(.has-warn):not(.has-place) td{background-color:rgba(255,255,255,.06)}
 .ev-table th small{display:block;font-size:9px;letter-spacing:.2px;text-transform:none;color:var(--dim);font-weight:500;margin-top:1px}
