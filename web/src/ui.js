@@ -354,8 +354,8 @@ function renderToggle() {
 }
 
 // ------------------------------------------------------------ render: QC tab
-const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-det"><col class="c-flags"><col class="c-notes"><col class="c-play"></colgroup>`;
-const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Detected</th><th>Checks</th><th>Notes</th><th></th></tr></thead>`;
+const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-det"><col class="c-flags"><col class="c-notes"><col class="c-sp"><col class="c-play"></colgroup>`;
+const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Detected</th><th>Checks</th><th>Notes</th><th></th><th></th></tr></thead>`;
 
 function renderQC() {
   const empty = !state.subs.length && !state.busy;
@@ -457,10 +457,11 @@ function rowHtml(r) {
     <td class="dot"><span class="sd sd-${r.severity}" title="${r.severity}"></span></td>
     <td class="fname"><div class="dn fn" title="${esc(r.name)}">${esc(r.name)}</div>${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}</td>
     <td><span class="ty ${typeCls}">${esc(r.type)}</span></td>
-    <td class="${!r.rawLabel ? 'hl-error' : expCls}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}"><code>${esc(r.rawLabel ?? '—')}</code>${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
+    <td class="${r.rawLabel ? expCls : ''}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}">${r.rawLabel ? `<code>${esc(r.rawLabel)}</code>` : '<span class="no-label">No label</span>'}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
     <td class="${detErr ? 'hl-error' : detWarn ? 'hl-warn' : ''}">${det}</td>
     <td class="flags">${flags || '<span class="ok">✓ OK</span>'}</td>
     <td class="notes">${notes}</td>
+    <td></td>
     <td><button class="play" data-f="${esc(r.name)}" title="Open in player">▶</button></td></tr>`;
 }
 
@@ -478,7 +479,7 @@ function detailHtml(r) {
   const ni = r.nameInfo || {};
   const nameBits = [ni.showWords && ni.showWords.length ? `show “${Match.titleCase(ni.showWords)}”` : '', ni.season != null ? `season ${ni.season}` : '', ni.episode != null ? `episode ${ni.episode}` : '',
     ni.titleWords && ni.titleWords.length ? `title “${Match.titleCase(ni.titleWords)}”` : '', ni.codes && ni.codes.length ? `code ${ni.codes.join(', ')}` : ''].filter(Boolean).join(' · ');
-  return `<tr class="detail"><td></td><td colspan="7"><div class="dchecks"><h4 class="h-checks">Checks</h4><ul class="fl">${flags}</ul></div><div class="dgrid">
+  return `<tr class="detail"><td></td><td colspan="8"><div class="dchecks"><h4 class="h-checks">Checks</h4><ul class="fl">${flags}</ul></div><div class="dgrid">
     <div><h4 class="h-file">File</h4><div class="kv"><span>Full name</span><code class="full">${esc(r.name)}</code></div>
       <div class="kv"><span>Format</span>${esc(r.format || '—')}${r.cueCount != null ? ` · ${r.cueCount} cue${r.cueCount === 1 ? '' : 's'}` : ''}</div>
       <div class="kv"><span>Frame rate</span>${r.fileFps ? `${+r.fileFps.toFixed(3)} fps declared` : '<span class="muted">not declared</span>'}${r.nameFps ? ` · name says ${r.nameFps}` : ''}</div>

@@ -331,6 +331,13 @@
     bar.appendChild(line);
   }
 
+  // ---- TEMPORARY: white border on the selected row, on / off to compare.
+  {
+    const cb = document.getElementById('selBorder');
+    const apply = on => document.body.classList.toggle('no-selborder', !on);
+    if (cb) { cb.checked = Store.get('qc:selBorder') !== '0'; apply(cb.checked);
+      cb.addEventListener('change', () => { apply(cb.checked); Store.set('qc:selBorder', cb.checked ? '1' : '0'); cb.blur(); }); }
+  }
   document.body.classList.add('ev-expanded');
   // Translate sits next to the search box (it translates the rows in view).
   { const tb = document.getElementById('translateBtn'), bar = document.querySelector('#sidebar .search-bar'); if (tb && bar) bar.appendChild(tb); }
