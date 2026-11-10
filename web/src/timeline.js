@@ -299,18 +299,33 @@
       ctx.fillStyle = `rgba(255,255,255,${hi ? 0.42 : 0.25})`;
       ctx.fillRect(x0, RULER + 1, x1 - x0, h - RULER - 2);
     });
-    // waveform: RMS solid, peak faint
+    // waveform: loudness per pixel column (grows from the bottom up), lightly smoothed across neighbouring
+    // columns and drawn as one soft-edged shape, so the outline flows instead of looking spiky.
     if (wf.peaks) {
-      for (let px = 0; px < w; px++) {
+      const W = Math.ceil(w), raw = new Float32Array(W), has = new Uint8Array(W);
+      for (let px = 0; px < W; px++) {
         const i0 = Math.floor((view.start + px / w * span) * PEAK_RATE);
         const i1 = Math.max(i0 + 1, Math.floor((view.start + (px + 1) / w * span) * PEAK_RATE));
-        let pk = 0, rs = 0, n = 0;
-        for (let i = Math.max(0, i0); i < Math.min(wf.peaks.length, i1); i++) { if (wf.peaks[i] > pk) pk = wf.peaks[i]; rs += wf.rms[i] * wf.rms[i]; n++; }
-        if (!n) continue;
-        const hp = level(pk) * amp, hr = level(Math.sqrt(rs / n)) * amp;
-        // half phase: grows from the bottom up
-        if (hr > 0.4) { ctx.fillStyle = 'rgba(120,214,206,0.92)'; ctx.fillRect(px, base - hr, 1, hr); }
+        let rs = 0, n = 0;
+        for (let i = Math.max(0, i0); i < Math.min(wf.peaks.length, i1); i++) { rs += wf.rms[i] * wf.rms[i]; n++; }
+        if (n) { raw[px] = level(Math.sqrt(rs / n)) * amp; has[px] = 1; }
       }
+      const sm = new Float32Array(W);
+      for (let px = 0; px < W; px++) {
+        if (!has[px]) continue;
+        const l = has[px - 1] ? raw[px - 1] : raw[px], r = has[px + 1] ? raw[px + 1] : raw[px];
+        sm[px] = (l + 2 * raw[px] + r) / 4;
+      }
+      ctx.fillStyle = 'rgba(120,214,206,0.92)';
+      ctx.beginPath();
+      let open = false;
+      for (let px = 0; px <= W; px++) {
+        const on = px < W && has[px] && sm[px] > 0.4;
+        if (on && !open) { ctx.moveTo(px, base); open = true; }
+        if (on) ctx.lineTo(px + 0.5, base - sm[px]);
+        else if (open) { ctx.lineTo(px, base); ctx.closePath(); open = false; }
+      }
+      ctx.fill();
     }
     // scanlines: a faint dark line on every other screen pixel row (a lit-display texture), drawn in
     // device pixels so it stays even at any window scale; the in / out lines go on top, crisp.
