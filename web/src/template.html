@@ -47,7 +47,8 @@ header.top{padding:0 28px!important;height:68px;box-sizing:border-box;flex-wrap:
 .tab{color:#c3c9d4!important}
 .hdr-left{width:calc(var(--left-w, 270px) - 40px);flex:none;display:flex;align-items:center}
 header.top{padding-left:40px!important}
-#helpBtn{font-size:14.5px;margin-right:14px}
+#helpBtn{font-size:14.5px;margin-right:14px;color:#c98a45}
+#helpBtn:hover{color:#ffae55}
 .vsep{width:1px;height:22px;background:var(--border);margin:0 8px 0 10px}
 .fl-lab{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.6px;color:#c9d6ee;margin-right:-4px}
 .fl-lab .ico{color:#9fc3ff}
@@ -139,7 +140,7 @@ body[data-tab=player] main{padding:0}
 .help-nav{flex:none;width:200px;display:flex;flex-direction:column;gap:2px;padding:14px 10px;border-right:1px solid var(--border);background:var(--panel2)}
 .help-nav button{font:inherit;font-size:13.5px;text-align:left;padding:8px 12px;border-radius:7px;border:0;background:none;color:var(--dim);cursor:pointer}
 .help-nav button:hover{color:var(--text);background:rgba(255,255,255,.04)}
-.help-nav button.on{color:var(--text);background:rgba(111,168,255,.15)}
+.help-nav button.on{color:#fff;background:#42607a}
 .help-pages{flex:1 1 auto;overflow:auto;padding:6px 26px 22px}
 .help-pages h4{margin:16px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
 .help-pages h4#appVersion{font-size:15px;text-transform:none;letter-spacing:0;color:var(--text)}
@@ -382,6 +383,8 @@ select:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:1px}
 .li.sel{background:#42607a;box-shadow:inset 3px 0 0 #8fb3d1}
 .li.sel .li-s,.li.sel .li-n,.li.sel .muted{color:rgba(255,255,255,.78)}
 .li.sel code{background:rgba(0,0,0,.25)}
+.li.sel .ty{background:rgba(0,0,0,.3)}
+.li.sel .ty-full{color:#b5d3ff} .li.sel .ty-forced{color:#e3c6f5} .li.sel .ty-cc{color:#9cebe2}
 .li-t{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .li-t .sd{margin:0}
 .li-s{font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
