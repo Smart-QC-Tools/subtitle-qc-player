@@ -610,7 +610,7 @@
     ctx.drawImage(ovStatic(w, h, d), 0, 0, w, h);
     // the part the bar above shows
     const { x0, x1 } = boxGeom(w), act = ovHover === 'box' || (ovDrag && ovDrag.mode === 'move');
-    ctx.fillStyle = act ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.10)'; ctx.fillRect(x0, 0, x1 - x0, h);
+    ctx.fillStyle = act ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.22)'; ctx.fillRect(x0, 0, x1 - x0, h);
     ctx.strokeStyle = act ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
     // hover: a line and the time under the pointer

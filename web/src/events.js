@@ -212,7 +212,10 @@
     evDetailIdx = i;
     const c = cueList[i];
     evDetail.textContent = '';
-    if (!c) { evDetail.innerHTML = `<div class="evd-empty">${cueList.length ? 'Click an event to see it here.' : 'Open a subtitle file to see its events.'}</div>`; return; }
+    // No event selected: nothing shown here, not even the switch.
+    const box = document.getElementById('evDetailBox');
+    if (box) box.classList.toggle('nosel', !c);
+    if (!c) return;
     const row = (cls) => { const d = document.createElement('div'); d.className = 'evd-meta' + (cls ? ' ' + cls : ''); return d; };
     const item = (into, k, v, cls, extra) => { const s = document.createElement('span'); const i = document.createElement('i'); i.textContent = k; s.appendChild(i); s.appendChild(span(cls || '', v)); if (extra) s.appendChild(span('evd-dim', extra)); into.appendChild(s); };
     // Row 1: in / out / duration (styled like the row below), the text beside them.
