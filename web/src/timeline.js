@@ -327,15 +327,6 @@
       }
       ctx.fill();
     }
-    // scanlines: a faint dark line on every other screen pixel row (a lit-display texture), drawn in
-    // device pixels so it stays even at any window scale; the in / out lines go on top, crisp.
-    if (loaded) {
-      const sc = (window.devicePixelRatio || 1) * uiZoom(), unit = Math.max(1, Math.round(window.devicePixelRatio || 1));
-      const W = tlWave.width, y0 = Math.ceil((RULER + 1) * sc), y1 = Math.floor((h - 1) * sc);
-      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgba(0,0,0,0.10)';
-      for (let y = y0; y < y1; y += 2 * unit) ctx.fillRect(0, y, W, unit);
-      ctx.restore();
-    }
     // subtitle events
     const t = video ? video.currentTime : 0, d = tlDuration();
     let inRange = 0;
@@ -351,7 +342,7 @@
       ctx.beginPath(); ctx.moveTo(x0, RULER + 1); ctx.lineTo(x0, h - 1); ctx.moveTo(x1, RULER + 1); ctx.lineTo(x1, h - 1); ctx.stroke(); ctx.lineWidth = 1;
     });
     // thin white border along the top and bottom of the bar
-    if (loaded) { ctx.fillStyle = '#3d5a73'; ctx.fillRect(0, RULER, w, 1); ctx.fillRect(0, h - 1, w, 1); }
+    if (loaded) { ctx.fillStyle = '#4f7393'; ctx.fillRect(0, RULER, w, 1); ctx.fillRect(0, h - 1, w, 1); }
     // playhead
     if (video) {
       const px = Math.round(x(t)) + 0.5;
