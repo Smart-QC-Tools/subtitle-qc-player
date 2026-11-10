@@ -435,6 +435,20 @@
       view.start += (e.deltaX || e.deltaY) / r.width * span; view.end = view.start + span; ensureView(); tlDirty = true;
     }
   }, { passive: false });
+  // Ctrl / ⌘ + scroll (and trackpad pinch) anywhere over the player column zooms the bar too, around
+  // the playhead (or the pointer when it's over the bar's width). Elsewhere on the QC page it does
+  // nothing, so the browser doesn't zoom the page; the Conform page keeps the browser's behaviour.
+  window.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.target === tlWave) return;
+    const qc = document.getElementById('tab-player');
+    if (!qc || !qc.offsetParent || !qc.contains(e.target)) return;
+    e.preventDefault();
+    if (!e.target.closest('.stagecol') || !ensureView()) return;
+    const span = view.end - view.start, r = tlWave.getBoundingClientRect();
+    const t = video ? video.currentTime : view.start;
+    const anchor = e.target === tlOv || !(t >= view.start && t <= view.end) ? timeAtX(Math.max(r.left, Math.min(r.right, e.clientX))) : t;
+    setSpan(span * Math.pow(1.0025, e.deltaY), anchor);
+  }, { passive: false, capture: true });
 
   // ---------------------------------------------------------------- transport controls
   const svg = (b) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
