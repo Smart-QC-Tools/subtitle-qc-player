@@ -244,7 +244,7 @@
     // A lit panel: a deeper blue-teal, a little brighter through the middle and darker at the edges.
     if (loaded) {
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#0b2233'); g.addColorStop(0.55, '#123248'); g.addColorStop(1, '#0a1f2e');
+      g.addColorStop(0, '#05131d'); g.addColorStop(0.55, '#0f2e45'); g.addColorStop(1, '#04111a');
       ctx.fillStyle = g;
     } else ctx.fillStyle = EMPTY_BG;
     ctx.fillRect(0, 0, w, h);
@@ -333,7 +333,7 @@
       ctx.beginPath(); ctx.moveTo(x0, RULER + 1); ctx.lineTo(x0, h - 1); ctx.moveTo(x1, RULER + 1); ctx.lineTo(x1, h - 1); ctx.stroke(); ctx.lineWidth = 1;
     });
     // thin white border along the top and bottom of the bar
-    if (loaded) { ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(0, RULER, w, 1); ctx.fillRect(0, h - 1, w, 1); }
+    if (loaded) { ctx.fillStyle = '#3d5a73'; ctx.fillRect(0, RULER, w, 1); ctx.fillRect(0, h - 1, w, 1); }
     // playhead
     if (video) {
       const px = Math.round(x(t)) + 0.5;
