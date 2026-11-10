@@ -188,7 +188,7 @@
   });
 
   // ---------------------------------------------------------------- view & zoom
-  const MIN_SPAN = 15, MAX_SPAN = 60, DEFAULT_SPAN = 60;   // the bar shows 15 s to 1 min; the index below shows it all
+  const MIN_SPAN = 10, MAX_SPAN = 90, DEFAULT_SPAN = 60;   // the bar shows 10 s to 1.5 min; the index below shows it all
   function ensureView() {
     const d = tlDuration();
     if (!d) return false;
@@ -539,7 +539,7 @@
   // ---------------------------------------------------------------- zoom handle (under the bar)
   // ---------------------------------------------------------------- index bar (the whole video)
   // Under the bar: the whole video at once. Faint waveform, where subtitles are (coverage), minute
-  // labels, the playhead, and a box marking the part the bar above shows. Drag the box to look around
+  // labels, and a box marking the part the bar above shows. Drag the box to look around
   // (the playhead stays); click anywhere to jump there (drag on to scrub).
   const OV_MIN_BLOCK = 2, OV_MIN_GAP = 3;          // px: a lone event shows at least 2 px; gaps under 3 px are filled
   let ovHover = null, ovDrag = null, ovCache = null, ovKey = '';
@@ -583,12 +583,12 @@
     const cv = ovCache || document.createElement('canvas');
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = HANDLE_TRACK; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#08090b'; ctx.fillRect(0, 0, w, h);
     const LAB = 11, top = LAB + 1, bandH = h - top - 3;
     // faint waveform, the whole video (loudest peak per pixel column)
     if (wf.peaks) {
       const amp = h - top - 1;
-      ctx.fillStyle = 'rgba(120,214,206,0.22)';
+      ctx.fillStyle = 'rgba(120,214,206,0.5)';
       for (let px = 0; px < w; px++) {
         const i0 = Math.floor(px / w * d * PEAK_RATE), i1 = Math.max(i0 + 1, Math.floor((px + 1) / w * d * PEAK_RATE));
         let rs = 0, k = 0;
@@ -636,8 +636,6 @@
     ctx.fillStyle = act ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.10)'; ctx.fillRect(x0, 0, x1 - x0, h);
     ctx.strokeStyle = act ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
-    // playhead
-    if (video) { const ph = Math.round(video.currentTime / d * w); ctx.fillStyle = PLAYHEAD; ctx.fillRect(ph - 1, 0, 2, h); }
     // hover: a line and the time under the pointer
     if (ovHover != null && typeof ovHover === 'object' && !ovDrag) {
       const px = Math.round(ovHover.x) + 0.5, txt = ovLabel(ovTime(ovHover.x, w));
