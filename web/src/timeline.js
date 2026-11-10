@@ -188,19 +188,19 @@
   });
 
   // ---------------------------------------------------------------- view & zoom
-  const MIN_SPAN = 5, DEFAULT_SPAN = 60;
+  const MIN_SPAN = 15, MAX_SPAN = 60, DEFAULT_SPAN = 60;   // the bar shows 15 s to 1 min; the index below shows it all
   function ensureView() {
     const d = tlDuration();
     if (!d) return false;
     if (!(view.end > view.start)) { view.start = 0; view.end = Math.min(DEFAULT_SPAN, d); }
-    const span = Math.max(Math.min(MIN_SPAN, d), Math.min(d, view.end - view.start));
+    const span = Math.max(Math.min(MIN_SPAN, d), Math.min(d, MAX_SPAN, view.end - view.start));
     view.start = Math.max(0, Math.min(d - span, view.start));
     view.end = view.start + span;
     return true;
   }
   function setSpan(span, anchor) {
     const d = tlDuration(); if (!d) return;
-    span = Math.max(Math.min(MIN_SPAN, d), Math.min(d, span));
+    span = Math.max(Math.min(MIN_SPAN, d), Math.min(d, MAX_SPAN, span));
     const old = view.end - view.start || d;
     const a = anchor != null ? anchor : (video ? video.currentTime : view.start + old / 2);
     const f = old ? (a - view.start) / old : 0.5;
@@ -537,77 +537,151 @@
   video && bindTransport();
 
   // ---------------------------------------------------------------- zoom handle (under the bar)
-  // The handle marks the visible part of the video. Drag it to move (the playhead moves with it),
-  // drag its ends to stretch or squeeze (zoom), click the track to jump there.
-  let ovHover = false;
+  // ---------------------------------------------------------------- index bar (the whole video)
+  // Under the bar: the whole video at once. Faint waveform, where subtitles are (coverage), minute
+  // labels, the playhead, and a box marking the part the bar above shows. Drag the box to look around
+  // (the playhead stays); click anywhere to jump there (drag on to scrub).
+  const OV_MIN_BLOCK = 2, OV_MIN_GAP = 3;          // px: a lone event shows at least 2 px; gaps under 3 px are filled
+  let ovHover = null, ovDrag = null, ovCache = null, ovKey = '';
+  const ovTime = (px, w) => Math.max(0, Math.min(tlDuration(), px / w * tlDuration()));
+  function ovLabel(t) {
+    const s = Math.round(t), hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60, p2 = n => String(n).padStart(2, '0');
+    return (hh ? hh + ':' + p2(mm) : String(mm)) + ':' + p2(ss);
+  }
+  // Coverage per pixel column: on where any event touches it, then short runs widened, small gaps closed.
+  function ovCoverage(w, d) {
+    const on = new Uint8Array(w);
+    for (const c of cueList) {
+      const [b, e] = cueVideoTime(c);
+      if (!isFinite(b) || !isFinite(e) || e <= 0 || b >= d) continue;
+      const x0 = Math.max(0, Math.floor(b / d * w)), x1 = Math.min(w - 1, Math.max(x0, Math.ceil(e / d * w) - 1));
+      for (let x = x0; x <= x1; x++) on[x] = 1;
+    }
+    for (let x = 0; x < w; ) {                       // runs narrower than OV_MIN_BLOCK
+      if (!on[x]) { x++; continue; }
+      let e = x; while (e < w && on[e]) e++;
+      for (let k = e; k < Math.min(w, x + OV_MIN_BLOCK); k++) on[k] = 1;
+      x = Math.max(e, x + OV_MIN_BLOCK);
+    }
+    for (let x = 0; x < w; ) {                       // gaps narrower than OV_MIN_GAP (between two runs)
+      if (on[x]) { x++; continue; }
+      let e = x; while (e < w && !on[e]) e++;
+      if (x > 0 && e < w && e - x < OV_MIN_GAP) for (let k = x; k < e; k++) on[k] = 1;
+      x = e;
+    }
+    return on;
+  }
+  // The static part (waveform, coverage, labels) is drawn once into a cache and only redrawn when
+  // something it shows changes; each frame then just adds the box and the playhead.
+  function ovStatic(w, h, d) {
+    const dpr = (window.devicePixelRatio || 1) * uiZoom();
+    const n = cueList.length, c0 = n ? cueList[0].begin : 0, cN = n ? cueList[n - 1].end : 0;
+    const key = [w, h, dpr, d, n, c0, cN, effectiveOffset(), wf.state, wf.peaks ? wf.peaks.length : 0,
+      wf.state === 'ready' ? 0 : Math.floor(performance.now() / 500)].join('|');
+    if (ovCache && key === ovKey) return ovCache;
+    ovKey = key;
+    const cv = ovCache || document.createElement('canvas');
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = HANDLE_TRACK; ctx.fillRect(0, 0, w, h);
+    const LAB = 11, top = LAB + 1, bandH = h - top - 3;
+    // faint waveform, the whole video (loudest peak per pixel column)
+    if (wf.peaks) {
+      const amp = h - top - 1;
+      ctx.fillStyle = 'rgba(120,214,206,0.22)';
+      for (let px = 0; px < w; px++) {
+        const i0 = Math.floor(px / w * d * PEAK_RATE), i1 = Math.max(i0 + 1, Math.floor((px + 1) / w * d * PEAK_RATE));
+        let rs = 0, k = 0;
+        for (let i = Math.max(0, i0); i < Math.min(wf.peaks.length, i1); i++) { rs += wf.rms[i] * wf.rms[i]; k++; }
+        if (!k) continue;
+        const hr = level(Math.sqrt(rs / k)) * amp;
+        if (hr > 0.4) ctx.fillRect(px, h - 1 - hr, 1, hr);
+      }
+    }
+    // subtitle coverage
+    const on = ovCoverage(w, d);
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    for (let x = 0; x < w; ) {
+      if (!on[x]) { x++; continue; }
+      let e = x; while (e < w && on[e]) e++;
+      ctx.fillRect(x, top + 2, e - x, bandH - 2);
+      x = e;
+    }
+    // minute labels: a step that leaves room for the text
+    const step = [60, 120, 300, 600, 900, 1200, 1800, 3600, 7200].find(st => st / d * w >= 64) || 7200;
+    ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif'; ctx.textBaseline = 'middle';
+    for (let t = step; t < d - step * 0.25; t += step) {
+      const px = Math.round(t / d * w) + 0.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(px - 0.5, 0, 1, h);
+      ctx.fillStyle = 'rgba(200,205,212,0.6)'; ctx.fillText(ovLabel(t), px + 3, LAB / 2 + 1);
+    }
+    ctx.fillStyle = 'rgba(200,205,212,0.6)'; ctx.fillText('0:00', 3, LAB / 2 + 1);
+    ovCache = cv;
+    return cv;
+  }
+  function boxGeom(w) {
+    const d = tlDuration(), minW = 8;
+    let x0 = view.start / d * w, x1 = view.end / d * w;
+    if (x1 - x0 < minW) { const c = (x0 + x1) / 2; x0 = Math.max(0, Math.min(w - minW, c - minW / 2)); x1 = x0 + minW; }
+    return { x0, x1 };
+  }
   function drawOverview() {
     const { ctx, w, h } = fitCanvas(tlOv);
     const loaded = !!(video && video.currentSrc);
-    ctx.fillStyle = loaded ? HANDLE_TRACK : EMPTY_BG; ctx.fillRect(0, 0, w, h);
     const d = tlDuration();
-    if (!loaded || !d || !ensureView()) return;
-    const { r, x0, x1 } = handleGeom(w, h);
-    const active = ovHover || !!ovDrag;
-    const y = 2, hh = h - 4;
-    ctx.fillStyle = active ? '#7a808b' : '#4d525b';
-    ctx.beginPath(); ctx.roundRect(x0, y, x1 - x0, hh, hh / 2); ctx.fill();
-    // grab circles at both ends
-    ctx.fillStyle = active ? '#e9ecf1' : '#c9cdd4';
-    for (const cx of [x0 + r + 1, x1 - r - 1]) { ctx.beginPath(); ctx.arc(cx, h / 2, r - 1.5, 0, Math.PI * 2); ctx.fill(); }
+    if (!loaded || !d || !ensureView()) { ctx.fillStyle = loaded ? HANDLE_TRACK : EMPTY_BG; ctx.fillRect(0, 0, w, h); return; }
+    ctx.drawImage(ovStatic(w, h, d), 0, 0, w, h);
+    // the part the bar above shows
+    const { x0, x1 } = boxGeom(w), act = ovHover === 'box' || (ovDrag && ovDrag.mode === 'move');
+    ctx.fillStyle = act ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.10)'; ctx.fillRect(x0, 0, x1 - x0, h);
+    ctx.strokeStyle = act ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+    ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
+    // playhead
+    if (video) { const ph = Math.round(video.currentTime / d * w); ctx.fillStyle = PLAYHEAD; ctx.fillRect(ph - 1, 0, 2, h); }
+    // hover: a line and the time under the pointer
+    if (ovHover != null && typeof ovHover === 'object' && !ovDrag) {
+      const px = Math.round(ovHover.x) + 0.5, txt = ovLabel(ovTime(ovHover.x, w));
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(px - 0.5, 0, 1, h);
+      ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(txt).width + 10, bx = Math.max(0, Math.min(w - tw, px + 6));
+      ctx.fillStyle = 'rgba(10,11,13,0.92)'; ctx.beginPath(); ctx.roundRect(bx, 2, tw, h - 4, 3); ctx.fill();
+      ctx.fillStyle = '#e8e9ec'; ctx.fillText(txt, bx + 5, h / 2);
+    }
   }
-  // Handle position in the overview. Zoomed far in it keeps a minimum width (centred on the visible
-  // part, kept inside the bar) so there is room to grab the middle for dragging.
-  function handleGeom(w, h) {
-    const d = tlDuration(), r = (h - 4) / 2, minW = Math.min(w, 2.5 * (4 * r + 6));
-    let x0 = view.start / d * w, x1 = view.end / d * w;
-    if (x1 - x0 < minW) { const c = (x0 + x1) / 2; x0 = Math.max(0, Math.min(w - minW, c - minW / 2)); x1 = x0 + minW; }
-    return { r, x0, x1 };
-  }
-  let ovDrag = null;
-  function ovHit(px, w) {
-    const { r, x0, x1 } = handleGeom(w, tlOv.clientHeight);
-    const g = 2 * r + 3;
-    if (px >= x0 - 3 && px <= x0 + g) return 'left';
-    if (px <= x1 + 3 && px >= x1 - g) return 'right';
-    if (px > x0 && px < x1) return 'move';
-    return 'outside';
-  }
+  function ovHitBox(px, w) { const { x0, x1 } = boxGeom(w); return px >= x0 - 2 && px <= x1 + 2; }
   tlOv.addEventListener('mousedown', (e) => {
-    const d = tlDuration(); if (!d || !ensureView()) return;
+    const d = tlDuration(); if (!d || !ensureView() || !video) return;
     e.preventDefault();
     const r = tlOv.getBoundingClientRect(), px = e.clientX - r.left;
-    let mode = ovHit(px, r.width);
-    if (mode === 'outside') {
-      const span = view.end - view.start;
-      view.start = px / r.width * d - span / 2; view.end = view.start + span; ensureView();
-      if (video) seekTo(px / r.width * d);
-      mode = 'move';
-    }
-    const rel = video ? (video.currentTime - view.start) / (view.end - view.start) : 0.5;
-    ovDrag = { mode, x: e.clientX, start: view.start, end: view.end, rel: Math.max(0, Math.min(1, rel)) };
+    if (ovHitBox(px, r.width)) ovDrag = { mode: 'move', x: e.clientX, start: view.start, moved: false };
+    else { ovDrag = { mode: 'scrub' }; seekTo(ovTime(px, r.width)); centerOn(ovTime(px, r.width)); }
     tlDirty = true;
   });
   window.addEventListener('mousemove', (e) => {
+    const r = tlOv.getBoundingClientRect();
     if (!ovDrag) {
       const d = tlDuration(); if (!d || scrub) return;
-      const r = tlOv.getBoundingClientRect();
-      if (e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) { if (ovHover) { ovHover = false; tlDirty = true; } return; }
-      const m = ovHit(e.clientX - r.left, r.width);
-      tlOv.style.cursor = m === 'left' || m === 'right' ? 'ew-resize' : 'default';
-      const hv = m !== 'outside';
-      if (hv !== ovHover) { ovHover = hv; tlDirty = true; }
+      const inside = !(e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right);
+      const hv = !inside ? null : ovHitBox(e.clientX - r.left, r.width) ? 'box' : { x: e.clientX - r.left };
+      tlOv.style.cursor = hv === 'box' ? 'grab' : 'default';
+      if (JSON.stringify(hv) !== JSON.stringify(ovHover)) { ovHover = hv; tlDirty = true; }
       return;
     }
-    const d = tlDuration(), r = tlOv.getBoundingClientRect(), dt = (e.clientX - ovDrag.x) / r.width * d, minSpan = Math.min(MIN_SPAN, d);
+    const d = tlDuration();
     if (ovDrag.mode === 'move') {
-      const span = ovDrag.end - ovDrag.start;
-      view.start = ovDrag.start + dt; view.end = view.start + span; ensureView();
-      if (video) seekTo(view.start + ovDrag.rel * (view.end - view.start));
-    } else if (ovDrag.mode === 'left') { view.start = Math.min(ovDrag.end - minSpan, Math.max(0, ovDrag.start + dt)); view.end = ovDrag.end; ensureView(); }
-    else { view.end = Math.max(ovDrag.start + minSpan, Math.min(d, ovDrag.end + dt)); view.start = ovDrag.start; ensureView(); }
+      if (Math.abs(e.clientX - ovDrag.x) > 2) ovDrag.moved = true;
+      const span = view.end - view.start;
+      view.start = ovDrag.start + (e.clientX - ovDrag.x) / r.width * d; view.end = view.start + span; ensureView();
+      tlOv.style.cursor = 'grabbing';
+    } else { const t = ovTime(e.clientX - r.left, r.width); seekTo(t); centerOn(t); }
     tlDirty = true;
   });
-  window.addEventListener('mouseup', () => { if (ovDrag) { ovDrag = null; tlDirty = true; } });
+  window.addEventListener('mouseup', (e) => {
+    if (!ovDrag) return;
+    // a click on the box (no drag) jumps there too
+    if (ovDrag.mode === 'move' && !ovDrag.moved) { const r = tlOv.getBoundingClientRect(); seekTo(ovTime(e.clientX - r.left, r.width)); }
+    ovDrag = null; tlOv.style.cursor = 'default'; tlDirty = true;
+  });
 
   // ---------------------------------------------------------------- Space = play/pause (also when a button or slider has focus)
   const isTyping = el => el && (el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && !/^(range|checkbox|radio|button)$/.test(el.type)));

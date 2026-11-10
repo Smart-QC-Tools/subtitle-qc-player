@@ -327,7 +327,7 @@ ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul
 #volSlider:hover,#volSlider:active{--fill:var(--ctl-hi);--rest:#4a505a}
 #volSlider::-webkit-slider-thumb:hover,#volSlider:active::-webkit-slider-thumb{background:#ffffff}
 #volSlider::-moz-range-thumb:hover,#volSlider:active::-moz-range-thumb{background:#ffffff}
-#overviewCanvas{display:block;width:100%;height:16px;margin-top:5px;border-radius:4px;cursor:default}
+#overviewCanvas{display:block;width:100%;height:28px;margin-top:5px;border-radius:4px;cursor:default}
 .pb-l{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
 .tc{font:600 19px -apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Inter,Roboto,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.3px;padding:3px 14px;background:#0b0c0f;border:1px solid var(--border);border-radius:5px;margin-left:6px}
 #waveChannel{font-size:11.5px;padding:2px 4px}
@@ -559,7 +559,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         </div>
         <div class="timeline" id="timeline">
           <div class="tl-wave"><canvas id="waveCanvas"></canvas><span class="tl-status" id="waveStatus"></span></div>
-          <canvas id="overviewCanvas" title="Drag to move through the video, drag the ends to zoom"></canvas>
+          <canvas id="overviewCanvas"></canvas>
           <div class="pbar">
             <div class="pb-left">
               <div class="pb-off" title="Offset: the timecode of the video's first frame (hh:mm:ss:ff)">
@@ -656,7 +656,8 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
           <h4>Waveform bar</h4>
           <ul>
             <li>Press or drag on the bar to move the playhead. Click a subtitle block to select that event in the table.</li>
-            <li>The handle underneath shows the visible part of the video: drag it to move, drag its ends to zoom between 5 seconds and the whole video.</li>
+            <li>The index underneath shows the whole video: where the subtitles are, a faint waveform, and a box for the part shown in the bar above. Click anywhere on it to jump there (drag to scrub); drag the box to look around without moving the playhead.</li>
+            <li>The bar shows between 15 seconds and 1 minute: ⌘ / Ctrl + scroll on it to zoom.</li>
             <li>The channel menu picks which audio channels are drawn. It doesn't change what you hear.</li>
           </ul>
           <h4>Offset &amp; timing</h4>
