@@ -10,7 +10,7 @@
   const tcDisplay = document.getElementById('tcDisplay');
   const tlOv = document.getElementById('overviewCanvas');
   const PEAK_RATE = 100, RULER = 21, DB_RANGE = 48;
-  const PLAYHEAD = '#0f8cff', BAR_BG = '#163a50', RULER_BG = '#17191d', HANDLE_TRACK = '#17191d', EMPTY_BG = '#070708';
+  const PLAYHEAD = '#0f8cff', BAR_BG = '#163a50', RULER_BG = '#101216', HANDLE_TRACK = '#17191d', EMPTY_BG = '#070708';
   const TC_FONT_SMALL = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif';
   const wf = { peaks: null, rms: null, duration: 0, worker: null, key: null, total: 0, sel: null, state: 'idle', msg: '', file: null };
   const view = { start: 0, end: 0 };
@@ -538,7 +538,7 @@
 
   // ---------------------------------------------------------------- zoom handle (under the bar)
   // ---------------------------------------------------------------- index bar (the whole video)
-  // Under the bar: the whole video at once. Faint waveform, where subtitles are (coverage)
+  // Under the bar: the whole video at once. Where subtitles are (coverage)
   // and a box marking the part the bar above shows. Drag the box to look around
   // (the playhead stays); click anywhere to jump there (drag on to scrub).
   const OV_MIN_BLOCK = 2, OV_MIN_GAP = 3;          // px: a lone event shows at least 2 px; gaps under 3 px are filled
@@ -576,8 +576,7 @@
   function ovStatic(w, h, d) {
     const dpr = (window.devicePixelRatio || 1) * uiZoom();
     const n = cueList.length, c0 = n ? cueList[0].begin : 0, cN = n ? cueList[n - 1].end : 0;
-    const key = [w, h, dpr, d, n, c0, cN, effectiveOffset(), wf.state, wf.peaks ? wf.peaks.length : 0,
-      wf.state === 'ready' ? 0 : Math.floor(performance.now() / 500)].join('|');
+    const key = [w, h, dpr, d, n, c0, cN, effectiveOffset()].join('|');
     if (ovCache && key === ovKey) return ovCache;
     ovKey = key;
     const cv = ovCache || document.createElement('canvas');
@@ -585,19 +584,6 @@
     const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#101216'; ctx.fillRect(0, 0, w, h);
     const top = 0, bandH = h - 3;
-    // faint waveform, the whole video (loudest peak per pixel column)
-    if (wf.peaks) {
-      const amp = h - top - 1;
-      ctx.fillStyle = 'rgba(120,214,206,0.5)';
-      for (let px = 0; px < w; px++) {
-        const i0 = Math.floor(px / w * d * PEAK_RATE), i1 = Math.max(i0 + 1, Math.floor((px + 1) / w * d * PEAK_RATE));
-        let rs = 0, k = 0;
-        for (let i = Math.max(0, i0); i < Math.min(wf.peaks.length, i1); i++) { rs += wf.rms[i] * wf.rms[i]; k++; }
-        if (!k) continue;
-        const hr = level(Math.sqrt(rs / k)) * amp;
-        if (hr > 0.4) ctx.fillRect(px, h - 1 - hr, 1, hr);
-      }
-    }
     // subtitle coverage
     const on = ovCoverage(w, d);
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -624,8 +610,8 @@
     ctx.drawImage(ovStatic(w, h, d), 0, 0, w, h);
     // the part the bar above shows
     const { x0, x1 } = boxGeom(w), act = ovHover === 'box' || (ovDrag && ovDrag.mode === 'move');
-    ctx.fillStyle = act ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.10)'; ctx.fillRect(x0, 0, x1 - x0, h);
-    ctx.strokeStyle = act ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+    ctx.fillStyle = act ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.22)'; ctx.fillRect(x0, 0, x1 - x0, h);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
     // hover: a line and the time under the pointer
     if (ovHover != null && typeof ovHover === 'object' && !ovDrag) {
