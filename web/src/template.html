@@ -260,9 +260,8 @@ td.hl-error code,td.hl-warn code{background:transparent}
 #filterBar{display:flex!important;flex-wrap:wrap;gap:6px!important;align-items:center}
 #filterBar .filter-chip{white-space:nowrap;margin:0!important}
 /* selected filter: filled with its colour, dot becomes a tick */
-/* no colour coding on the buttons: one teal for the selected filter (with a tick); the count is a small badge */
-#filterBar .filter-chip.active::before{content:'✓';font-weight:700;font-size:11px;line-height:1}
-#filterBar .filter-chip.active,#filterBar .filter-chip.f-all.active{background:#2a9d8f;border-color:#2a9d8f;color:#fff}
+/* no colour coding on the buttons: one blue fill for the selected filter (same size as unselected); the count is a small badge */
+#filterBar .filter-chip.active,#filterBar .filter-chip.f-all.active{background:#1e698f;border-color:#1e698f;color:#fff}
 #filterBar .filter-chip .fc-n{display:inline-block;min-width:18px;padding:1px 5px;border-radius:9px;background:rgba(255,255,255,.09);color:#e6e9ee;font-size:11px;font-weight:600;line-height:1.35;text-align:center;font-variant-numeric:tabular-nums}
 #filterBar .filter-chip.active .fc-n{background:rgba(0,0,0,.22);color:#fff}
 #filterBar .filter-chip.active:hover{filter:brightness(1.08)}
@@ -352,7 +351,7 @@ ul.fl li.sev-error b{color:var(--err)} ul.fl li.sev-warn b{color:var(--warn)} ul
 .vline{display:flex;gap:7px;align-items:center;min-width:0}
 .vrow:hover{color:var(--text)}
 .vrow .vt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vrow.sel{color:var(--accent);font-weight:650}
+.vrow.sel{color:var(--text);background:rgba(111,168,255,.15);box-shadow:inset 3px 0 0 var(--accent)}
 .vrow.sel .vt{white-space:normal}
 button.toggle{border-color:var(--border)} button.toggle.on{background:rgba(111,168,255,.15);border-color:var(--accent);color:var(--text)}
 .common-l{font-weight:650;color:var(--text);font-size:14px;margin-right:6px}
@@ -362,7 +361,7 @@ button.toggle{border-color:var(--border)} button.toggle.on{background:rgba(111,1
 select:focus{outline:none}
 select:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:1px}
 .lph .common-l{font-size:12.5px;text-transform:none;letter-spacing:0}
-.vinfo{padding:8px 14px;border-bottom:1px solid var(--border);min-height:52px;background:rgba(0,0,0,.15)}
+.vinfo{flex:none;padding:8px 14px;border-bottom:1px solid var(--border);min-height:52px;background:rgba(0,0,0,.15)}
 .vi-name{font-size:12px;overflow-wrap:anywhere;font-weight:600}
 .vi-meta{font-size:11.5px;color:var(--dim);margin-top:2px}
 .nochrome{color:var(--warn);font-size:12px}
