@@ -241,13 +241,7 @@
     const { ctx, w, h } = fitCanvas(tlWave);
     const loaded = !!(video && video.currentSrc);
     document.getElementById('timeline').classList.toggle('empty', !loaded);
-    // A lit panel: a deeper blue-teal, a little brighter through the middle and darker at the edges.
-    if (loaded) {
-      const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#05131d'); g.addColorStop(0.55, '#0f2e45'); g.addColorStop(1, '#04111a');
-      ctx.fillStyle = g;
-    } else ctx.fillStyle = EMPTY_BG;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = loaded ? BAR_BG : EMPTY_BG; ctx.fillRect(0, 0, w, h);
     updateTC();
     if (!ensureView()) { tlStatus.textContent = wf.msg || ''; return; }
     const span = view.end - view.start, x = t => (t - view.start) / span * w;
