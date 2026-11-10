@@ -10,7 +10,7 @@
   const tcDisplay = document.getElementById('tcDisplay');
   const tlOv = document.getElementById('overviewCanvas');
   const PEAK_RATE = 100, RULER = 21, DB_RANGE = 48;
-  const PLAYHEAD = '#0f8cff', BAR_BG = '#163a50', RULER_BG = '#101216', HANDLE_TRACK = '#17191d', EMPTY_BG = '#070708';
+  const PLAYHEAD = '#0f8cff', BAR_BG = '#1b4560', RULER_BG = '#101216', HANDLE_TRACK = '#17191d', EMPTY_BG = '#070708';
   const TC_FONT_SMALL = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif';
   const wf = { peaks: null, rms: null, duration: 0, worker: null, key: null, total: 0, sel: null, state: 'idle', msg: '', file: null };
   const view = { start: 0, end: 0 };
@@ -311,6 +311,15 @@
         // half phase: grows from the bottom up
         if (hr > 0.4) { ctx.fillStyle = 'rgba(120,214,206,0.92)'; ctx.fillRect(px, base - hr, 1, hr); }
       }
+    }
+    // scanlines: a faint dark line on every other screen pixel row (a lit-display texture), drawn in
+    // device pixels so it stays even at any window scale; the in / out lines go on top, crisp.
+    if (loaded) {
+      const sc = (window.devicePixelRatio || 1) * uiZoom(), unit = Math.max(1, Math.round(window.devicePixelRatio || 1));
+      const W = tlWave.width, y0 = Math.ceil((RULER + 1) * sc), y1 = Math.floor((h - 1) * sc);
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgba(0,0,0,0.10)';
+      for (let y = y0; y < y1; y += 2 * unit) ctx.fillRect(0, y, W, unit);
+      ctx.restore();
     }
     // subtitle events
     const t = video ? video.currentTime : 0, d = tlDuration();
