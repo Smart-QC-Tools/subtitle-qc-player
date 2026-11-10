@@ -518,7 +518,7 @@ function renderLibrary() {
   else vl.innerHTML = vids.map(v => {
     const st = Store.get('status:v:' + v.name) || '';
     return `<div class="vrow${state.selectedVideo === v.name ? ' sel' : ''}" data-v="${esc(v.name)}" title="${esc(v.name)}">
-      <div class="vline"><span class="stdot st-${st || 'none'}" title="${esc((STATUS_OPTS.find(o => o[0] === st) || STATUS_OPTS[0])[1])}"></span><span class="vt">${esc(videoTitle(v))}</span>${v.codec && v.codec.chrome === false ? ` <span class="nochrome" title="${PLAYER_NAME} can't display this codec">⚠</span>` : ''}</div></div>`;
+      <div class="vline"><span class="vt">${esc(videoTitle(v))}</span>${v.codec && v.codec.chrome === false ? ` <span class="nochrome" title="${PLAYER_NAME} can't display this codec">⚠</span>` : ''}</div></div>`;
   }).join('');
   if (state.ignoredVideos.length) vl.innerHTML += `<details class="ign"${state.ignOpen ? ' open' : ''}><summary>Ignored (${state.ignoredVideos.length}): audio files, dubcards, short clips</summary>${state.ignoredVideos.map(v => `
     <div class="li ignored" data-ign="${esc(v.name)}"><div class="li-s">${esc(v.name)}</div><div class="li-n muted">${esc(v.reason)} · <button class="mini incl" data-n="${esc(v.name)}">Include</button></div></div>`).join('')}</details>`;
@@ -544,7 +544,7 @@ function renderLibrary() {
   const cur = Player.currentSubtitle();
   sl.innerHTML = [...subs].sort((a, b) => langSortKey(a).localeCompare(langSortKey(b))).map(r => `
     <div class="li${cur === r.name ? ' sel' : ''}" data-f="${esc(r.name)}" title="${esc(r.name)}">
-      <div class="li-t"><span class="sd sd-${r.severity}"></span>${esc(langLabel(r) || 'No label')}
+      <div class="li-t">${esc(langLabel(r) || 'No label')}
         <code>${esc(r.rawLabel || '—')}</code> <span class="ty ${r.type === 'Forced' ? 'ty-forced' : r.type === 'CC/SDH' ? 'ty-cc' : 'ty-full'}">${esc(r.type)}</span></div>
       <div class="li-s">${esc(state.selectedVideo && r.video === state.selectedVideo ? r.name : displayName(r))}</div>
       ${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}
