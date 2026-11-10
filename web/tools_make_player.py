@@ -207,5 +207,7 @@ rep("""  function getVisibleUntranslatedRows() {
     }
     const stickyEl = sidebar.querySelector('.sidebar-sticky');""")
 
+# Filter buttons: the count as a small badge instead of in brackets.
+rep("btn.textContent = `${f.label} (${count})`;", "btn.innerHTML = `${esc(f.label)}<span class=\"fc-n\">${count}</span>`;")
 open('src/player.js','w').write(js)
 print('ok', len(js))
