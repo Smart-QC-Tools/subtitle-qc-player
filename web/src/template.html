@@ -501,7 +501,11 @@ body.ev-expanded .ev-detail-box{display:flex;align-items:stretch;flex:1 1 auto;m
 body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:center;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden;padding:14px 16px;font-size:13.5px;box-sizing:border-box}
 /* the info can be switched off; its space stays the same either way */
 .ev-detail-box.off .ev-detail,.ev-detail-box.nosel .evd-sw{visibility:hidden}
-.evd-sw{flex:none;align-self:center;flex-direction:column;align-items:center;gap:7px;width:74px;margin-right:12px;text-align:center;line-height:1.25;font-size:12px}
+.ev-detail-box{position:relative}
+.evd-sw{position:absolute;top:8px;right:12px;font-size:12.5px;color:#aab0ba;z-index:1}
+.evd-sw:hover{color:var(--text)}
+.evd-sw.on{color:var(--val)}
+.evd-sw.on:hover{color:#a9caff}
 .evd-empty{color:var(--dim)}
 .evd-top{display:flex;gap:28px;align-items:center;margin-bottom:12px;flex:none}
 .evd-meta.evd-times{flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;height:auto;overflow:visible;font-variant-numeric:tabular-nums}
@@ -588,7 +592,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
             </div>
           </div>
         </div>
-        <div class="ev-detail-box" id="evDetailBox"><div class="ev-detail" id="evDetail"></div><label class="sw-wrap evd-sw" for="infoToggle"><span>Show subtitle info</span><button class="sw" id="infoToggle" role="switch" aria-checked="false"><span class="knob"></span></button></label></div>
+        <div class="ev-detail-box" id="evDetailBox"><div class="ev-detail" id="evDetail"></div><button class="textbtn evd-sw" id="infoToggle" aria-pressed="false">Show subtitle info</button></div>
       </div>
       <div class="sidebar" id="sidebar">
         <div class="sidebar-sticky">

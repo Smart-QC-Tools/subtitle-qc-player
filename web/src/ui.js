@@ -235,7 +235,7 @@ function groupsFor(list) {
     }
   } else if (state.groupBy === 'name') {
     // One group per language as written in the file name (regions kept apart), split by type.
-    const TYPE_ORDER = { Full: 0, Forced: 1, 'CC/SDH': 2 };
+    const TYPE_ORDER = { Full: 0, Forced: 1, 'CC': 2 };
     for (const r of list) {
       const code = r.fileLang && r.fileLang.code;
       const type = r.type || 'Full';
@@ -452,7 +452,7 @@ function rowHtml(r) {
   const flags = r.flags.filter(f => f.sev !== 'info').map(f => `<span class="flag sev-${f.sev}">${esc(f.text)}</span>`).join('');
   const notes = r.flags.filter(f => f.sev === 'info' && /^(Region|Cantonese|Inner|Image|Low|.* close variants|.* has no language label)/.test(f.text) && !/markers consistent/.test(f.text))
     .map(f => `<span class="note" title="${esc(f.detail || '')}">${esc(f.text)}</span>`).join('');
-  const typeCls = r.type === 'Forced' ? 'ty-forced' : r.type === 'CC/SDH' ? 'ty-cc' : 'ty-full';
+  const typeCls = r.type === 'Forced' ? 'ty-forced' : r.type === 'CC' ? 'ty-cc' : 'ty-full';
   return `<tr class="row sev-row-${r.severity}${state.open.has(r.name) ? ' open' : ''}" data-f="${esc(r.name)}">
     <td class="dot"><span class="sd sd-${r.severity}" title="${r.severity}"></span></td>
     <td class="fname"><div class="dn fn" title="${esc(r.name)}">${esc(r.name)}</div>${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}</td>
@@ -545,7 +545,7 @@ function renderLibrary() {
   sl.innerHTML = [...subs].sort((a, b) => langSortKey(a).localeCompare(langSortKey(b))).map(r => `
     <div class="li${cur === r.name ? ' sel' : ''}" data-f="${esc(r.name)}" title="${esc(r.name)}">
       <div class="li-t">${esc(langLabel(r) || 'No label')}
-        <code>${esc(r.rawLabel || '—')}</code> <span class="ty ${r.type === 'Forced' ? 'ty-forced' : r.type === 'CC/SDH' ? 'ty-cc' : 'ty-full'}">${esc(r.type)}</span></div>
+        <code>${esc(r.rawLabel || '—')}</code> <span class="ty ${r.type === 'Forced' ? 'ty-forced' : r.type === 'CC' ? 'ty-cc' : 'ty-full'}">${esc(r.type)}</span></div>
       <div class="li-s">${esc(state.selectedVideo && r.video === state.selectedVideo ? r.name : displayName(r))}</div>
       ${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}
       ${state.selectedVideo && r.video === state.selectedVideo ? `<div class="li-n muted">matched on ${esc(r.matchReasons.join(', '))}</div>` : ''}

@@ -170,7 +170,7 @@ const Match = (() => {
 
   function subtitleType(lo) {
     if (lo.includes('forced') || lo.includes('fn') || lo.includes('fpn')) return 'Forced';
-    if (lo.includes('cc') || lo.includes('sdh')) return 'CC/SDH';
+    if (lo.includes('cc') || lo.includes('sdh')) return 'CC';
     if (lo.includes('full')) return 'Full';
     return null;
   }
