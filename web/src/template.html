@@ -430,6 +430,11 @@ html.native .web-only{display:none}
 .ev-lim input::selection{background:rgba(127,176,255,.35);color:#fff}
 .ev-lim input:hover{background:rgba(127,176,255,.08)}
 .ev-lim input.editing{outline:none;cursor:text;background:rgba(127,176,255,.14);color:#fff}
+/* limit values as small recessed readouts */
+.ev-lim input{background:#07080a!important;border:1px solid #000!important;border-radius:4px;padding:2px 5px!important;width:3.4ch!important;text-align:center;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.85),0 1px 0 rgba(255,255,255,.05);text-shadow:0 0 7px rgba(127,176,255,.45)}
+.ev-lim input:hover{background:#0b0d11!important}
+.ev-lim input.editing{background:#0d1118!important;box-shadow:inset 0 1px 3px rgba(0,0,0,.85),0 0 0 1px rgba(127,176,255,.45)}
 .ev-lim input:focus{outline:none}
 body.lim-dragging,body.lim-dragging *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='24' viewBox='0 0 26 24'%3E%3Cpath d='M7 2.5c.8 0 1.5.7 1.5 1.5v6.2c.2 0 .4-.1.6-.1.9 0 1.6.5 1.8 1.2.4-.3.9-.5 1.4-.5.8 0 1.5.5 1.7 1.2.3-.2.7-.3 1.1-.3 1 0 1.9.8 1.9 1.9V18c0 2.5-2 4.5-4.5 4.5H10c-1.3 0-2.5-.6-3.3-1.6L3.5 17c-.6-.7-.5-1.7.2-2.3.7-.5 1.6-.4 2.2.2l-.4-.5V4c0-.8.7-1.5 1.5-1.5z' fill='white' stroke='black' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M22 3.2l2.9 4H19.1z' fill='white' stroke='black' stroke-width='.9' stroke-linejoin='round'/%3E%3Cpath d='M22 14.8l2.9-4H19.1z' fill='white' stroke='black' stroke-width='.9' stroke-linejoin='round'/%3E%3C/svg%3E") 7 3,ns-resize!important;user-select:none}
 .ev-wrap{display:none}
@@ -503,8 +508,8 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
 .ev-detail-box.off .ev-detail,.ev-detail-box.nosel .evd-sw{visibility:hidden}
 .ev-detail-box{position:relative}
 .evd-sw{position:absolute;top:8px;right:12px;font-size:12.5px;color:#aab0ba;z-index:1}
-.evd-sw:hover{color:var(--text)}
-.evd-sw.on{color:var(--val)}
+.evd-sw:hover{color:#a9caff}
+.evd-sw.on{color:var(--val);text-shadow:0 0 8px rgba(127,176,255,.5)}
 .evd-sw.on:hover{color:#a9caff}
 .evd-empty{color:var(--dim)}
 .evd-top{display:flex;gap:28px;align-items:center;margin-bottom:12px;flex:none}

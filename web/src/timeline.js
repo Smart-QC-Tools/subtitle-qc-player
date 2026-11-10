@@ -241,7 +241,13 @@
     const { ctx, w, h } = fitCanvas(tlWave);
     const loaded = !!(video && video.currentSrc);
     document.getElementById('timeline').classList.toggle('empty', !loaded);
-    ctx.fillStyle = loaded ? BAR_BG : EMPTY_BG; ctx.fillRect(0, 0, w, h);
+    // A lit panel: a deeper blue-teal, a little brighter through the middle and darker at the edges.
+    if (loaded) {
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#0b2233'); g.addColorStop(0.55, '#123248'); g.addColorStop(1, '#0a1f2e');
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = EMPTY_BG;
+    ctx.fillRect(0, 0, w, h);
     updateTC();
     if (!ensureView()) { tlStatus.textContent = wf.msg || ''; return; }
     const span = view.end - view.start, x = t => (t - view.start) / span * w;
@@ -610,7 +616,7 @@
     ctx.drawImage(ovStatic(w, h, d), 0, 0, w, h);
     // the part the bar above shows
     const { x0, x1 } = boxGeom(w), act = ovHover === 'box' || (ovDrag && ovDrag.mode === 'move');
-    ctx.fillStyle = act ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.22)'; ctx.fillRect(x0, 0, x1 - x0, h);
+    ctx.fillStyle = act ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.34)'; ctx.fillRect(x0, 0, x1 - x0, h);
     ctx.strokeStyle = act ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
     // hover: a line and the time under the pointer
