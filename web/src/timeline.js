@@ -538,8 +538,8 @@
 
   // ---------------------------------------------------------------- zoom handle (under the bar)
   // ---------------------------------------------------------------- index bar (the whole video)
-  // Under the bar: the whole video at once. Faint waveform, where subtitles are (coverage), minute
-  // labels, and a box marking the part the bar above shows. Drag the box to look around
+  // Under the bar: the whole video at once. Faint waveform, where subtitles are (coverage)
+  // and a box marking the part the bar above shows. Drag the box to look around
   // (the playhead stays); click anywhere to jump there (drag on to scrub).
   const OV_MIN_BLOCK = 2, OV_MIN_GAP = 3;          // px: a lone event shows at least 2 px; gaps under 3 px are filled
   let ovHover = null, ovDrag = null, ovCache = null, ovKey = '';
@@ -583,8 +583,8 @@
     const cv = ovCache || document.createElement('canvas');
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#08090b'; ctx.fillRect(0, 0, w, h);
-    const LAB = 11, top = LAB + 1, bandH = h - top - 3;
+    ctx.fillStyle = '#101216'; ctx.fillRect(0, 0, w, h);
+    const top = 0, bandH = h - 3;
     // faint waveform, the whole video (loudest peak per pixel column)
     if (wf.peaks) {
       const amp = h - top - 1;
@@ -600,22 +600,13 @@
     }
     // subtitle coverage
     const on = ovCoverage(w, d);
-    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
     for (let x = 0; x < w; ) {
       if (!on[x]) { x++; continue; }
       let e = x; while (e < w && on[e]) e++;
       ctx.fillRect(x, top + 2, e - x, bandH - 2);
       x = e;
     }
-    // minute labels: a step that leaves room for the text
-    const step = [60, 120, 300, 600, 900, 1200, 1800, 3600, 7200].find(st => st / d * w >= 64) || 7200;
-    ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif'; ctx.textBaseline = 'middle';
-    for (let t = step; t < d - step * 0.25; t += step) {
-      const px = Math.round(t / d * w) + 0.5;
-      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(px - 0.5, 0, 1, h);
-      ctx.fillStyle = 'rgba(200,205,212,0.6)'; ctx.fillText(ovLabel(t), px + 3, LAB / 2 + 1);
-    }
-    ctx.fillStyle = 'rgba(200,205,212,0.6)'; ctx.fillText('0:00', 3, LAB / 2 + 1);
     ovCache = cv;
     return cv;
   }
