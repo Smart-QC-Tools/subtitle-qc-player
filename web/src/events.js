@@ -346,6 +346,14 @@
     bar.appendChild(line);
   }
 
+  // Subtitle info under the player: on / off (off to start with); the space it takes stays the same.
+  {
+    const box = document.getElementById('evDetailBox'), sw = document.getElementById('infoToggle');
+    const apply = on => { box.classList.toggle('off', !on); sw.classList.toggle('on', on); sw.setAttribute('aria-checked', String(on)); };
+    let on = Store.get('qc:showInfo') === '1';
+    apply(on);
+    sw.addEventListener('click', (e) => { e.preventDefault(); on = !on; apply(on); Store.set('qc:showInfo', on ? '1' : '0'); sw.blur(); });
+  }
   document.body.classList.add('ev-expanded');
   // Translate sits next to the search box (it translates the rows in view).
   { const tb = document.getElementById('translateBtn'), bar = document.querySelector('#sidebar .search-bar'); if (tb && bar) bar.appendChild(tb); }
