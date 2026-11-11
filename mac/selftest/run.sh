@@ -3,7 +3,7 @@
 set -uo pipefail
 MEDIA="$1"; OUT="$2"; mkdir -p "$OUT"
 BIN="$(pwd)/build/Subtitle QC Player.app/Contents/MacOS/SubtitleQC"
-defaults delete com.danmurciano.subtitleqc >/dev/null 2>&1 || true
+defaults delete com.smartqctools.subtitleqc >/dev/null 2>&1 || true
 rm -rf "$HOME/Library/Logs/Subtitle QC Player"
 { sw_vers; sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize; system_profiler SPDisplaysDataType 2>/dev/null | head -20; } > "$OUT/system.txt" 2>&1
 for f in "$MEDIA"/Videos/*; do echo "== $(basename "$f") $(stat -f%z "$f") bytes"; ffprobe -v error -show_entries stream=index,codec_name,profile,width,height,r_frame_rate,channels,pix_fmt:format=duration -of compact "$f"; done > "$OUT/media.txt" 2>&1
