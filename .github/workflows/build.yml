@@ -3,7 +3,7 @@ name: Build Mac app
 on:
   push:
     branches: [main, video-analysis, 'release/**']
-    paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'mac/selftest/**', '.github/workflows/selftest.yml']
+    paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'CLAUDE.md', 'mac/selftest/**', '.github/workflows/selftest.yml']
   workflow_dispatch:
     inputs:
       replace_release:
