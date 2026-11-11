@@ -5,6 +5,11 @@ on:
     branches: [main, video-analysis, 'release/**']
     paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'mac/selftest/**', '.github/workflows/selftest.yml']
   workflow_dispatch:
+    inputs:
+      replace_release:
+        description: On a release/x.y.z branch, rebuild the existing vx.y.z release in place (same download links)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,18 +47,28 @@ jobs:
             --notes "Latest build ($(date -u '+%Y-%m-%d %H:%M UTC'), commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
 
       # A release/x.y.z branch keeps that version as its own permanent release (tag vx.y.z), which later
-      # builds never replace. It is not marked as the latest, so the download page keeps following main.
+      # builds never replace (only a manual run with replace_release rebuilds it in place). It is not marked
+      # as the latest, so the download page keeps following main.
       - name: Publish a permanent release for a release branch
         if: startsWith(github.ref, 'refs/heads/release/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER="${GITHUB_REF_NAME#release/}"
-          gh release view "v$VER" >/dev/null 2>&1 && { echo "v$VER already exists: left as it is"; exit 0; }
+          NOTES="Stable version $VER (commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
+          if gh release view "v$VER" >/dev/null 2>&1; then
+            # Only a manual run with replace_release swaps the files of an existing release (links stay the same).
+            [ "${{ inputs.replace_release }}" = "true" ] || { echo "v$VER already exists: left as it is"; exit 0; }
+            git tag -f "v$VER" "$GITHUB_SHA" && git push -f origin "refs/tags/v$VER"
+            gh release upload "v$VER" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html --clobber
+            gh release edit "v$VER" --notes "$NOTES"
+            echo "::notice::v$VER rebuilt from ${GITHUB_SHA::7}"
+            exit 0
+          fi
           gh release create "v$VER" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
             --target "$GITHUB_SHA" --latest=false \
             --title "Subtitle QC Player $VER (stable)" \
-            --notes "Stable version $VER (commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
+            --notes "$NOTES"
 
       # Work in progress on the video-analysis branch: a test build that never touches the download page.
       - name: Publish the video-analysis test build (pre-release)
