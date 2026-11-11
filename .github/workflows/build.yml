@@ -2,8 +2,7 @@ name: Build Mac app
 
 on:
   push:
-    branches: [main, video-analysis]
-    tags: ['v*']
+    branches: [main, video-analysis, 'release/**']
     paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'mac/selftest/**', '.github/workflows/selftest.yml']
   workflow_dispatch:
 
@@ -42,17 +41,19 @@ jobs:
             --title "Subtitle QC Player $(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js) — build ${{ github.run_number }}" \
             --notes "Latest build ($(date -u '+%Y-%m-%d %H:%M UTC'), commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
 
-      # A version tag (v1.0.0 …) keeps that version as its own permanent release, which later builds never
-      # replace. It is not marked as the latest, so the download page keeps following main.
-      - name: Publish a permanent release for a version tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      # A release/x.y.z branch keeps that version as its own permanent release (tag vx.y.z), which later
+      # builds never replace. It is not marked as the latest, so the download page keeps following main.
+      - name: Publish a permanent release for a release branch
+        if: startsWith(github.ref, 'refs/heads/release/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
+          VER="${GITHUB_REF_NAME#release/}"
+          gh release view "v$VER" >/dev/null 2>&1 && { echo "v$VER already exists: left as it is"; exit 0; }
+          gh release create "v$VER" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
             --target "$GITHUB_SHA" --latest=false \
-            --title "Subtitle QC Player ${GITHUB_REF_NAME#v} (stable)" \
-            --notes "Stable version ${GITHUB_REF_NAME#v} (commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
+            --title "Subtitle QC Player $VER (stable)" \
+            --notes "Stable version $VER (commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
 
       # Work in progress on the video-analysis branch: a test build that never touches the download page.
       - name: Publish the video-analysis test build (pre-release)
