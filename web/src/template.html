@@ -366,6 +366,45 @@ select:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:1px}
 .vinfo{flex:none;padding:8px 14px;border-bottom:1px solid var(--border);min-height:52px;background:rgba(0,0,0,.15)}
 .vi-name{font-size:12px;overflow-wrap:anywhere;font-weight:600}
 .vi-meta{font-size:11.5px;color:var(--dim);margin-top:2px}
+.vi-ana{font-size:11.5px;color:var(--dim);margin-top:2px}
+.vi-ana:empty{display:none}
+/* ---- video analysis window ---- */
+#anaBtn{font-size:14.5px;margin-right:18px;color:#aab0ba}
+#anaBtn:hover{color:#a9caff}
+#anaBtn.busy{color:var(--val)}
+.modal.ana{max-width:1120px;display:flex;flex-direction:column;overflow:hidden}
+.ana-sim{margin-left:12px;font-size:11.5px;color:#f5bd5c;border:1px solid rgba(245,189,92,.4);border-radius:999px;padding:2px 9px;cursor:help}
+.ana-body{padding:14px 18px 6px;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
+.ana-row{display:flex;align-items:center;gap:14px;font-size:13px}
+.ana-k{width:52px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.ana-folder{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ana-chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none}
+.ana-chk.later,.ana-chk.off{color:var(--dim);cursor:default}
+.ana-chk i{font-style:normal;font-size:11.5px}
+.ana-tablewrap{overflow:auto;min-height:120px;max-height:52vh;border:1px solid var(--border);border-radius:8px}
+.ana-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13px}
+.ana-table input{margin:0;vertical-align:middle}
+.ana-table col.c-c{width:38px} .ana-table col.c-l{width:80px} .ana-table col.c-t{width:150px}
+.ana-table th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--dim);padding:8px 10px;border-bottom:1px solid var(--border)}
+.ana-table th.later,.ana-table td.later{color:#5d636d}
+.ana-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ana-table tr:last-child td{border-bottom:0}
+.ana-table tr.off td{color:var(--dim)}
+.ana-table td.ana-file{overflow-wrap:anywhere}
+.ana-table td.ana-len{font-variant-numeric:tabular-nums}
+.ana-note{font-size:11.5px;color:var(--dim);margin-top:2px} .ana-note.bad{color:#ff8f8f}
+.ana-empty{text-align:center;color:var(--dim);padding:24px!important}
+.ana-ok{color:#4cc38a;font-weight:700} .ana-warn{color:#f5bd5c;font-weight:600;cursor:help} .ana-bad{color:#ff8f8f;font-weight:600;cursor:help} .ana-dim{color:var(--dim)}
+.ana-run{display:inline-flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;color:var(--val)}
+.ana-bar{display:inline-block;width:70px;height:5px;border-radius:3px;background:#2a2e36;overflow:hidden}
+.ana-bar i{display:block;height:100%;background:var(--val)}
+.ana-foot{display:flex;align-items:center;gap:14px;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap}
+.ana-foot .spacer{flex:1}
+.ana-sum{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.ana-foot button.btn{padding:6px 18px}
+.ana-foot button.btn.primary{background:#42607a;border-color:#42607a;color:#fff}
+.ana-foot button.btn.primary:hover{background:#4c6d89}
+.ana-foot button.btn:disabled{opacity:.45;cursor:default;border-color:var(--border)}
 .nochrome{color:var(--warn);font-size:12px}
 .stage-msg{position:absolute;left:0;right:0;top:0;padding:12px 16px;background:rgba(46,39,22,.95);color:#e8c77a;font-size:13px;line-height:1.5;z-index:3}
 .vrow .vd{margin-top:3px;font-weight:400;font-size:11.5px;color:var(--dim);padding-left:15px;overflow-wrap:anywhere}
@@ -539,6 +578,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
   <label class="sw-wrap" for="matchToggle"><span>Matched only</span><button class="sw" id="matchToggle" role="switch" aria-checked="true"><span class="knob"></span></button></label>
   <button class="btn sm" id="rescan" hidden title="Re-read both folders">↻ Rescan</button>
   <span class="spacer"></span>
+  <button class="textbtn" id="anaBtn" title="Find commercial blacks and opening credits in a folder of videos (a batch job, separate from QC)">Analyse videos</button>
   <button class="textbtn" id="helpBtn" title="Keyboard shortcuts and how the tool works">Help</button>
   <input type="file" id="subDirInput" webkitdirectory directory multiple hidden>
   <input type="file" id="vidDirInput" webkitdirectory directory multiple hidden>
