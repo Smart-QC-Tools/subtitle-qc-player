@@ -9,8 +9,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   `preview.html` = latest `analysis-preview` test build, deliberately not linked from the main page
   (it links back to stable). Pages served from `main` `/docs`.
 - Intro slide deck (Claude artifact, Slides type): https://claude.ai/artifact/855rermCmJDWnomiRFh5ay
-  10 slides: 5 pitch + quick start (install, Conform, QC, keyboard) + "Good to know". No download URL in it
-  on purpose (user didn't want his name on it). Screenshots are from v1.0.0 with a made-up show "Harbor Lights".
+  10 slides: 5 pitch + quick start (install, Conform, QC, keyboard) + "Good to know". Download page link on
+  slides 6 (Install) and 10 (Good to know). Screenshots are from v1.0.0 with a made-up show "Harbor Lights".
 - Ideas discussed but not built: `IDEAS.md` (commercial blacks, opening-credits detection, etc.).
 
 ## Branches, versions, releases
