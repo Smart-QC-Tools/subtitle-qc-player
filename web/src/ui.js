@@ -8,7 +8,6 @@ const state = {
   open: new Set(), lang: '',   // language picked with the filter buttons ('' = all)
   selectedVideo: null, busy: false, matchedOnly: Store.get('matchedOnly') !== 'all', ignoredVideos: [], subCount: 0, vidCount: 0,
 };
-const STATUS_OPTS = [['', 'Not reviewed'], ['progress', 'In progress'], ['done', 'Done'], ['issues', 'Has issues']];
 
 // ------------------------------------------------------------ folders
 async function listDir(handle, re) {
@@ -378,15 +377,13 @@ function renderQC() {
     const rows = state.issuesOnly ? g.rows.filter(r => r.severity === 'error' || r.severity === 'warn') : g.rows;
     if (state.issuesOnly && !rows.length) continue;
     const e = g.rows.filter(r => r.severity === 'error').length, w = g.rows.filter(r => r.severity === 'warn').length, ok = g.rows.length - e - w;
-    const status = Store.get('status:' + g.key) || '';
     const meta = g.video ? `<span class="muted small" title="${esc(g.video)}">🎬 ${esc(g.video)}</span>` : g.noVideo ? `<span class="tag-novideo">no matching video</span>` : '';
-    html += `<section class="card st-${status || 'none'}" data-g="${esc(g.key)}">
+    html += `<section class="card" data-g="${esc(g.key)}">
       <div class="card-h">
         <div class="ct"><div class="title">${esc(g.title)} ${g.code ? `<code>${esc(g.code)}</code>` : ''}</div>${meta}</div>
         <span class="muted small">${g.rows.length} file${g.rows.length === 1 ? '' : 's'}</span>
         ${e ? `<span class="chip sev-error sm">${e} error${e === 1 ? '' : 's'}</span>` : ''}${w ? `<span class="chip sev-warn sm">${w} warning${w === 1 ? '' : 's'}</span>` : ''}${ok ? `<span class="chip sev-ok sm">${ok} OK</span>` : ''}
         <span class="spacer"></span>
-        ${state.groupBy === 'episode' ? `<select class="rstatus" data-g="${esc(g.key)}" title="Review status">${STATUS_OPTS.map(([v, l]) => `<option value="${v}"${v === status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}
       </div>`;
     if (!g.rows.length) html += `<div class="card-empty">No subtitle files matched this video.</div>`;
     else html += `<table>${COLS}${THEAD}<tbody>${rows.map(r => rowHtml(r) + (state.open.has(r.name) ? detailHtml(r) : '')).join('')}</tbody></table>`;
@@ -515,7 +512,6 @@ function renderLibrary() {
   if (!state.videos.length) vl.innerHTML = '';
   else if (!vids.length) vl.innerHTML = `<div class="list-empty">No video matches any subtitle file. Switch “Matched only” off to see every video.</div>`;
   else vl.innerHTML = vids.map(v => {
-    const st = Store.get('status:v:' + v.name) || '';
     return `<div class="vrow${state.selectedVideo === v.name ? ' sel' : ''}" data-v="${esc(v.name)}" title="${esc(v.name)}">
       <div class="vline"><span class="vt">${esc(videoTitle(v))}</span>${v.codec && v.codec.chrome === false ? ` <span class="nochrome" title="${PLAYER_NAME} can't display this codec">⚠</span>` : ''}</div></div>`;
   }).join('');
@@ -638,10 +634,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderQC();
   };
   $('#issuesOnly').onchange = e => { state.issuesOnly = e.target.checked; renderQC(); };
-  $('#groups').addEventListener('change', e => {
-    const s = e.target.closest("select.rstatus");
-    if (s) { s.value ? Store.set('status:' + s.dataset.g, s.value) : Store.del('status:' + s.dataset.g); s.closest('.card').className = 'card st-' + (s.value || 'none'); }
-  });
   $('#groups').addEventListener('click', e => {
     if (e.target.closest('select')) return;
     const cp = e.target.closest('button.copy');
