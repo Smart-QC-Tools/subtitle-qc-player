@@ -212,9 +212,9 @@ body.drag main{outline:3px dashed var(--accent);outline-offset:-12px}
 .tag-novideo{font-size:11.5px;color:var(--warn)}
 table{border-collapse:collapse;width:100%;table-layout:fixed}
 /* the table stops at a comfortable width on wide windows instead of spreading out */
-/* fixed content columns; the spare width goes to the gap before the play button */
+/* fixed content columns; Notes, the last one, takes the rest of the width */
 col.c-dot{width:30px} col.c-file{width:520px} col.c-type{width:110px} col.c-label{width:140px}
-col.c-det{width:170px} col.c-flags{width:320px} col.c-notes{width:230px} col.c-sp{width:auto} col.c-play{width:46px}
+col.c-det{width:170px} col.c-flags{width:320px} col.c-notes{width:auto}
 td.lbl code{font-size:13.5px}
 .no-label{color:var(--warn);font-weight:600;font-size:12.5px}
 td .pct{color:var(--dim);margin-left:2px} td .det-o{margin-top:3px;font-size:12.5px}
@@ -286,8 +286,6 @@ td.hl-error code,td.hl-warn code{background:transparent}
 .filter-chip.f-issue.active{border-color:#ff5c5c;background:rgba(255,92,92,.15)}
 .filter-chip.f-place.active{border-color:#f0a830;background:rgba(240,168,48,.15)}
 .filter-chip.f-neutral.active{border-color:#aab0ba;background:rgba(255,255,255,.08)}
-button.play{background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:6px;cursor:pointer;padding:3px 8px}
-button.play:hover{border-color:var(--accent);background:var(--info-bg)}
 .none{text-align:center;color:var(--dim);padding:30px}
 tr.detail td{background:rgba(0,0,0,.18)}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:6px 6px 14px}
@@ -595,7 +593,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
       <div id="langFilter" class="langfilter" hidden></div>
       <div id="progress" hidden></div>
       <div id="groups"></div>
-      <div class="foot">Click a row for details · ▶ opens it in the player</div>
+      <div class="foot">Click a row for details · the QC tab, top left, opens the files in the player</div>
     </div>
   </section>
 
@@ -756,7 +754,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
             <li><b>Detected</b>: the language the text is actually in, and any <b>other languages</b> found in it.</li>
             <li><b>Checks</b>: anything else worth knowing, such as the file name saying a different language, a season / episode that doesn't match the video or the folder, or encoding damage (“�” or garbled characters like “Ã©”).</li>
             <li>Per-event checks (reading speed, line length, overlaps …) are on the QC tab.</li>
-            <li>Click a row for details; ▶ opens the file in the player.</li>
+            <li>Click a row for details. Then switch to the <b>QC</b> tab, top left: every file is already matched to its video.</li>
           </ul>
           <h4>Grouping &amp; matching</h4>
           <ul>
