@@ -354,8 +354,8 @@ function renderToggle() {
 }
 
 // ------------------------------------------------------------ render: QC tab
-const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-det"><col class="c-flags"><col class="c-notes"><col class="c-sp"><col class="c-play"></colgroup>`;
-const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Detected</th><th>Checks</th><th>Notes</th><th></th><th></th></tr></thead>`;
+const COLS = `<colgroup><col class="c-dot"><col class="c-file"><col class="c-type"><col class="c-label"><col class="c-det"><col class="c-flags"><col class="c-notes"></colgroup>`;
+const THEAD = `<thead><tr><th></th><th>File</th><th>Type</th><th>Label</th><th>Detected</th><th>Checks</th><th>Notes</th></tr></thead>`;
 
 function renderQC() {
   const empty = !state.subs.length && !state.busy;
@@ -386,7 +386,6 @@ function renderQC() {
         ${e ? `<span class="chip sev-error sm">${e} error${e === 1 ? '' : 's'}</span>` : ''}${w ? `<span class="chip sev-warn sm">${w} warning${w === 1 ? '' : 's'}</span>` : ''}${ok ? `<span class="chip sev-ok sm">${ok} OK</span>` : ''}
         <span class="spacer"></span>
         ${state.groupBy === 'episode' ? `<select class="rstatus" data-g="${esc(g.key)}" title="Review status">${STATUS_OPTS.map(([v, l]) => `<option value="${v}"${v === status ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}
-        ${g.video ? `<button class="ghost open-video" data-v="${esc(g.video)}">▶ Open in player</button>` : ''}
       </div>`;
     if (!g.rows.length) html += `<div class="card-empty">No subtitle files matched this video.</div>`;
     else html += `<table>${COLS}${THEAD}<tbody>${rows.map(r => rowHtml(r) + (state.open.has(r.name) ? detailHtml(r) : '')).join('')}</tbody></table>`;
@@ -460,9 +459,7 @@ function rowHtml(r) {
     <td class="lbl ${r.rawLabel ? expCls : ''}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}">${r.rawLabel ? `<code>${esc(r.rawLabel)}</code>` : '<span class="no-label">No label</span>'}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
     <td class="${detErr ? 'hl-error' : detWarn ? 'hl-warn' : ''}">${det}</td>
     <td class="flags">${flags || '<span class="ok">✓ OK</span>'}</td>
-    <td class="notes">${notes}</td>
-    <td></td>
-    <td><button class="play" data-f="${esc(r.name)}" title="Open in player">▶</button></td></tr>`;
+    <td class="notes">${notes}</td></tr>`;
 }
 
 function detailHtml(r) {
@@ -479,7 +476,7 @@ function detailHtml(r) {
   const ni = r.nameInfo || {};
   const nameBits = [ni.showWords && ni.showWords.length ? `show “${Match.titleCase(ni.showWords)}”` : '', ni.season != null ? `season ${ni.season}` : '', ni.episode != null ? `episode ${ni.episode}` : '',
     ni.titleWords && ni.titleWords.length ? `title “${Match.titleCase(ni.titleWords)}”` : '', ni.codes && ni.codes.length ? `code ${ni.codes.join(', ')}` : ''].filter(Boolean).join(' · ');
-  return `<tr class="detail"><td></td><td colspan="8"><div class="dchecks"><h4 class="h-checks">Checks</h4><ul class="fl">${flags}</ul></div><div class="dgrid">
+  return `<tr class="detail"><td></td><td colspan="6"><div class="dchecks"><h4 class="h-checks">Checks</h4><ul class="fl">${flags}</ul></div><div class="dgrid">
     <div><h4 class="h-file">File</h4><div class="kv"><span>Full name</span><code class="full">${esc(r.name)}</code></div>
       <div class="kv"><span>Format</span>${esc(r.format || '—')}${r.cueCount != null ? ` · ${r.cueCount} cue${r.cueCount === 1 ? '' : 's'}` : ''}</div>
       <div class="kv"><span>Frame rate</span>${r.fileFps ? `${+r.fileFps.toFixed(3)} fps declared` : '<span class="muted">not declared</span>'}${r.nameFps ? ` · name says ${r.nameFps}` : ''}</div>
@@ -579,13 +576,6 @@ async function openSubtitle(r) {
   Player.loadSubtitle(text, r.name);
   renderLibrary();
 }
-async function playFromQC(name) {
-  const r = state.subs.find(x => x.name === name);
-  if (!r) return;
-  setTab('player');
-  if (r.video) await selectVideo(r.video, { autoSub: false });
-  await openSubtitle(r);
-}
 
 // ------------------------------------------------------------ wiring
 document.addEventListener('DOMContentLoaded', () => {
@@ -653,10 +643,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cp = e.target.closest('button.copy');
     if (cp) { e.stopPropagation(); navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy).then(() => { cp.textContent = 'Copied'; setTimeout(() => cp.textContent = 'Copy', 1200); }); return; }
     if (e.target.closest('tr.detail')) return;
-    const play = e.target.closest('button.play');
-    if (play) { e.stopPropagation(); return playFromQC(play.dataset.f); }
-    const ov = e.target.closest('button.open-video');
-    if (ov) { setTab('player'); return selectVideo(ov.dataset.v); }
     const row = e.target.closest('tr.row');
     if (row) { const f = row.dataset.f; state.open.has(f) ? state.open.delete(f) : state.open.add(f); renderQC(); }
   });
