@@ -204,7 +204,8 @@ body.drag main{outline:3px dashed var(--accent);outline-offset:-12px}
 .lchip.on{color:var(--text);border-color:var(--accent);background:rgba(111,168,255,.15)}
 .lchip.lnone{font-style:italic}
 .lclear{font-size:12.5px;margin-left:4px}
-.card-h .ct{display:flex;flex-direction:column;min-width:0}
+.card-h .ct{display:flex;align-items:baseline;gap:12px;min-width:0}
+.card-h .ct .title{flex:none} .card-h .ct .vname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .card-h .title{font-weight:650;font-size:14.5px}
 .card-h select{font-size:12.5px}
 .card-empty{padding:14px 18px;color:var(--dim);font-size:13px}

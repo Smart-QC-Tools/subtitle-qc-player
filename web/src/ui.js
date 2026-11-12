@@ -377,7 +377,7 @@ function renderQC() {
     const rows = state.issuesOnly ? g.rows.filter(r => r.severity === 'error' || r.severity === 'warn') : g.rows;
     if (state.issuesOnly && !rows.length) continue;
     const e = g.rows.filter(r => r.severity === 'error').length, w = g.rows.filter(r => r.severity === 'warn').length, ok = g.rows.length - e - w;
-    const meta = g.video ? `<span class="muted small" title="${esc(g.video)}">🎬 ${esc(g.video)}</span>` : g.noVideo ? `<span class="tag-novideo">no matching video</span>` : '';
+    const meta = g.video ? `<span class="muted small vname" title="${esc(g.video)}">${esc(g.video)}</span>` : g.noVideo ? `<span class="tag-novideo">no matching video</span>` : '';
     html += `<section class="card" data-g="${esc(g.key)}">
       <div class="card-h">
         <div class="ct"><div class="title">${esc(g.title)} ${g.code ? `<code>${esc(g.code)}</code>` : ''}</div>${meta}</div>
