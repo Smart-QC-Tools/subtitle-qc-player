@@ -66,7 +66,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Subtitle info under the player: off by default, toggled by a text button "Show subtitle info" (top right;
   grey, blue on hover / when on); hidden until an event is selected; space stays the same.
 - Conform page: Checks (errors/warnings or ✓ OK) + Notes column (info); File 520px, Type/Label/Detected 170/Checks
-  fixed px, Notes (last) takes the spare width. No ▶ / "Open in player" buttons: the Conform / QC tabs switch stages; "No label" in amber; Detected shows % only when it
+  fixed px, Notes (last) takes the spare width. No ▶ / "Open in player" buttons (the Conform / QC tabs switch stages), no review-status dropdown; "No label" in amber; Detected shows % only when it
   matters; title shown large without a "Title" label; one language filter at a time (All default);
   section titles in the detail view all blue. No sticky headers. Type label "CC" (not CC/SDH).
 - Help button orange-tinted. Help modal has a left nav (Keyboard, Waveform & timing, Subtitle checks,
