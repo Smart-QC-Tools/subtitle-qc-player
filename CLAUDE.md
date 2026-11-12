@@ -6,7 +6,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 
 - Repo: github.com/Smart-QC-Tools/subtitle-qc-player (moved from danmurciano/…; no one had the old links).
 - Download page: https://smart-qc-tools.github.io/subtitle-qc-player/ (pinned to stable v1.0.0);
-  `preview.html` = latest `analysis-preview` test build. Pages served from `main` `/docs`.
+  `preview.html` = latest `analysis-preview` test build, deliberately not linked from the main page
+  (it links back to stable). Pages served from `main` `/docs`.
 - Intro slide deck (Claude artifact, Slides type): https://claude.ai/artifact/855rermCmJDWnomiRFh5ay
   10 slides: 5 pitch + quick start (install, Conform, QC, keyboard) + "Good to know". No download URL in it
   on purpose (user didn't want his name on it). Screenshots are from v1.0.0 with a made-up show "Harbor Lights".

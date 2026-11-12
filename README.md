@@ -9,7 +9,8 @@ QC player with waveform, frame-accurate timecode and subtitle rendering.
   (also published with every build as `Subtitle_QC_Player.html`).
 
 ## Getting the app
-Download page: **https://smart-qc-tools.github.io/subtitle-qc-player/** (the stable version; test builds on its preview page).
+Download page: **https://smart-qc-tools.github.io/subtitle-qc-player/** (the stable version).
+Test builds of work in progress: `preview.html` on the same site, not linked from the main page.
 
 Every push to `main` builds the app on GitHub (Actions tab) and publishes it under
 **Releases → latest → Subtitle-QC-Player.zip**.
