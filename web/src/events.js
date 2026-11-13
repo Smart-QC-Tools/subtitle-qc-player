@@ -210,7 +210,9 @@
       target = inside >= 0 ? inside : last >= 0 ? last : tlSelected;
     }
     if (target !== tlSelected) { tlSelected = target; reapplyTlSel(); tlDirty = true; }
-    if (evRevealPending || tlSelected !== evRevealedSel) evReveal(tlSelected, 'jump');
+    // Sorted by a measure (CPS, duration …): the table stays where it is; only ↑ / ↓ and clicks move it.
+    if (evSort.key !== 'begin') evRevealedSel = tlSelected;
+    else if (evRevealPending || tlSelected !== evRevealedSel) evReveal(tlSelected, 'jump');
     evRevealPending = false;
   }
 
@@ -253,7 +255,7 @@
       // Playing: turn the page in the direction of travel (in time order; otherwise just keep it in sight).
       if (performance.now() - evUserScrollAt < EV_FOLLOW_PAUSE_MS) evRevealedSel = tlSelected;
       else if (evSort.key === 'begin') evReveal(tlSelected, 'page', (speed < 0 ? -1 : 1) * evSort.dir);
-      else evReveal(tlSelected, 'jump');
+      else evRevealedSel = tlSelected;   // sorted by a measure: the table stays put (the highlight still moves)
     }
   }
   function evMarkDirty() { evDirty = true; evDetailIdx = -2; if (expanded) renderEventsTable(); else updateEvDetail(); }
