@@ -211,7 +211,7 @@
     if (!video || !ensureView()) return;
     const t = video.currentTime, span = view.end - view.start;
     if (span >= tlDuration() - 0.01) return;
-    if (t > view.end - span * 0.03 || t < view.start) { view.start = t - span * 0.1; view.end = view.start + span; ensureView(); tlDirty = true; }
+    if (t > view.end - span * 0.03 || t < view.start) { view.start = t - span * 0.05; view.end = view.start + span; ensureView(); tlDirty = true; }
   }
   function centerOn(t) { const span = view.end - view.start || tlDuration(); view.start = t - span / 2; view.end = view.start + span; ensureView(); tlDirty = true; }
 
