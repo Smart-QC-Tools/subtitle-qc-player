@@ -56,14 +56,14 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   Duration as `2:13s` / `1:05:12m`. Columns centred except Text.
   Table follows the playhead: playing or ↑/↓ = paging (row within ~3 rows of the edge it heads for → jumps to
   a quarter in; `evReveal` in events.js); paused seek / scrub / typed TC = centre the row if out of view; hand
-  scrolling pauses following for 4 s. In a gap the event that last began is selected. A click on the bar
+  scrolling pauses following for 4 s. Sorted by anything but In/Out: the table doesn't follow (↑/↓, clicks do). In a gap the event that last began is selected. A click on the bar
   leaves the playhead where clicked; a click on a row seeks to the event's first whole frame.
 - Filter bar: buttons only for checks with hits, no dots; selected = soft steel fill, same size as unselected;
   count as a badge; "All issues" (red + amber, not placement/top) first with a divider; zero-hit checks on a
   "✓ Clean: …" line. Mixed align is amber. No "Critical" filter.
 - Limits (Lines 2–4, CPS 3–40 default 20 amber, CPL 10–60): plain blue values, drag or click-to-type.
 - Waveform bar: background `#1b4560`, blue-grey top/bottom lines `#4f7393`, light smoothing, no scanlines,
-  no colour coding of events. Zoom 10 s – 1.5 min (default 1 min); Ctrl/⌘+scroll anywhere over the player
+  no colour coding of events. Zoom 10 s – 1.5 min (default 1 min); playing pages the view at 97%, playhead lands at 5%; Ctrl/⌘+scroll anywhere over the player
   column zooms; browser zoom blocked elsewhere on the QC page.
 - Index bar under it: 18px, `#101216`, subtitle coverage blocks (2px min, gaps <3px closed), view box with
   22%/34% fill, no playhead, no times, hover readout.
