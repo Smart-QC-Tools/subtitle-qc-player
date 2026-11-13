@@ -54,6 +54,10 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Events table: row tints 35% (60% when selected); selected row = 1px grey frame `#6b7079` replacing the row
   lines; unflagged selected row fill rgba(255,255,255,.06). Selection follows the playhead (one selection).
   Duration as `2:13s` / `1:05:12m`. Columns centred except Text.
+  Table follows the playhead: playing or ↑/↓ = paging (row within ~3 rows of the edge it heads for → jumps to
+  a quarter in; `evReveal` in events.js); paused seek / scrub / typed TC = centre the row if out of view; hand
+  scrolling pauses following for 4 s. In a gap the event that last began is selected. A click on the bar
+  leaves the playhead where clicked; a click on a row seeks to the event's first whole frame.
 - Filter bar: buttons only for checks with hits, no dots; selected = soft steel fill, same size as unselected;
   count as a badge; "All issues" (red + amber, not placement/top) first with a divider; zero-hit checks on a
   "✓ Clean: …" line. Mixed align is amber. No "Critical" filter.

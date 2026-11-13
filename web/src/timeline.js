@@ -113,7 +113,7 @@
     forceRender(); keepInView(); tlDirty = true;
   }
   function stepFrame(dir) { if (!video) return; video.pause(); seekFrame(currentFrame() + dir); }
-  function seekTo(t) { if (!video) return; video.currentTime = Math.max(0, Math.min((tlDuration() || t) - 0.001, t)); forceRender(); tlDirty = true; }
+  function seekTo(t) { if (!video) return; video.currentTime = Math.max(0, Math.min((tlDuration() || t) - 0.001, t)); forceRender(); tlDirty = true; evRevealPending = true; }
   function setStartTimecode(tc) {   // from the video's timecode track
     window.__videoDropFrame = !!(tc && tc.dropFrame);
     if (tc) { vmeta.tcStartFrames = tc.frameNumber; vmeta.tcFps = Math.round(tc.fps); vmeta.dropFrame = tc.dropFrame; }
@@ -183,7 +183,7 @@
   tcDisplay.addEventListener('blur', () => { tcDisplay.dataset.sel = ''; tcW = 0; tcDisplay.style.removeProperty('padding-left'); tcDisplay.style.removeProperty('padding-right'); getSelection().removeAllRanges(); updateTC(); });
   tcDisplay.addEventListener('keydown', e => {
     e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); goToTypedTC(); tcDisplay.blur(); }
+    if (e.key === 'Enter') { e.preventDefault(); evRevealPending = true; goToTypedTC(); tcDisplay.blur(); }
     else if (e.key === 'Escape') { e.preventDefault(); tcDisplay.blur(); }
   });
 
@@ -360,7 +360,7 @@
     requestAnimationFrame(tlTick);
     if (document.body.dataset.tab !== 'player') return;
     const t = video ? video.currentTime : -1;
-    if (t !== lastT) { lastT = t; tlDirty = true; if (video && !video.paused && !scrub) keepInView(); }
+    if (t !== lastT) { lastT = t; tlDirty = true; if (video && !video.paused && !scrub) keepInView(); evFollowPaused(); }
     updateFps();
     if (!tlDirty && wf.state !== 'loading') return;
     tlDirty = false;
@@ -381,7 +381,8 @@
     const row = reapplyTlSel();
     if (row && scrollList) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
     const c = cueList[i];
-    if (c && seek && video) { video.currentTime = Math.max(0, c.begin - effectiveOffset()); forceRender(); }
+    // Land on the event's first frame (a whole frame, like ↑ / ↓), not a hair before it.
+    if (c && seek && video) { video.currentTime = Math.min((tlDuration() || Infinity) - 0.001, (Math.max(0, Math.round((c.begin - effectiveOffset()) * fps())) + 0.5) / fps()); forceRender(); }
     if (c) { const [b, e] = cueVideoTime(c); if (b < view.start || e > view.end) centerOn((b + e) / 2); }
     tlDirty = true;
   }
@@ -420,7 +421,8 @@
         const t = timeAtX(e.clientX);
         let hit = -1, best = -Infinity;
         cueList.forEach((c, i) => { const [b, en] = cueVideoTime(c); if (t >= b && t < en && b > best) { best = b; hit = i; } });
-        if (hit >= 0) selectCue(hit, { seek: true, scrollList: true });
+        // The playhead stays where it was clicked; the event there becomes the selected one.
+        if (hit >= 0) { selectCue(hit, { seek: false, scrollList: true }); evRevealPending = true; }
       }
     }
     if (s.wasPlaying) video.play();
@@ -721,7 +723,7 @@
       if (n < 0 || n >= order.length) return;
       seekFrame(Math.round((cueList[order[n]].begin - effectiveOffset()) * fps()));
       selectCue(order[n], { seek: false, scrollList: true });
-      if (evRows[order[n]]) evRows[order[n]].scrollIntoView({ block: 'nearest' });
+      evReveal(order[n], 'page', dir);
       return;
     }
     const half = 0.5 / fps(), t = video.currentTime + effectiveOffset();
@@ -737,7 +739,7 @@
     if (target < 0) return;
     seekFrame(Math.round((cueList[target].begin - effectiveOffset()) * fps()));
     selectCue(target, { seek: false, scrollList: !expanded });
-    if (expanded && evRows[target]) evRows[target].scrollIntoView({ block: 'nearest' });
+    if (expanded) evReveal(target, 'page', dir);
   }
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
