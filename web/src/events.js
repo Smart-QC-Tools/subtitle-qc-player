@@ -157,9 +157,62 @@
     if (evSort.key === th.dataset.sort) evSort.dir = -evSort.dir;
     else { evSort.key = th.dataset.sort; evSort.dir = th.dataset.sort === 'begin' ? 1 : -1; }
     sortEvents(); updateSortHeads();
-    const sel = evRows[tlSelected];
-    if (sel) sel.scrollIntoView({ block: 'nearest' });
+    evReveal(tlSelected, 'jump');
   });
+
+  // ---- keeping the selected row in sight
+  // 'jump' (a seek, a scrub, a typed timecode): if the row isn't fully in view, centre it.
+  // 'page' (playing, or stepping with the arrows; dir = direction of travel): when the row comes within a few
+  // rows of the edge it is heading for, turn the page, so it sits a quarter of the way in with what comes
+  // next in view. The table then stays still until the next page.
+  let evRevealedSel = -1, evRevealPending = false, evUserScrollAt = -1e9;
+  function evReveal(i, mode, dir) {
+    evRevealedSel = i;
+    const r = evRows[i];
+    if (!r || r.hidden || !expanded || !evWrap) return;
+    const wr = evWrap.getBoundingClientRect(), rr = r.getBoundingClientRect();
+    const hh = evTable.tHead.getBoundingClientRect().height;
+    const top = wr.top + hh, bottom = wr.top + evWrap.clientHeight, vh = bottom - top;
+    if (vh <= 0) return;
+    let to = null;   // where the row's top should sit, as a fraction of the visible height
+    if (mode === 'page') {
+      const margin = Math.min(3 * rr.height, vh * 0.3);
+      if (dir >= 0) { if (rr.bottom > bottom - margin || rr.top < top) to = 0.25; }
+      else if (rr.top < top + margin || rr.bottom > bottom) to = 0.75 - rr.height / vh;
+    } else if (rr.top < top || rr.bottom > bottom) to = 0.5 - rr.height / vh / 2;
+    if (to != null) evWrap.scrollTop += Math.round(rr.top - top - to * vh);
+  }
+  // Scrolling the table by hand while the video plays: following waits a few seconds.
+  if (evWrap) {
+    const userScroll = () => { evUserScrollAt = performance.now(); };
+    let wrapDown = false;
+    evWrap.addEventListener('wheel', userScroll, { passive: true });
+    evWrap.addEventListener('touchmove', userScroll, { passive: true });
+    evWrap.addEventListener('mousedown', e => { if (e.target === evWrap) { wrapDown = true; userScroll(); } });   // its scrollbar
+    window.addEventListener('mouseup', () => { wrapDown = false; });
+    evWrap.addEventListener('scroll', () => { if (wrapDown) userScroll(); });
+  }
+  const EV_FOLLOW_PAUSE_MS = 4000;
+  // Paused and the playhead moved (seek, scrub, frame step): select the event under the playhead, or in a
+  // gap the one that last began, and bring it into view.
+  function evFollowPaused() {
+    if (!video || !cueList.length || isMoving()) return;
+    const t = video.currentTime + effectiveOffset(), half = 0.5 / fps();
+    let target = tlSelected;
+    const cur = cueList[tlSelected];
+    if (!(cur && t >= cur.begin && t < cur.end)) {
+      let inside = -1, last = -1, lastB = -Infinity;
+      cueList.forEach((c, i) => {
+        if (!isFinite(c.begin)) return;
+        if (t >= c.begin && t < c.end) { if (inside < 0) inside = i; }
+        if (c.begin <= t + half && c.begin > lastB) { lastB = c.begin; last = i; }
+      });
+      target = inside >= 0 ? inside : last >= 0 ? last : tlSelected;
+    }
+    if (target !== tlSelected) { tlSelected = target; reapplyTlSel(); tlDirty = true; }
+    if (evRevealPending || tlSelected !== evRevealedSel) evReveal(tlSelected, 'jump');
+    evRevealPending = false;
+  }
 
   // Same filter + search as the list.
   function evApplyFilter() {
@@ -197,8 +250,10 @@
     let first = null;
     activeCueIndices.forEach(i => { const r = evRows[i]; if (r) { r.classList.add('active'); if (!first) first = r; } });
     if (first && expanded && isMoving()) {
-      const wr = evWrap.getBoundingClientRect(), rr = first.getBoundingClientRect();
-      if (rr.top < wr.top + 28 || rr.bottom > wr.bottom) first.scrollIntoView({ block: 'nearest' });
+      // Playing: turn the page in the direction of travel (in time order; otherwise just keep it in sight).
+      if (performance.now() - evUserScrollAt < EV_FOLLOW_PAUSE_MS) evRevealedSel = tlSelected;
+      else if (evSort.key === 'begin') evReveal(tlSelected, 'page', (speed < 0 ? -1 : 1) * evSort.dir);
+      else evReveal(tlSelected, 'jump');
     }
   }
   function evMarkDirty() { evDirty = true; evDetailIdx = -2; if (expanded) renderEventsTable(); else updateEvDetail(); }
@@ -256,6 +311,7 @@
     const tr = e.target.closest('tr');
     if (!tr || e.target.closest('.suspicious-char')) return;
     selectCue(Number(tr.dataset.index), { seek: true, scrollList: false });
+    evRevealedSel = tlSelected;
   });
 
   // Limits (shared with the list and the Conform page). Shown in the panel header while expanded.
