@@ -156,7 +156,7 @@
     // First click: time ascending, measures worst first. Again reverses.
     if (evSort.key === th.dataset.sort) evSort.dir = -evSort.dir;
     else { evSort.key = th.dataset.sort; evSort.dir = th.dataset.sort === 'begin' ? 1 : -1; }
-    sortEvents(); updateSortHeads();
+    sortEvents(); updateSortHeads(); evMarkPos();
     evReveal(tlSelected, 'jump');
   });
 
@@ -168,7 +168,8 @@
   let evRevealedSel = -1, evRevealPending = false, evUserScrollAt = -1e9;
   function evReveal(i, mode, dir) {
     evRevealedSel = i;
-    const r = evRows[i];
+    let r = evRows[i];
+    if (r && r.hidden) r = evPosRow;   // filtered out: follow the line that marks the playhead's place
     if (!r || r.hidden || !expanded || !evWrap) return;
     const wr = evWrap.getBoundingClientRect(), rr = r.getBoundingClientRect();
     const hh = evTable.tHead.getBoundingClientRect().height;
@@ -235,11 +236,25 @@
   // The visible row just above the selected one: its bottom line is the selection frame's top edge.
   function evMarkPreSel() {
     for (const p of evBody.querySelectorAll('tr.pre-sel,tr.sel-top')) p.classList.remove('pre-sel', 'sel-top');
+    evMarkPos();
     const r = evBody.querySelector('tr.sel');
     if (!r || r.hidden) return;
     let p = r.previousElementSibling;
     while (p && p.hidden) p = p.previousElementSibling;
     if (p) p.classList.add('pre-sel'); else r.classList.add('sel-top');
+  }
+  // A filter or search is hiding the event at the playhead: a playhead-blue line between the two listed rows
+  // it falls between shows where you are (time order only).
+  let evPosRow = null;
+  function evMarkPos() {
+    for (const p of evBody.querySelectorAll('tr.ph-above,tr.ph-below')) p.classList.remove('ph-above', 'ph-below');
+    evPosRow = null;
+    const r = evRows[tlSelected];
+    if (!r || !r.hidden || evSort.key !== 'begin') return;
+    let n = r.nextElementSibling; while (n && n.hidden) n = n.nextElementSibling;
+    if (n) { n.classList.add('ph-above'); evPosRow = n; return; }
+    let p = r.previousElementSibling; while (p && p.hidden) p = p.previousElementSibling;
+    if (p) { p.classList.add('ph-below'); evPosRow = p; }
   }
   function evSyncActive() {
     updateEvDetail();

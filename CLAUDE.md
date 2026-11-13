@@ -56,7 +56,9 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   Duration as `2:13s` / `1:05:12m`. Columns centred except Text.
   Table follows the playhead: playing or ↑/↓ = paging (row within ~3 rows of the edge it heads for → jumps to
   a quarter in; `evReveal` in events.js); paused seek / scrub / typed TC = centre the row if out of view; hand
-  scrolling pauses following for 4 s. Sorted by anything but In/Out: the table doesn't follow (↑/↓, clicks do). In a gap the event that last began is selected. A click on the bar
+  scrolling pauses following for 4 s. Sorted by anything but In/Out: the table doesn't follow (↑/↓, clicks do).
+  Filter/search hiding the event at the playhead: a 2px playhead-blue line between the listed rows it falls
+  between (`evMarkPos`), steady through hidden events and gaps; the table pages to keep it in view. In a gap the event that last began is selected. A click on the bar
   leaves the playhead where clicked; a click on a row seeks to the event's first whole frame.
 - Filter bar: buttons only for checks with hits, no dots; selected = soft steel fill, same size as unselected;
   count as a badge; "All issues" (red + amber, not placement/top) first with a divider; zero-hit checks on a

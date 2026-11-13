@@ -450,10 +450,10 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap}
 .ev-table tbody tr{cursor:pointer}
 .ev-table tbody tr:hover td{background-image:linear-gradient(rgba(255,255,255,.04),rgba(255,255,255,.04))}
-.ev-table td:first-child{box-shadow:inset 3px 0 0 transparent}
-.ev-table tr.has-issue td:first-child{box-shadow:inset 3px 0 0 #ff5c5c}
-.ev-table tr.has-warn td:first-child{box-shadow:inset 3px 0 0 #f0a830}
-.ev-table tr.has-place td:first-child{box-shadow:inset 3px 0 0 #f0a830}
+.ev-table td:first-child{box-shadow:var(--ph,0 0 0 transparent),inset 3px 0 0 transparent}
+.ev-table tr.has-issue td:first-child{box-shadow:var(--ph,0 0 0 transparent),inset 3px 0 0 #ff5c5c}
+.ev-table tr.has-warn td:first-child{box-shadow:var(--ph,0 0 0 transparent),inset 3px 0 0 #f0a830}
+.ev-table tr.has-place td:first-child{box-shadow:var(--ph,0 0 0 transparent),inset 3px 0 0 #f0a830}
 .ev-table tr.has-issue td{background-color:rgba(255,120,120,.35)}
 .ev-table tr.has-warn td{background-color:rgba(250,190,80,.35)}
 .ev-table tr.has-place td{background-color:rgba(250,190,80,.35)}
@@ -466,6 +466,8 @@ body.ev-expanded #sidebar .filter-bar{padding-top:8px}
 .ev-table tbody tr:last-child td{border-bottom:1px solid var(--border)}
 .ev-table tbody tr.sel td{border-bottom-color:var(--sel-line)}
 .ev-table tr.pre-sel td{border-bottom-color:var(--sel-line)}
+.ev-table tr.ph-above{--ph:inset 0 2px 0 #0f8cff} .ev-table tr.ph-below{--ph:inset 0 -2px 0 #0f8cff}
+.ev-table tr.ph-above td:not(:first-child),.ev-table tr.ph-below td:not(:first-child){box-shadow:var(--ph)}
 /* top edge when there is no row above (first row) */
 .ev-table tr.sel td{--st:0 0 0 transparent;--sb:0 0 0 transparent;box-shadow:var(--st),var(--sb)}
 .ev-table tr.sel.sel-top td{--st:inset 0 1px 0 var(--sel-line)}
