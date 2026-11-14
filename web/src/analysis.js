@@ -18,7 +18,10 @@ const Analysis = (() => {
     blacks: { v: 1, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, coarsePerSecond: 4 },
     credits: { v: 1, searchMinutes: 20, coarseStepSeconds: 4, joinGapSeconds: 30 },
   };
-  const SIMULATED = !NATIVE;                 // the real engine lives in the Mac app
+  // The real engine (Mac app) isn't built yet: until it is, the Mac app runs the same simulated engine as the web
+  // preview and says so, so made-up results are never taken for real ones.
+  const ENGINE_READY = false;
+  const SIMULATED = !NATIVE || !ENGINE_READY;
 
   // ------------------------------------------------------------ results store
   // By video file name; each result carries the fingerprint of the file it was made from.
@@ -163,7 +166,7 @@ const Analysis = (() => {
     m.className = 'modal-bg'; m.id = 'anaModal'; m.hidden = true;
     m.innerHTML = `
       <div class="modal ana" role="dialog" aria-label="Video analysis">
-        <div class="modal-h"><b>Video analysis</b>${SIMULATED ? '<span class="ana-sim" title="The web version simulates the analysis so the window can be tried; results are kept in this browser only. The real analysis runs in the Mac app.">Preview · simulated results</span>' : ''}<span class="spacer"></span><button class="btn sm" id="anaClose">Close</button></div>
+        <div class="modal-h"><b>Video analysis</b>${SIMULATED ? `<span class="ana-sim" title="${NATIVE ? 'The real analysis is not in the Mac app yet. For now it simulates the results so the window can be tried: they are made up, and no results file is written.' : 'The web version simulates the analysis so the window can be tried; results are kept in this browser only. The real analysis runs in the Mac app.'}">Preview · simulated results</span>` : ''}<span class="spacer"></span><button class="btn sm" id="anaClose">Close</button></div>
         <div class="ana-body">
           <div class="ana-row"><span class="ana-k">Folder</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
           <div class="ana-row"><span class="ana-k">Run</span>${TYPES.map(t => `<label class="ana-chk${t.later ? ' later' : ''}"${t.later ? ' title="Coming later"' : ''}><input type="checkbox" data-type="${t.key}"${t.later ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.later ? ' <i>(later)</i>' : ''}</label>`).join('')}</div>
