@@ -138,6 +138,17 @@ extension AnalysisJob {
         }
         // Shorter than half a second: a misread, not a card.
         cards = cards.filter { $0.tout - $0.tin >= minSeconds }
+        // In the same place at the same time as a longer card: a piece of it (read while it faded).
+        cards.sort { ($0.tout - $0.tin) > ($1.tout - $1.tin) }
+        var kept: [TextCard] = []
+        for c in cards {
+            let inside = kept.contains { k in
+                let shared = min(k.tout, c.tout) - max(k.tin, c.tin)
+                return shared >= (c.tout - c.tin) * 0.7 && AnalysisJob.overlap(k.box, c.box) > 0.5
+            }
+            if !inside { kept.append(c) }
+        }
+        cards = kept
         cards.sort { $0.tin < $1.tin }
 
         let credits = cards.filter { $0.kind == "credit" }
