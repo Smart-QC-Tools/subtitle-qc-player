@@ -70,12 +70,13 @@
         let prog = 0;
         const res = await new Promise((resolve, reject) => {
           Native.on('analysis', m => { if (m.id !== id) return; if (m.type === 'progress') prog++; else if (m.type === 'done') resolve(m.result); else reject(new Error(m.message || m.type)); });
-          Native.call('analysisStart', { id, path: f.path, type: 'blacks', settings: { pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -60 } }).catch(reject);
+          Native.call('analysisStart', { id, path: f.path, type: 'blacks', settings: { pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -50 } }).catch(reject);
         }).catch(e => ({ error: String(e && e.message || e) }));
         step('analysis: blacks', { file: f.name, ms: round(now() - t, 0), progressEvents: prog, result: res });
         if (res.error) { problem('analysis failed', { file: f.name, error: res.error }); continue; }
         if (expected) {
-          const want = expected.blacks.map(b => ({ in: b[0], out: b[1], silent: b[3] === 'silent' }));
+          // blacks with sound (inside a scene) are left out of the results
+          const want = expected.blacks.filter(b => b[3] === 'silent').map(b => ({ in: b[0], out: b[1], silent: true }));
           const got = res.items || [];
           const fr = 1001 / 24000;
           if (got.length !== want.length) problem('analysis: number of blacks', { file: f.name, got: got.length, want: want.length });

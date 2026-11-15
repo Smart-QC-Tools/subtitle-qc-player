@@ -119,6 +119,11 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Credits design (IDEAS.md): scan from 0 every ~4 s for credit-like static aligned text, read text only on hits,
   stop at "Directed by" (+1 min), limit 20 min, card in/out by bisection, compare with rendered subtitle box;
   raised-with-no-credits window 20 s; margins as future "Advanced" settings.
-- Next step: use the results on the QC page (credits band + black ticks on the index bar, credit / black
-  checks in the events table: subtitle box vs credit boxes, raised subs with no credit near).
+- QC page (index bar only, for now): credits = gold strip `#d9b85f` in the lower third, credits < 20 s apart
+  joined (`Analysis.marks`); commercial blacks = red `#ff5c5c` full-height marks (min 3 px); nothing for
+  start / end blacks. Hover label adds "Credits 0:50 – 2:31" / "Commercial black". Help (Waveform & timing)
+  explains the colours. `Player.setAnalysisMarks` from ui.js renderLibrary (only for the video in the player).
+  Blacks engine v3: silence = RMS ≤ −50 dBFS (a low noise floor counts); blacks with sound are dropped.
+- Next: checks in the events table (subtitle box vs credit boxes, raised subs with no credit near, events
+  across a commercial black); maybe marks on the waveform bar later.
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).

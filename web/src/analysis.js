@@ -20,9 +20,10 @@ const Analysis = (() => {
   // Settings each result is made with; a result made with older settings shows as Outdated.
   const SETTINGS = {
     // Black frame: pictureShare of the picture at or below pixelLevel. Kept from minSeconds. Silent: sound at or
-    // below silenceDb (dBFS, RMS) across the black. Each item: in, out, frames, audio (silent | sound | none),
-    // level, kind (start | end | commercial | other = a black with sound, inside a scene).
-    blacks: { v: 2, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -60 },
+    // below silenceDb (dBFS, RMS) across the black: a low noise floor counts as silence. Blacks with sound
+    // (inside a scene) are left out. Each item: in, out, frames, audio (silent | none), level, kind (start |
+    // end | commercial).
+    blacks: { v: 3, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -50 },
     // One frame a second from the start; stops a minute after "Directed by" (or at 20 min). Text staying longer
     // than staticMaxSeconds (logos, burnt-in timecode) isn't a card. Each card: in, out, text, lines, kind
     // (credit | title | text), box and line boxes [x, y, w, h] (0…1, from the top left). Runs: credits ≤ joinGap apart.
@@ -334,7 +335,7 @@ const Analysis = (() => {
     const t = res && res[key]; if (!t) return '';
     if (key === 'blacks') {
       const it = t.items || [], c = it.filter(b => b.kind === 'commercial').length, o = it.length - c;
-      return `${c} commercial${o ? ` · ${o} other` : ''}`;
+      return `${c} commercial black${c === 1 ? '' : 's'}`;
     }
     if (key === 'credits') {
       const n = (t.cards || []).filter(c => !c.kind || c.kind === 'credit').length;
@@ -517,5 +518,17 @@ const Analysis = (() => {
     });
   }
 
-  return { open, close, forVideo, statusLine, fingerprint, TYPES, DATA_DIR };
+  // For the index bar: credits joined where less than 20 s apart, and the commercial blacks.
+  const CREDIT_JOIN = 20;
+  function marks(r) {
+    if (!r) return null;
+    const credits = [];
+    for (const c of ((r.credits && r.credits.cards) || []).filter(c => !c.kind || c.kind === 'credit').sort((a, b) => a.in - b.in)) {
+      const last = credits[credits.length - 1];
+      if (last && c.in - last[1] < CREDIT_JOIN) last[1] = Math.max(last[1], c.out); else credits.push([c.in, c.out]);
+    }
+    const blacks = ((r.blacks && r.blacks.items) || []).filter(b => b.kind === 'commercial').map(b => [b.in, b.out]);
+    return credits.length || blacks.length ? { video: r.video && r.video.name, credits, blacks } : null;
+  }
+  return { open, close, forVideo, statusLine, marks, fingerprint, TYPES, DATA_DIR };
 })();

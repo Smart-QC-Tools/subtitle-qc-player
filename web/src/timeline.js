@@ -574,6 +574,20 @@
   // (the playhead stays); click anywhere to jump there (drag on to scrub).
   const OV_MIN_BLOCK = 2, OV_MIN_GAP = 3;          // px: a lone event shows at least 2 px; gaps under 3 px are filled
   let ovHover = null, ovDrag = null, ovCache = null, ovKey = '';
+  // Video analysis results for the video in the player (set from the QC page): credits as strips in the lower
+  // third (credits under 20 s apart join into one), commercial blacks as red full-height marks.
+  let anaMarks = null, anaSeq = 0;
+  const ANA_CREDITS = '#d9b85f', ANA_BLACK = '#ff5c5c';
+  window.Player.setAnalysisMarks = (m) => { anaMarks = m; anaSeq++; tlDirty = true; };
+  const marksNow = () => (anaMarks && anaMarks.video === currentVideoName) ? anaMarks : null;
+  // What the analysis marks under the pointer (x in px of a w-wide bar), for the hover label.
+  function anaAt(x, w) {
+    const m = marksNow(), d = tlDuration(); if (!m || !d) return '';
+    const px = t => t / d * w;
+    for (const [a, b] of m.blacks) if (x >= px(a) - 3 && x <= Math.max(px(b), px(a) + 2) + 3) return 'Commercial black';
+    for (const [a, b] of m.credits) if (x >= px(a) - 1 && x <= Math.max(px(b), px(a) + 2) + 1) return `Credits ${ovLabel(a)} – ${ovLabel(b)}`;
+    return '';
+  }
   const ovTime = (px, w) => Math.max(0, Math.min(tlDuration(), px / w * tlDuration()));
   function ovLabel(t) {
     const s = Math.round(t), hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60, p2 = n => String(n).padStart(2, '0');
@@ -607,7 +621,7 @@
   function ovStatic(w, h, d) {
     const dpr = (window.devicePixelRatio || 1) * uiZoom();
     const n = cueList.length, c0 = n ? cueList[0].begin : 0, cN = n ? cueList[n - 1].end : 0;
-    const key = [w, h, dpr, d, n, c0, cN, effectiveOffset()].join('|');
+    const key = [w, h, dpr, d, n, c0, cN, effectiveOffset(), anaSeq, currentVideoName].join('|');
     if (ovCache && key === ovKey) return ovCache;
     ovKey = key;
     const cv = ovCache || document.createElement('canvas');
@@ -623,6 +637,14 @@
       let e = x; while (e < w && on[e]) e++;
       ctx.fillRect(x, top + 2, e - x, bandH - 2);
       x = e;
+    }
+    const m = marksNow();
+    if (m) {
+      ctx.fillStyle = ANA_CREDITS;
+      const sh = Math.round(h / 3);
+      for (const [a, b] of m.credits) { const x0 = Math.floor(a / d * w); ctx.fillRect(x0, h - sh, Math.max(2, Math.ceil(b / d * w) - x0), sh); }
+      ctx.fillStyle = ANA_BLACK;
+      for (const [a, b] of m.blacks) { const x0 = Math.floor(a / d * w); ctx.fillRect(x0, 0, Math.max(3, Math.ceil(b / d * w) - x0), h); }
     }
     ovCache = cv;
     return cv;
@@ -646,7 +668,8 @@
     ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
     // hover: a line and the time under the pointer
     if (ovHover != null && typeof ovHover === 'object' && !ovDrag) {
-      const px = Math.round(ovHover.x) + 0.5, txt = ovLabel(ovTime(ovHover.x, w));
+      const what = anaAt(ovHover.x, w);
+      const px = Math.round(ovHover.x) + 0.5, txt = ovLabel(ovTime(ovHover.x, w)) + (what ? ' · ' + what : '');
       ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(px - 0.5, 0, 1, h);
       ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif'; ctx.textBaseline = 'middle';
       const tw = ctx.measureText(txt).width + 10, bx = Math.max(0, Math.min(w - tw, px + 6));

@@ -506,7 +506,10 @@ function renderLibrary() {
   if (sv) {
     const n = subsForVideo(sv.name).length;
     $('#vidInfo').innerHTML = `<div class="vi-name">${esc(sv.name)}</div><div class="vi-meta">${sv.codec ? `${esc(sv.codec.name)}${sv.probe && sv.probe.width ? ` · ${sv.probe.width}×${sv.probe.height}` : ''} · ` : ''}${n ? `${n} subtitle file${n === 1 ? '' : 's'}` : 'no matching subtitle files'}${sv.codec && sv.codec.chrome === false ? ` · <span class="warn-t">${PLAYER_NAME} can't show this picture</span>` : ''}${sv.forced ? ` · <button class="mini excl" data-n="${esc(sv.name)}">Ignore again</button>` : ''}</div><div class="vi-ana" id="viAna"></div>`;
-    if (typeof Analysis !== 'undefined') Analysis.statusLine(sv).then(t => { const el = $('#viAna'); if (el && state.selectedVideo === sv.name) el.textContent = 'Analysis: ' + t; }).catch(() => {});
+    if (typeof Analysis !== 'undefined') {
+      Analysis.statusLine(sv).then(t => { const el = $('#viAna'); if (el && state.selectedVideo === sv.name) el.textContent = 'Analysis: ' + t; }).catch(() => {});
+      Analysis.forVideo(sv).then(r => { if (state.selectedVideo === sv.name && window.Player.setAnalysisMarks) window.Player.setAnalysisMarks(Analysis.marks(r)); }).catch(() => {});
+    }
   } else $('#vidInfo').innerHTML = '';
 
   if (!state.videos.length) vl.innerHTML = '';

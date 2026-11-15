@@ -67,7 +67,7 @@ final class AnalysisJob {
         let nominal = Double(try await track.load(.nominalFrameRate))
         let frameDur = nominal > 1 ? 1 / nominal : 1.0 / 24
 
-        let share = setting("pictureShare", 0.98), minSeconds = setting("minSeconds", 0.25), silenceDb = setting("silenceDb", -60)
+        let share = setting("pictureShare", 0.98), minSeconds = setting("minSeconds", 0.25), silenceDb = setting("silenceDb", -50)
         // 8-bit video range: black is 16, white 235.
         let limit = UInt8(max(0, min(255, (16 + setting("pixelLevel", 0.10) * 219).rounded())))
 
@@ -134,7 +134,8 @@ final class AnalysisJob {
             // black inside a scene (the sound carries on).
             if r.tin <= frames[0].t + frameDur * 0.5 { item["kind"] = "start" }
             else if r.tout >= end - frameDur * 1.5 { item["kind"] = "end" }
-            else { item["kind"] = audio == "sound" ? "other" : "commercial" }
+            else if audio == "sound" { continue }   // a black inside a scene (the sound carries on): not a break
+            else { item["kind"] = "commercial" }
             items.append(item)
         }
         post(["type": "progress", "p": 1.0])
