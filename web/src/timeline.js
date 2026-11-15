@@ -548,7 +548,7 @@
     transportBound = true;
     video.controls = false;
     video.addEventListener('play', onVideoPlay); video.addEventListener('pause', onVideoPause); video.addEventListener('ended', () => setSpeed(0));
-    video.addEventListener('loadedmetadata', () => { view.start = 0; view.end = 0; ensureView(); tlDirty = true; layoutQC(); });
+    video.addEventListener('loadedmetadata', () => { view.start = 0; view.end = 0; ensureView(); tlDirty = true; layoutQC(); requalify(); });
     video.addEventListener('click', togglePlay);
     const v = parseFloat(Store.get('volume'));
     video.volume = isFinite(v) ? v : 1;
@@ -704,8 +704,7 @@
     if (k === 'l') { if (!e.repeat) stepSpeed(1); return; }
     const dir = k === 'ArrowRight' ? 1 : -1;
     setSpeed(0);
-    if (e.altKey) seekTo(video.currentTime + dir * 300);           // ⌥ Option: 5 minutes
-    else if (e.shiftKey) seekTo(video.currentTime + dir * 5);      // Shift: 5 seconds
+    if (e.shiftKey || e.altKey) seekTo(video.currentTime + dir * 300);   // Shift (or ⌥ Option): 5 minutes
     else { stepFrame(dir); return; }
     keepInView(); tlDirty = true;
   }, true);
@@ -743,9 +742,16 @@
   }
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    if (document.body.dataset.tab !== 'player' || !video || isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (document.body.dataset.tab !== 'player' || !video || isTyping(e.target) || e.metaKey || e.ctrlKey) return;
     if (e.target && e.target.tagName === 'SELECT') return;
     e.preventDefault(); e.stopImmediatePropagation();
+    if (e.shiftKey || e.altKey) {   // Shift (or ⌥ Option) + ↑ / ↓: the first / last frame of the video
+      setSpeed(0);
+      const d = tlDuration();
+      evRevealPending = true;
+      seekFrame(e.key === 'ArrowDown' && d ? Math.floor((d - 0.001) * fps()) : 0);
+      return;
+    }
     stepEvent(e.key === 'ArrowDown' ? 1 : -1);
   }, true);
   document.addEventListener('keyup', (e) => {
