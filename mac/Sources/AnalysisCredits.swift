@@ -20,6 +20,8 @@ extension AnalysisJob {
         var fastText: [String] = []
         var text = "", lineTexts: [String] = [], kind = "text"
         var tin = 0.0, tout = 0.0
+        var missedAt: Double?           // the coarse frame where it was first missing (one miss is forgiven)
+        var bestFast: String { fastText.max(by: { $0.filter(\.isLetter).count < $1.filter(\.isLetter).count }) ?? "" }
         init(box: CGRect, lines: [CGRect], at: Double, before: Double?) { self.box = box; self.lines = lines; first = at; last = at; self.before = before }
     }
     struct TextBlock { var box: CGRect; var lines: [CGRect]; var text: String; var lineH: CGFloat }
@@ -72,12 +74,14 @@ extension AnalysisJob {
             var still: [TextCard] = []
             var used = Set<Int>()
             for c in active {
-                if let k = blocks.indices.first(where: { !used.contains($0) && AnalysisJob.sameCard(c.box, blocks[$0].box) }) {
+                if let k = blocks.indices.first(where: { !used.contains($0) && AnalysisJob.sameCard(c.box, blocks[$0].box, c.bestFast, blocks[$0].text) }) {
                     used.insert(k)
-                    c.last = at; c.fastText.append(blocks[k].text)
-                    c.box = blocks[k].box; c.lines = blocks[k].lines
+                    c.last = at; c.missedAt = nil; c.fastText.append(blocks[k].text)
+                    if blocks[k].box.width * blocks[k].box.height >= c.box.width * c.box.height * 0.8 { c.box = blocks[k].box; c.lines = blocks[k].lines }
                     still.append(c)
-                } else { c.after = at; cards.append(c) }
+                } else if c.missedAt == nil {
+                    c.missedAt = at; still.append(c)   // not read on this frame: give it one more
+                } else { c.after = c.missedAt; cards.append(c) }
             }
             for k in blocks.indices where !used.contains(k) {
                 let c = TextCard(box: blocks[k].box, lines: blocks[k].lines, at: at, before: prevAt)
@@ -97,7 +101,8 @@ extension AnalysisJob {
             }
             t = at + step
         }
-        cards.append(contentsOf: active)   // still on screen where the scan stopped (after = nil)
+        for c in active { c.after = c.missedAt; cards.append(c) }   // after = nil: still on screen where the scan stopped
+        cards = AnalysisJob.mergeFragments(cards, step: step)
         // Logos, burnt-in timecode and the like stay for much longer than a card.
         cards = cards.filter { $0.last - $0.first <= staticMax }
 
@@ -108,7 +113,7 @@ extension AnalysisJob {
             if let got = try? await full.image(at: CMTime(seconds: mid + fd / 2, preferredTimescale: 60000)) {
                 c.lineTexts = AnalysisJob.readText(got.image, in: c.box.insetBy(dx: -0.03, dy: -0.03))
             }
-            if c.lineTexts.isEmpty { c.lineTexts = c.fastText.max(by: { $0.count < $1.count })?.components(separatedBy: "\n") ?? [] }
+            if c.lineTexts.isEmpty { c.lineTexts = c.bestFast.components(separatedBy: "\n") }
             c.text = c.lineTexts.joined(separator: " / ")
             post(["type": "progress", "p": 0.8 + 0.05 * Double(i + 1) / Double(max(1, cards.count))])
         }
@@ -178,35 +183,87 @@ extension AnalysisJob {
 
     // MARK: - reading text
 
-    private static func observations(_ img: CGImage, level: VNRequestTextRecognitionLevel, roi: CGRect? = nil) -> [VNRecognizedTextObservation] {
+    private static func observations(_ img: CGImage, level: VNRequestTextRecognitionLevel, minHeight: Float? = nil) -> [VNRecognizedTextObservation] {
         let req = VNRecognizeTextRequest()
         req.recognitionLevel = level
         req.usesLanguageCorrection = false   // names
-        if let r = roi {
-            // Vision's region: bottom-left origin; ours: top-left.
-            let v = CGRect(x: r.minX, y: 1 - r.maxY, width: r.width, height: r.height).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
-            if v.isNull || v.width <= 0 || v.height <= 0 { return [] }
-            req.regionOfInterest = v
-        }
+        if let m = minHeight { req.minimumTextHeight = m }   // the default (1/32 of the picture) misses small role lines
         let handler = VNImageRequestHandler(cgImage: img, options: [:])
         do { try handler.perform([req]) } catch { return [] }
         return req.results ?? []
     }
 
-    /// The text on a frame, grouped into blocks of lines that belong together (a role and a name, say).
-    static func textBlocks(_ img: CGImage, level: VNRequestTextRecognitionLevel) -> [TextBlock] {
-        let tc = try? NSRegularExpression(pattern: #"^\s*\d{1,2}[:;.]\d{2}[:;.]\d{2}[:;.]\d{2}\s*$"#)
-        var lines: [(box: CGRect, text: String)] = []
-        for o in observations(img, level: level) {
+    /// The picture as white text would see it: dark where it's near white (min of R, G, B high), light
+    /// everywhere else. White credits over a pale yellow or pink scene have almost no brightness contrast;
+    /// here they stand out black on white. Colour doesn't matter, only how far from white a pixel is.
+    static func whiteText(_ img: CGImage) -> CGImage? {
+        let w = img.width, h = img.height
+        guard w > 0, h > 0 else { return nil }
+        var rgba = [UInt8](repeating: 0, count: w * h * 4)
+        let ok = rgba.withUnsafeMutableBytes { raw -> Bool in
+            guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
+            ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        guard ok else { return nil }
+        var gray = [UInt8](repeating: 0, count: w * h)
+        rgba.withUnsafeBufferPointer { p in
+            gray.withUnsafeMutableBufferPointer { g in
+                for i in 0..<(w * h) {
+                    let m = min(p[4 * i], min(p[4 * i + 1], p[4 * i + 2]))
+                    g[i] = UInt8(min(255, (255 - Int(m)) * 4))
+                }
+            }
+        }
+        guard let provider = CGDataProvider(data: Data(gray) as CFData) else { return nil }
+        return CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w, space: CGColorSpaceCreateDeviceGray(),
+                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+    }
+
+    /// Part of the picture (box: 0…1 from the top left), enlarged so its text is a comfortable size to read.
+    static func crop(_ img: CGImage, _ box: CGRect, minHeight: Int = 240) -> CGImage? {
+        let r = box.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+        if r.isNull || r.width <= 0 || r.height <= 0 { return nil }
+        let px = CGRect(x: r.minX * CGFloat(img.width), y: r.minY * CGFloat(img.height), width: r.width * CGFloat(img.width), height: r.height * CGFloat(img.height)).integral
+        guard let c = img.cropping(to: px) else { return nil }
+        let k = c.height < minHeight ? min(4, Double(minHeight) / Double(max(1, c.height))) : 1
+        if k <= 1.05 { return c }
+        let w = Int(Double(c.width) * k), h = Int(Double(c.height) * k)
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return c }
+        ctx.interpolationQuality = .high
+        ctx.draw(c, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage() ?? c
+    }
+
+    private static let timecodeRx = try? NSRegularExpression(pattern: #"^\s*\d{1,2}[:;.]\d{2}[:;.]\d{2}[:;.]\d{2}\s*$"#)
+    /// Lines of text on a picture: (box 0…1 from the top left, text). Noise and burnt-in timecode left out.
+    private static func lines(_ img: CGImage, level: VNRequestTextRecognitionLevel, minHeight: Float?) -> [(box: CGRect, text: String, conf: Float)] {
+        var out: [(box: CGRect, text: String, conf: Float)] = []
+        for o in observations(img, level: level, minHeight: minHeight) {
             guard let cand = o.topCandidates(1).first, cand.confidence >= 0.3 else { continue }
             let s = cand.string.trimmingCharacters(in: .whitespaces)
-            if !AnalysisJob.hasWord(s) { continue }   // pattern noise read as "rr", "TfT" …
-            if let tc = tc, tc.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil { continue }
+            if !hasWord(s) { continue }   // pattern noise read as "rr", "TfT" …
+            if let tc = timecodeRx, tc.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil { continue }
             let b = o.boundingBox
-            let box = CGRect(x: b.minX, y: 1 - b.maxY, width: b.width, height: b.height)
-            if box.height < 0.018 { continue }   // too small for a credit (a logo's small print …)
-            lines.append((box, s))
+            out.append((CGRect(x: b.minX, y: 1 - b.maxY, width: b.width, height: b.height), s, cand.confidence))
         }
+        return out
+    }
+
+    /// The text on a frame, grouped into blocks of lines that belong together (a role and a name, say).
+    /// Read twice: as it is, and for white text (see whiteText); a line found both ways is kept once.
+    static func textBlocks(_ img: CGImage, level: VNRequestTextRecognitionLevel) -> [TextBlock] {
+        var found = lines(img, level: level, minHeight: 0.015)
+        if let wt = whiteText(img) {
+            for l in lines(wt, level: level, minHeight: 0.015) {
+                if let k = found.firstIndex(where: { overlap($0.box, l.box) > 0.5 }) {
+                    if l.text.filter(\.isLetter).count > found[k].text.filter(\.isLetter).count { found[k] = l }
+                } else { found.append(l) }
+            }
+        }
+        var lines = found.filter { $0.box.height >= 0.018 }   // smaller than a credit (a logo's small print …)
         lines.sort { $0.box.minY < $1.box.minY }
         var blocks: [TextBlock] = []
         for l in lines {
@@ -231,31 +288,77 @@ extension AnalysisJob {
         return blocks
     }
 
-    /// The careful read of one card: its lines, top to bottom.
+    /// The careful read of one card: its lines, top to bottom. Whichever reading (as it is, or for white
+    /// text) gives more confident words wins.
     static func readText(_ img: CGImage, in box: CGRect) -> [String] {
-        observations(img, level: .accurate, roi: box)
-            .compactMap { o -> (CGFloat, String)? in
-                guard let c = o.topCandidates(1).first, c.confidence >= 0.3 else { return nil }
-                let s = c.string.trimmingCharacters(in: .whitespaces)
-                return s.isEmpty ? nil : (o.boundingBox.midY, s)
-            }
-            .sorted { $0.0 > $1.0 }
-            .map { $0.1 }
+        guard let c = crop(img, box) else { return [] }
+        var best: [String] = [], bestScore: Float = 0
+        for pic in [c, whiteText(c)].compactMap({ $0 }) {
+            let ls = lines(pic, level: .accurate, minHeight: nil).sorted { $0.box.minY < $1.box.minY }
+            let score = ls.reduce(Float(0)) { $0 + $1.conf * Float($1.text.filter(\.isLetter).count) }
+            if score > bestScore { bestScore = score; best = ls.map { $0.text } }
+        }
+        return best
     }
 
     /// Is there (still) text where the card is?
     static func hasText(_ img: CGImage, in box: CGRect) -> Bool {
-        observations(img, level: .fast, roi: box).contains { o in
-            guard let c = o.topCandidates(1).first else { return false }
-            return c.confidence >= 0.3 && c.string.filter { $0.isLetter }.count >= 2
-        }
+        guard let c = crop(img, box, minHeight: 160) else { return false }
+        if !lines(c, level: .fast, minHeight: nil).isEmpty { return true }
+        if let wt = whiteText(c), !lines(wt, level: .fast, minHeight: nil).isEmpty { return true }
+        return false
     }
 
-    static func sameCard(_ a: CGRect, _ b: CGRect) -> Bool {
+    /// How much two boxes cover each other: the shared area over the smaller box.
+    static func overlap(_ a: CGRect, _ b: CGRect) -> CGFloat {
         let i = a.intersection(b)
-        if i.isNull { return false }
-        let inter = i.width * i.height, uni = a.width * a.height + b.width * b.height - inter
-        return uni > 0 && inter / uni > 0.3
+        if i.isNull { return 0 }
+        let small = min(a.width * a.height, b.width * b.height)
+        return small > 0 ? i.width * i.height / small : 0
+    }
+    /// How much two readings agree: the shared letter pairs over the shorter one's (misreads differ a little;
+    /// another card differs a lot). Upper case letters only.
+    static func similar(_ a: String, _ b: String) -> Double {
+        func pairs(_ s: String) -> [String] {
+            let l = Array(s.uppercased().filter(\.isLetter))
+            return l.count < 2 ? [] : (0..<(l.count - 1)).map { String(l[$0]) + String(l[$0 + 1]) }
+        }
+        let pa = pairs(a), pb = pairs(b)
+        if pa.isEmpty || pb.isEmpty { return 1 }
+        var bag: [String: Int] = [:]
+        for p in pb { bag[p, default: 0] += 1 }
+        var shared = 0
+        for p in pa where (bag[p] ?? 0) > 0 { shared += 1; bag[p]! -= 1 }
+        return Double(shared) / Double(min(pa.count, pb.count))
+    }
+    /// The same card on the next frame: in the same place, saying (more or less) the same.
+    static func sameCard(_ a: CGRect, _ b: CGRect, _ ta: String, _ tb: String) -> Bool {
+        overlap(a, b) > 0.5 && similar(ta, tb) >= 0.6
+    }
+    /// Pieces of one card seen separately (only its role line while it faded in, say): joined.
+    static func mergeFragments(_ list: [TextCard], step: Double) -> [TextCard] {
+        var cards = list.sorted { $0.first < $1.first }
+        var merged = true
+        while merged {
+            merged = false
+            outer: for i in cards.indices {
+                for j in cards.indices where j > i {
+                    let a = cards[i], b = cards[j]
+                    guard b.first - a.last <= step * 2.5, a.first - b.last <= step * 2.5 else { continue }
+                    guard overlap(a.box, b.box) > 0.5, similar(a.bestFast, b.bestFast) >= 0.6 else { continue }
+                    let early = a.first <= b.first ? a : b, late = a.last >= b.last ? a : b
+                    a.before = early.before; a.after = late.after
+                    a.first = min(a.first, b.first); a.last = max(a.last, b.last)
+                    if b.box.width * b.box.height > a.box.width * a.box.height { a.lines = b.lines }
+                    a.box = a.box.union(b.box)
+                    a.fastText += b.fastText
+                    cards.remove(at: j)
+                    merged = true
+                    break outer
+                }
+            }
+        }
+        return cards
     }
 
     // MARK: - what a card is
