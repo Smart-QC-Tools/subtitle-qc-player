@@ -125,6 +125,7 @@ const Analysis = (() => {
       if (at > 30 && at < d - 30) items.push({ in: r3(at), out: r3(at + len), audio: 'silent', kind: 'commercial' });
     }
     items.push({ in: r3(Math.max(0, d - 1 - R())), out: r3(d), audio: 'silent', kind: 'end' });
+    items.sort((x, y) => x.in - y.in);
     return { items };
   }
   function simCredits(d, R) {

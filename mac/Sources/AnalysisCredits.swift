@@ -320,8 +320,11 @@ extension AnalysisJob {
     /// another card differs a lot). Upper case letters only.
     static func similar(_ a: String, _ b: String) -> Double {
         func pairs(_ s: String) -> [String] {
-            let l = Array(s.uppercased().filter(\.isLetter))
-            return l.count < 2 ? [] : (0..<(l.count - 1)).map { String(l[$0]) + String(l[$0 + 1]) }
+            let l: [Character] = Array(s.uppercased().filter { $0.isLetter })
+            var out: [String] = []
+            if l.count < 2 { return out }
+            for i in 0..<(l.count - 1) { out.append(String(l[i]) + String(l[i + 1])) }
+            return out
         }
         let pa = pairs(a), pb = pairs(b)
         if pa.isEmpty || pb.isEmpty { return 1 }
