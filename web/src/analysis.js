@@ -528,7 +528,8 @@ const Analysis = (() => {
       if (last && c.in - last[1] < CREDIT_JOIN) last[1] = Math.max(last[1], c.out); else credits.push([c.in, c.out]);
     }
     const blacks = ((r.blacks && r.blacks.items) || []).filter(b => b.kind === 'commercial').map(b => [b.in, b.out]);
-    return credits.length || blacks.length ? { video: r.video && r.video.name, credits, blacks } : null;
+    const cards = ((r.credits && r.credits.cards) || []).map(c => ({ in: c.in, out: c.out, kind: c.kind || 'credit', text: c.text, box: c.box || (c.boxes && c.boxes[0]) || null }));
+    return credits.length || blacks.length || r.credits ? { video: r.video && r.video.name, credits, blacks, cards, scannedTo: r.credits ? r.credits.scannedTo || (r.video && r.video.duration) : 0 } : null;
   }
   return { open, close, forVideo, statusLine, marks, fingerprint, TYPES, DATA_DIR };
 })();
