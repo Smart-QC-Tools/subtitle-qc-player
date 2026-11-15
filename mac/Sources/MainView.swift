@@ -53,6 +53,7 @@ final class MainView: NSView {
             self?.bridge.emit("drop", ["items": items])
         }
         addSubview(webView)
+        bridge.webView = webView
         video.bridge = bridge
         setFrameSize(frame.size)   // apply the zoom for the starting size
     }
@@ -74,16 +75,18 @@ final class MainView: NSView {
         guard let url = Bundle.main.url(forResource: "index", withExtension: "html") else {
             Log.write("error", "index.html missing from the app bundle"); return
         }
-        let go = { [weak self] in self?.webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent()) }
-        if networkBlocked { _ = go(); return }
-        // Safety net: the interface never needs the internet, so every web request is blocked.
-        // (WebKit's rule syntax has no "a|b": one rule per scheme.)
+        let go = { [weak self] in _ = self?.webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent()) }
+        if networkBlocked { go(); return }
+        MainView.blockNetwork(webView) { [weak self] in self?.networkBlocked = true; go() }
+    }
+    /// Safety net: the interface never needs the internet, so every web request is blocked.
+    /// (WebKit's rule syntax has no "a|b": one rule per scheme.) `then` runs once the rules are in place.
+    static func blockNetwork(_ web: WKWebView, then: @escaping () -> Void) {
         let rules = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}},{"trigger":{"url-filter":"^wss?://"},"action":{"type":"block"}},{"trigger":{"url-filter":"^ftp://"},"action":{"type":"block"}}]"#
-        WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "no-network", encodedContentRuleList: rules) { [weak self] list, error in
-            guard let self = self else { return }
-            if let list = list { self.webView.configuration.userContentController.add(list); self.networkBlocked = true }
+        WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "no-network", encodedContentRuleList: rules) { list, error in
+            if let list = list { web.configuration.userContentController.add(list) }
             else { Log.write("error", "Network block rules failed: \(error?.localizedDescription ?? "?")") }
-            _ = go()
+            then()
         }
     }
     func reload() { video.unload(); playerHost.isHidden = true; load() }

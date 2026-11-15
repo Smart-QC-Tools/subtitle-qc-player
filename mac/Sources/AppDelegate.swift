@@ -28,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         mainView.load()
         window.makeFirstResponder(mainView.webView)   // keyboard shortcuts work straight away
+        #if SELFTEST
+        SelfTest.afterLaunch()
+        #endif
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -77,6 +80,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let win = NSMenu(title: "Window")
         win.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         win.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        win.addItem(.separator())
+        let ana = win.addItem(withTitle: "Video Analysis", action: #selector(showAnalysis(_:)), keyEquivalent: "a")
+        ana.keyEquivalentModifierMask = [.command, .shift]
+        ana.target = self
+        win.addItem(.separator())
         windowItem.submenu = win
         NSApp.windowsMenu = win
 
@@ -88,6 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.mainMenu = main
     }
 
-    @objc func reloadPage(_ sender: Any?) { mainView.reload() }
+    @objc func reloadPage(_ sender: Any?) {
+        if let w = AnalysisWindow.shared.window, w.isKeyWindow { AnalysisWindow.shared.reload() } else { mainView.reload() }
+    }
+    @objc func showAnalysis(_ sender: Any?) { AnalysisWindow.shared.show() }
     @objc func showLog(_ sender: Any?) { NSWorkspace.shared.activateFileViewerSelecting([Log.fileURL]) }
 }

@@ -608,7 +608,8 @@ document.addEventListener('DOMContentLoaded', () => {
   Promise.all([HandleStore.load('subs'), HandleStore.load('videos')]).then(async () => {
     renderHeader();
     // The app can reopen the last folders straight away (a browser needs a click for permission).
-    if (NATIVE) for (const kind of ['videos', 'subs']) {
+    // (Not in the app's Video Analysis window: that page shows only the analysis panel.)
+    if (NATIVE && !window.__analysisWindow) for (const kind of ['videos', 'subs']) {
       const d = HandleStore.cache[kind];
       if (d) { try { await useDir(kind, d); } catch (e) { console.warn('Could not reopen', d.path, e); } }
     }

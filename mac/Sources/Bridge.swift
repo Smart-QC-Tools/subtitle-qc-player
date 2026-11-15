@@ -3,10 +3,18 @@ import WebKit
 
 /// Messages from the page (window.webkit.messageHandlers.native.postMessage) and events back to it.
 final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
-    weak var view: MainView?
+    weak var view: MainView?          // the main window's content; nil for the Video Analysis window
+    weak var webView: WKWebView?      // the page this bridge talks to
     private var waveJobs: [Int: WaveformJob] = [:]
+    private var analysisJobs: [Int: AnalysisJob] = [:]
+    private static let all = NSHashTable<Bridge>.weakObjects()
 
-    init(view: MainView) { self.view = view }
+    init(view: MainView?) { self.view = view; super.init(); Bridge.all.add(self) }
+
+    /// An event for every other window's page (results written in one window show up in the other).
+    private func tellOthers(_ type: String, _ payload: [String: Any]) {
+        for b in Bridge.all.allObjects where b !== self { b.emit(type, payload) }
+    }
 
     // MARK: - page → app
     func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage,
@@ -21,12 +29,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
 
         case "storeSet": Settings.set(str("key"), str("value")); replyHandler(true, nil)
         case "storeDel": Settings.remove(str("key")); replyHandler(true, nil)
+        case "storeGet": replyHandler(Settings.get(str("key")) ?? NSNull(), nil)   // the value as it is now (another window may have set it)
 
         case "pickFolder":
             let panel = NSOpenPanel()
             panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
             panel.prompt = "Select"
-            panel.message = str("kind") == "subs" ? "Select the subtitles folder" : "Select the videos folder"
+            panel.message = str("kind") == "subs" ? "Select the subtitles folder" : str("kind") == "analysis" ? "Select the folder of videos to analyse" : "Select the videos folder"
             let start = str("start")
             if !start.isEmpty {
                 let u = URL(fileURLWithPath: start)
@@ -35,7 +44,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             let finish = { (r: NSApplication.ModalResponse) in
                 if r == .OK, let p = panel.url?.path { Access.allowFolder(p); replyHandler(p, nil) } else { replyHandler(NSNull(), nil) }
             }
-            if let win = view?.window { panel.beginSheetModal(for: win, completionHandler: finish) } else { finish(panel.runModal()) }
+            if let win = webView?.window { panel.beginSheetModal(for: win, completionHandler: finish) } else { finish(panel.runModal()) }
 
         case "listFolder":
             let path = str("path")
@@ -101,6 +110,42 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             waveJobs[id]?.cancel(); waveJobs.removeValue(forKey: id)
             replyHandler(true, nil)
 
+        // ---- video analysis (Analysis.swift)
+        case "analysisStart":
+            let id = Int(num("id")), path = str("path")
+            guard Access.isAllowed(path) else { replyHandler(nil, "Not allowed"); return }
+            let job = AnalysisJob(id: id, path: path, type: str("type"), settings: body["settings"] as? [String: Any] ?? [:]) { [weak self] msg in self?.emit("analysis", msg) }
+            analysisJobs[id] = job
+            Log.write("info", "Analysis (\(str("type"))) started: \((path as NSString).lastPathComponent)")
+            job.start { [weak self] in self?.analysisJobs.removeValue(forKey: id) }
+            replyHandler(true, nil)
+        case "analysisCancel":
+            analysisJobs[Int(num("id"))]?.cancel()
+            replyHandler(true, nil)
+        case "analysisReadAll":
+            let folder = str("folder")
+            guard Access.isAllowed(folder) else { replyHandler([String](), nil); return }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let list = AnalysisFiles.readAll(folder: folder)
+                DispatchQueue.main.async { replyHandler(list, nil) }
+            }
+        case "analysisWrite":
+            let folder = str("folder"), name = str("name"), json = str("json")
+            guard Access.isAllowed(folder) else { replyHandler(nil, "Not allowed: choose this folder first."); return }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let problem = AnalysisFiles.write(folder: folder, videoName: name, json: json)
+                DispatchQueue.main.async { [weak self] in
+                    if let p = problem { replyHandler(nil, p); return }
+                    self?.tellOthers("analysisFile", ["folder": Access.canonical(folder), "name": name, "json": json])
+                    replyHandler(true, nil)
+                }
+            }
+        case "analysisBusy":
+            AnalysisWindow.shared.setBusy(running: body["running"] as? Bool ?? false, keepAwake: body["awake"] as? Bool ?? false, title: str("title"))
+            replyHandler(true, nil)
+        case "analysisOpen":
+            AnalysisWindow.shared.show(); replyHandler(true, nil)
+
         #if SELFTEST
         case "selftestStats":
             guard let v = view?.video else { replyHandler(nil, "no video"); return }
@@ -124,7 +169,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
     // MARK: - app → page
     func emit(_ type: String, _ payload: [String: Any]) {
         let run = { [weak self] in
-            guard let web = self?.view?.webView,
+            guard let web = self?.webView,
                   let data = try? JSONSerialization.data(withJSONObject: payload),
                   let json = String(data: data, encoding: .utf8) else { return }
             web.evaluateJavaScript("window.__nativeEvent && window.__nativeEvent(\"\(type)\", \(json));", completionHandler: nil)

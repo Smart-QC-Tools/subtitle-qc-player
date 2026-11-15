@@ -55,7 +55,50 @@
     setTab('player');
     await sleep(500);
 
-    const order = [...state.videos];
+    // ---------------------------------------------------------------- video analysis
+    // The engine, asked directly: blacks in each test file, compared with what make_analysis_media.py put there.
+    // Meanwhile the app's own Video Analysis window runs the same folder (see SelfTest.swift) and writes its files.
+    if (CFG.analysis) {
+      const files = await Native.listFolder(CFG.analysis);
+      let expected = null;
+      const ex = files.find(f => f.name === 'expected.json');
+      if (ex) { try { expected = JSON.parse(await new Native.NFile(ex).text()); } catch (e) { problem('expected.json unreadable', { e: String(e) }); } }
+      const vids = files.filter(f => /\.(mp4|mov)$/i.test(f.name));
+      let jid = 9000;
+      for (const f of vids) {
+        const id = ++jid, t = now();
+        let prog = 0;
+        const res = await new Promise((resolve, reject) => {
+          Native.on('analysis', m => { if (m.id !== id) return; if (m.type === 'progress') prog++; else if (m.type === 'done') resolve(m.result); else reject(new Error(m.message || m.type)); });
+          Native.call('analysisStart', { id, path: f.path, type: 'blacks', settings: { pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -60 } }).catch(reject);
+        }).catch(e => ({ error: String(e && e.message || e) }));
+        step('analysis: blacks', { file: f.name, ms: round(now() - t, 0), progressEvents: prog, result: res });
+        if (res.error) { problem('analysis failed', { file: f.name, error: res.error }); continue; }
+        if (expected) {
+          const want = expected.blacks.map(b => ({ in: b[0], out: b[1], silent: b[3] === 'silent' }));
+          const got = res.items || [];
+          const fr = 1001 / 24000;
+          if (got.length !== want.length) problem('analysis: number of blacks', { file: f.name, got: got.length, want: want.length });
+          want.forEach((w, i) => {
+            const g = got.find(x => Math.abs(x.in - w.in) < 0.3);
+            if (!g) { problem('analysis: black not found', { file: f.name, want: w }); return; }
+            if (Math.abs(g.in - w.in) > fr * 1.01 || Math.abs(g.out - w.out) > fr * 1.01) problem('analysis: black off by more than a frame', { file: f.name, got: g, want: w });
+            if ((g.audio === 'silent') !== w.silent) problem('analysis: sound of a black misjudged', { file: f.name, got: g, want: w });
+            const kind = i === 0 ? 'start' : i === want.length - 1 ? 'end' : w.silent ? 'commercial' : 'other';
+            if (g.kind !== kind) problem('analysis: kind of black', { file: f.name, got: g, wantKind: kind });
+          });
+        }
+      }
+      // the window's own run: wait for its results files
+      const t = now(); let texts = [];
+      while (now() - t < 240000) { texts = await Native.call('analysisReadAll', { folder: CFG.analysis }).catch(() => []); if (texts.length >= vids.length) break; await sleep(1000); }
+      const written = texts.map(x => { try { const r = JSON.parse(x); return { name: r.video && r.video.name, format: r.format, version: r.version, app: r.app, simulated: r.simulated, fingerprint: r.video && r.video.fingerprint, duration: r.video && r.video.duration, blacks: r.blacks && { settings: r.blacks.settings, n: (r.blacks.items || []).length, commercial: (r.blacks.items || []).filter(b => b.kind === 'commercial').length }, credits: !!r.credits }; } catch (e) { return { bad: String(e) }; } });
+      step('analysis: results files written by the window', { waitedMs: round(now() - t, 0), files: written });
+      if (written.length < vids.length) problem('analysis window wrote fewer results files than videos', { written: written.length, videos: vids.length });
+      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3) problem('analysis window: unexpected results file', w);
+    }
+
+    const order = CFG.only === 'analysis' ? [] : [...state.videos];
     for (const v of order) {
       const fps = (v.probe && v.probe.fps) || 24;
       const F = { file: v.name };

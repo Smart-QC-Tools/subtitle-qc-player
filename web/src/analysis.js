@@ -5,23 +5,29 @@
    "Subtitle QC Data" folder next to the videos (Mac app). The web version is a preview:
    it simulates the analysis and keeps the results in the browser, so the window, the
    queue and the results can be tried without the Mac app.
+
+   Mac app: the analysis has its own window (Window ▸ Video Analysis), which is this same
+   page in "window" mode: only this panel, with its own folder. The engine is native
+   (mac/Sources/Analysis.swift). Blacks are real; opening credits are still to come there.
    ========================================================================== */
 const Analysis = (() => {
   const FORMAT = 'subtitle-qc-analysis', VERSION = 1, DATA_DIR = 'Subtitle QC Data';
   const TYPES = [
     { key: 'blacks', label: 'Commercial blacks', head: 'Blacks' },
-    { key: 'credits', label: 'Opening credits', head: 'Opening credits' },
+    { key: 'credits', label: 'Opening credits', head: 'Opening credits', later: NATIVE },   // Mac app: not built yet
     { key: 'text', label: 'On-screen text', head: 'On-screen text', later: true },
   ];
   // Settings each result is made with; a result made with older settings shows as Outdated.
   const SETTINGS = {
-    blacks: { v: 1, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, coarsePerSecond: 4 },
+    // Black frame: pictureShare of the picture at or below pixelLevel. Kept from minSeconds. Silent: sound at or
+    // below silenceDb (dBFS, RMS) across the black. Each item: in, out, frames, audio (silent | sound | none),
+    // level, kind (start | end | commercial | other = a black with sound, inside a scene).
+    blacks: { v: 2, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -60 },
     credits: { v: 1, searchMinutes: 20, coarseStepSeconds: 4, joinGapSeconds: 30 },
   };
-  // The real engine (Mac app) isn't built yet: until it is, the Mac app runs the same simulated engine as the web
-  // preview and says so, so made-up results are never taken for real ones.
-  const ENGINE_READY = false;
-  const SIMULATED = !NATIVE || !ENGINE_READY;
+  const SIMULATED = !NATIVE;                 // the web version simulates; the Mac app analyses for real
+  const WINDOW = NATIVE && !!window.__analysisWindow;   // this page is the Mac app's Video Analysis window
+  if (WINDOW) document.documentElement.classList.add('ana-window');
 
   // ------------------------------------------------------------ results store
   // By video file name; each result carries the fingerprint of the file it was made from.
@@ -29,19 +35,33 @@ const Analysis = (() => {
   const memKey = name => 'analysis:' + name;
   function loadStored(name) {
     if (store.has(name)) return store.get(name);
+    if (NATIVE) return null;                 // the Mac app goes by the results files only
     let r = null;
     try { const s = localStorage.getItem(memKey(name)); r = s ? JSON.parse(s) : null; } catch (e) { r = null; }
     if (r && r.format === FORMAT) store.set(name, r);
     return store.get(name) || null;
   }
-  function saveResult(name, r) {
+  // Mac app: written to "Subtitle QC Data/<video file name>.analysis.json" in the folder (throws if it can't be).
+  // Web preview: kept in the browser.
+  async function saveResult(name, r, folder) {
     store.set(name, r);
-    // Mac app: written to "Subtitle QC Data/<video>.analysis.json" (next step). Web preview: kept in the browser.
-    try { localStorage.setItem(memKey(name), JSON.stringify(r)); } catch (e) { /* storage full or blocked */ }
-    window.dispatchEvent(new CustomEvent('analysis-updated', { detail: { name } }));
+    try {
+      if (NATIVE) { if (!folder) throw new Error('No folder to save the results in'); await Native.call('analysisWrite', { folder, name, json: JSON.stringify(r, null, 1) }); }
+      else { try { localStorage.setItem(memKey(name), JSON.stringify(r)); } catch (e) { /* storage full or blocked */ } }
+    } finally { window.dispatchEvent(new CustomEvent('analysis-updated', { detail: { name } })); }
   }
+  const takeResult = text => {
+    try { const r = JSON.parse(text); if (r && r.format === FORMAT && r.video && r.video.name) { store.set(r.video.name, r); return r; } } catch (e) { /* not ours, or damaged */ }
+    return null;
+  };
   // Results files that are already in the folder (from the Mac app, maybe on another machine).
   async function readDataDir(handle) {
+    if (NATIVE) {
+      if (!handle || !handle.path) return;
+      let list = []; try { list = await Native.call('analysisReadAll', { folder: handle.path }); } catch (e) { return; }
+      for (const text of list || []) takeResult(text);
+      return;
+    }
     if (!handle || !handle.getDirectoryHandle) return;
     let dir;
     try { dir = await handle.getDirectoryHandle(DATA_DIR); } catch (e) { return; }
@@ -62,8 +82,9 @@ const Analysis = (() => {
     const key = file.name + '|' + file.size + '|' + file.lastModified;
     if (fpCache.has(key)) return fpCache.get(key);
     const piece = 65536, n = file.size;
-    const parts = [0, Math.max(0, Math.floor(n / 2) - piece / 2), Math.max(0, n - piece)].map(o => file.slice(o, Math.min(n, o + piece)));
-    const buf = new Uint8Array(await new Blob(parts).arrayBuffer());
+    const parts = await Promise.all([0, Math.max(0, Math.floor(n / 2) - piece / 2), Math.max(0, n - piece)].map(o => file.slice(o, Math.min(n, o + piece)).arrayBuffer()));
+    const buf = new Uint8Array(parts.reduce((s, p) => s + p.byteLength, 0));
+    parts.reduce((o, p) => { buf.set(new Uint8Array(p), o); return o + p.byteLength; }, 0);
     let hex;
     if (window.crypto && crypto.subtle) {
       const h = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
@@ -98,9 +119,9 @@ const Analysis = (() => {
     const items = [], n = 3 + Math.floor(R() * 3);
     for (let k = 1; k <= n; k++) {
       const at = d * k / (n + 1) + (R() - 0.5) * 180, len = 0.5 + R() * 1.5;
-      if (at > 30 && at < d - 30) items.push({ in: r3(at), out: r3(at + len) });
+      if (at > 30 && at < d - 30) items.push({ in: r3(at), out: r3(at + len), audio: 'silent', kind: 'commercial' });
     }
-    items.push({ in: r3(Math.max(0, d - 1 - R())), out: r3(d) });
+    items.push({ in: r3(Math.max(0, d - 1 - R())), out: r3(d), audio: 'silent', kind: 'end' });
     return { items };
   }
   function simCredits(d, R) {
@@ -130,7 +151,23 @@ const Analysis = (() => {
     return { confirmed: true, directedBy: { in: db.in, out: db.out, text: db.text }, runs, cards };
   }
   // Runs one analysis type on one video, reporting progress; simulated time scales with the length.
+  // Mac app: the native engine does the work and reports back as "analysis" events.
+  const nativeJobs = new Map(); let nativeSeq = 0, nativeCurrent = 0;
+  if (NATIVE) Native.on('analysis', m => {
+    const j = nativeJobs.get(m.id); if (!j) return;
+    if (m.type === 'progress') { j.onProgress(m.p); return; }
+    nativeJobs.delete(m.id);
+    if (m.type === 'done') j.resolve(m.result); else j.reject(new Error(m.type === 'cancelled' ? 'stopped' : (m.message || 'Unknown error')));
+  });
+  function runNative(row, key, onProgress) {
+    return new Promise((resolve, reject) => {
+      const id = nativeCurrent = ++nativeSeq;
+      nativeJobs.set(id, { resolve, reject, onProgress });
+      Native.call('analysisStart', { id, path: row.file.path, type: key, settings: SETTINGS[key] }).catch(e => { nativeJobs.delete(id); reject(new Error(String(e && e.message || e))); });
+    });
+  }
   async function runType(row, key, onProgress, stopped) {
+    if (NATIVE) return runNative(row, key, onProgress);
     const R = rng(row.fp + key), d = row.duration || 2700;
     const secs = key === 'blacks' ? 2 + d / 1500 : 1.5 + Math.min(d, 1200) / 700;
     const t0 = performance.now();
@@ -146,7 +183,7 @@ const Analysis = (() => {
 
   // ------------------------------------------------------------ the window
   let rows = [], running = false, stopReq = false, built = false, sourceHandle = null, sourceLabel = '', ownFolder = false;
-  let queueInfo = null;
+  let queueInfo = null, folderProblem = '';
   const typeOn = { blacks: Store.get('ana:t:blacks') !== '0', credits: Store.get('ana:t:credits') !== '0' };
   let skipDone = Store.get('ana:skip') !== '0';
 
@@ -166,7 +203,7 @@ const Analysis = (() => {
     m.className = 'modal-bg'; m.id = 'anaModal'; m.hidden = true;
     m.innerHTML = `
       <div class="modal ana" role="dialog" aria-label="Video analysis">
-        <div class="modal-h"><b>Video analysis</b>${SIMULATED ? `<span class="ana-sim" title="${NATIVE ? 'The real analysis is not in the Mac app yet. For now it simulates the results so the window can be tried: they are made up, and no results file is written.' : 'The web version simulates the analysis so the window can be tried; results are kept in this browser only. The real analysis runs in the Mac app.'}">Preview · simulated results</span>` : ''}<span class="spacer"></span><button class="btn sm" id="anaClose">Close</button></div>
+        <div class="modal-h"><b>Video analysis</b>${SIMULATED ? `<span class="ana-sim" title="${NATIVE ? 'The real analysis is not in the Mac app yet. For now it simulates the results so the window can be tried: they are made up, and no results file is written.' : 'The web version simulates the analysis so the window can be tried; results are kept in this browser only. The real analysis runs in the Mac app.'}">Preview · simulated results</span>` : ''}<span class="spacer"></span><button class="btn sm" id="anaClose"${WINDOW ? ' hidden' : ''}>Close</button></div>
         <div class="ana-body">
           <div class="ana-row"><span class="ana-k">Folder</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
           <div class="ana-row"><span class="ana-k">Run</span>${TYPES.map(t => `<label class="ana-chk${t.later ? ' later' : ''}"${t.later ? ' title="Coming later"' : ''}><input type="checkbox" data-type="${t.key}"${t.later ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.later ? ' <i>(later)</i>' : ''}</label>`).join('')}</div>
@@ -183,26 +220,73 @@ const Analysis = (() => {
       </div>`;
     document.body.appendChild(m);
     $('#anaClose').onclick = close;
-    m.addEventListener('mousedown', e => { if (e.target === m) close(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !m.hidden) close(); });
+    if (!WINDOW) {
+      m.addEventListener('mousedown', e => { if (e.target === m) close(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && !m.hidden) close(); });
+    }
     m.querySelectorAll('input[data-type]').forEach(cb => cb.onchange = () => { typeOn[cb.dataset.type] = cb.checked; Store.set('ana:t:' + cb.dataset.type, cb.checked ? '1' : '0'); render(); });
     $('#anaSkip').onchange = e => { skipDone = e.target.checked; Store.set('ana:skip', skipDone ? '1' : '0'); render(); };
     $('#anaAll').onchange = e => { if (running) return; rows.forEach(r => r.checked = e.target.checked); render(); };
     $('#anaBody').addEventListener('change', e => { const cb = e.target.closest('input[data-i]'); if (cb && !running) { rows[+cb.dataset.i].checked = cb.checked; render(); } });
+    // a click on an analysed row shows what was found
+    $('#anaBody').addEventListener('click', e => {
+      if (e.target.closest('input') || e.target.closest('tr.ana-detail')) return;
+      const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+      const r = rows[+tr.dataset.i]; if (!r || !(store.get(r.name) && store.get(r.name).blacks)) return;
+      r.open = !r.open; $('#anaBody').innerHTML = rows.map(rowHtml).join('');
+    });
     $('#anaStart').onclick = start;
-    $('#anaStop').onclick = () => { stopReq = true; };
+    $('#anaStop').onclick = stop;
     $('#anaChange').onclick = changeFolder;
-    $('#anaUseQc').onclick = () => { ownFolder = false; refresh(); };
-    $('#anaChange').hidden = NATIVE;   // Mac app: its own folder choice comes with the separate window
+    $('#anaUseQc').onclick = async () => {
+      if (running) return;
+      if (WINDOW) { Store.del('ana:folder'); const p = await qcFolderPath(); sourceHandle = p ? new Native.NDir(p) : null; ownFolder = false; }
+      else ownFolder = false;
+      refresh();
+    };
+    $('#anaAwake').onchange = e => { Store.set('ana:awake', e.target.checked ? '1' : '0'); tellApp(true); };
+    if (NATIVE) $('#anaAwake').checked = Store.get('ana:awake') !== '0';
+  }
+  function stop() { stopReq = true; if (NATIVE && nativeCurrent) Native.post('analysisCancel', { id: nativeCurrent }); }
+  // ---- Mac app's analysis window: its own folder (the QC videos folder until another one is chosen)
+  const qcFolderPath = async () => { try { return await Native.call('storeGet', { key: 'folder:videos' }) || ''; } catch (e) { return ''; } };
+  async function setWindowFolder(path, own) {
+    sourceHandle = new Native.NDir(path); ownFolder = own;
+    if (own) Store.set('ana:folder', path);
+    await refresh();
+  }
+  let toldApp = '';
+  function tellApp(force) {   // the window's title, and whether the Mac may sleep
+    if (!WINDOW) return;
+    const title = running && queueInfo ? `Video Analysis: ${queueInfo.done + 1} of ${queueInfo.total}` : '';
+    const msg = { running, awake: $('#anaAwake') ? $('#anaAwake').checked : true, title };
+    const key = JSON.stringify(msg);
+    if (!force && key === toldApp) return;
+    toldApp = key; Native.post('analysisBusy', msg);
   }
   async function changeFolder() {
-    if (running || !window.showDirectoryPicker) return;
+    if (running) return;
+    if (WINDOW) {
+      const dir = await Native.pickFolder('analysis', sourceHandle && sourceHandle.path);
+      if (dir) await setWindowFolder(dir.path, true);
+      return;
+    }
+    if (!window.showDirectoryPicker) return;
     let dir; try { dir = await window.showDirectoryPicker({ mode: 'read', id: 'analysis' }); } catch (e) { return; }
     ownFolder = true; sourceHandle = dir; sourceLabel = dir.name;
     await loadRows((await listDir(dir, VIDEO_EXT)));
   }
   // The QC page's videos folder, every video in it (Matched only doesn't apply here).
   async function refresh() {
+    if (WINDOW) {
+      if (running) { render(); return; }
+      sourceLabel = sourceHandle ? sourceHandle.path : '';
+      let files = [], problem = '';
+      if (sourceHandle) { try { files = await listDir(sourceHandle, VIDEO_EXT); } catch (e) { problem = 'This folder can\'t be read: choose it again with Change…'; } }
+      folderProblem = problem;
+      await loadRows(files);
+      return;
+    }
     if (running || ownFolder) { render(); return; }
     sourceHandle = state.vidHandle; sourceLabel = state.vidFolder || '';
     const files = [...state.videos.map(v => v.file), ...state.ignoredVideos.map(v => v.file)];
@@ -216,11 +300,12 @@ const Analysis = (() => {
       const qv = state.videos.find(v => v.name === f.name), ig = state.ignoredVideos.find(v => v.name === f.name);
       const prev = old.get(f.name);
       return { file: f, name: f.name, size: f.size, duration: qv && qv.probe ? qv.probe.duration : null, fps: qv && qv.probe ? qv.probe.fps : null,
-        short: ig ? ig.reason : '', checked: prev ? prev.checked : !ig, fp: null, live: {} };
+        short: ig ? ig.reason : '', checked: prev ? prev.checked : !ig, open: prev ? prev.open : false, fp: null, live: {} };
     });
     render();
     for (const r of rows) {           // lengths and fingerprints, filled in as they come
       if (r.duration == null) { try { const p = await TimecodeTrack.probe(r.file); r.duration = p && p.duration; r.fps = p && p.fps; } catch (e) { /* unreadable */ } }
+      if (WINDOW && !old.has(r.name) && r.duration != null && r.duration < 60 && !r.short) { r.short = `short (${Math.round(r.duration)}s), probably a dubcard`; r.checked = false; }
       try { r.fp = await fingerprint(r.file); } catch (e) { r.fp = null; r.err = 'The file can\'t be read'; }
       loadStored(r.name);
       renderRow(r);
@@ -236,16 +321,48 @@ const Analysis = (() => {
       if (lv.state === 'failed') return `<span class="ana-bad" title="${esc(lv.msg || '')}">Failed</span>`;
     }
     const st = typeStatus(store.get(r.name), r.fp, t.key);
-    if (st.state === 'done') return `<span class="ana-ok">✓</span> ${esc(fmtAt(st.at))}${st.simulated && !SIMULATED ? ' <span class="ana-dim">(simulated)</span>' : ''}`;
+    if (st.state === 'done') return `<span class="ana-ok">✓</span> <span title="Analysed ${esc(fmtAt(st.at))}">${esc(found(store.get(r.name), t.key) || fmtAt(st.at))}</span>${st.simulated && !SIMULATED ? ' <span class="ana-dim">(simulated)</span>' : ''}`;
     if (st.state === 'outdated') return `<span class="ana-warn" title="${esc(st.why)}">Outdated</span>`;
     return '<span class="ana-dim">—</span>';
   }
+  // What an analysis found, in a few words (the cell), and in full (the row opened with a click).
+  function found(res, key) {
+    const t = res && res[key]; if (!t) return '';
+    if (key === 'blacks') {
+      const it = t.items || [], c = it.filter(b => b.kind === 'commercial').length, o = it.length - c;
+      return `${c} commercial${o ? ` · ${o} other` : ''}`;
+    }
+    if (key === 'credits') return t.cards && t.cards.length ? `${t.cards.length} cards${t.confirmed ? '' : ' (unconfirmed)'}` : 'none found';
+    return '';
+  }
+  const KIND = { commercial: 'Commercial black', start: 'Start of the file', end: 'End of the file', other: 'Black with sound (inside a scene)' };
+  function fmtFrames(sec, fps) {   // h:mm:ss:ff from the start of the file
+    const f = Math.round(fps) || 24, n = Math.max(0, Math.round(sec * fps)), p = x => String(x).padStart(2, '0');
+    return `${Math.floor(n / (f * 3600))}:${p(Math.floor(n / (f * 60)) % 60)}:${p(Math.floor(n / f) % 60)}:${p(n % f)}`;
+  }
+  function detailHtml(r) {
+    const res = store.get(r.name), b = res && res.blacks;
+    if (!b) return '';
+    const fps = b.fps || r.fps || (res.video && res.video.fps) || 24, items = b.items || [];
+    const lines = items.map(x => {
+      const n = x.frames != null ? x.frames : Math.round((x.out - x.in) * fps);
+      const len = n < Math.round(fps) ? `${n} fr` : `${(x.out - x.in).toFixed(1)} s`;
+      const snd = x.audio === 'sound' ? `Sound${x.level != null ? ` (${Math.round(x.level)} dB)` : ''}` : x.audio === 'silent' ? 'Silent' : x.audio === 'none' ? 'No audio' : '';
+      return `<tr class="k-${esc(x.kind || '')}"><td>${fmtFrames(x.in, fps)}</td><td>${fmtFrames(x.out, fps)}</td><td>${len}</td><td>${snd}</td><td>${esc(KIND[x.kind] || '')}</td></tr>`;
+    }).join('');
+    return `<tr class="ana-detail"><td></td><td colspan="${2 + TYPES.length}"><div class="ana-dh">Blacks <span class="ana-dim">· times from the start of the file (h:mm:ss:frames)${res.simulated ? ' · simulated' : ''}</span></div>${
+      items.length ? `<table class="ana-dt"><thead><tr><th>In</th><th>Out</th><th>Length</th><th>Sound</th><th>What it is</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No blacks found.</div>'}</td></tr>`;
+  }
   function rowHtml(r, i) {
-    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running ? ' disabled' : ''}></td>
+    return rowMain(r, i) + (r.open ? detailHtml(r) : '');
+  }
+  function rowMain(r, i) {
+    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${store.get(r.name) && store.get(r.name).blacks ? ' has-res' : ''}${r.open ? ' open' : ''}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running ? ' disabled' : ''}></td>
       <td class="ana-file"><div>${esc(r.name)}</div>${r.short ? `<div class="ana-note">${esc(r.short)}</div>` : ''}${r.err ? `<div class="ana-note bad">${esc(r.err)}</div>` : ''}</td>
       <td class="ana-len">${fmtLen(r.duration)}</td>${TYPES.map(t => `<td class="${t.later ? 'later' : ''}">${cellHtml(r, t)}</td>`).join('')}</tr>`;
   }
   function renderRow(r) {
+    if (rows.some(x => x.open)) { $('#anaBody').innerHTML = rows.map(rowHtml).join(''); return; }
     const i = rows.indexOf(r), tr = document.querySelector(`#anaBody tr[data-i="${i}"]`);
     if (tr) tr.outerHTML = rowHtml(r, i);
   }
@@ -260,9 +377,11 @@ const Analysis = (() => {
   }
   function render() {
     if (!built) return;
-    $('#anaFolder').textContent = sourceLabel || (rows.length ? '' : 'No videos folder yet: choose one on the QC page or here');
+    $('#anaFolder').textContent = sourceLabel || (rows.length ? '' : WINDOW ? 'No folder yet: choose one with Change…, or drop it on this window' : 'No videos folder yet: choose one on the QC page or here');
+    $('#anaFolder').title = sourceLabel;
     $('#anaUseQc').hidden = !ownFolder || running;
-    $('#anaBody').innerHTML = rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="${3 + TYPES.length}" class="ana-empty">No video files in this folder.</td></tr>`;
+    $('#anaChange').disabled = running;
+    $('#anaBody').innerHTML = rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="${3 + TYPES.length}" class="ana-empty">${folderProblem || (sourceLabel || !WINDOW ? 'No video files in this folder.' : '')}</td></tr>`;
     const all = $('#anaAll'); all.checked = rows.length > 0 && rows.every(r => r.checked); all.indeterminate = rows.some(r => r.checked) && !all.checked; all.disabled = running;
     const jobs = plan();
     $('#anaStart').disabled = running || !jobs.length;
@@ -275,6 +394,7 @@ const Analysis = (() => {
     const b = $('#anaBtn'); if (!b) return;
     b.classList.toggle('busy', running);
     b.textContent = running && queueInfo ? `Analysing ${queueInfo.done + 1} of ${queueInfo.total}…` : 'Analyse videos';
+    tellApp();
   }
   async function start() {
     const jobs = plan();
@@ -310,7 +430,8 @@ const Analysis = (() => {
           r.live[k] = { state: 'failed', msg: e && e.message || 'Unknown error' }; queueInfo.failed++;
         }
         doneSecs += r.duration || 2700; workSecs += (performance.now() - t0) / 1000;
-        saveResult(r.name, res);        // after each type: a stop or a crash keeps what's done
+        // after each type: a stop or a crash keeps what's done
+        if (!r.live[k]) { try { await saveResult(r.name, res, sourceHandle && sourceHandle.path); } catch (e) { r.live[k] = { state: 'failed', msg: 'The results could not be saved in this folder: ' + (e && e.message || e) }; queueInfo.failed++; } }
         renderRow(r);
       }
       queueInfo.done++;
@@ -323,7 +444,7 @@ const Analysis = (() => {
     stopReq = false;
   }
   function fmtLeft(s) { s = Math.max(1, Math.round(s)); return s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`; }
-  function open() { build(); $('#anaModal').hidden = false; refresh(); }
+  function open() { if (NATIVE && !WINDOW) { Native.post('analysisOpen'); return; } build(); $('#anaModal').hidden = false; refresh(); }
   function close() { if (built) $('#anaModal').hidden = true; }
 
   // ------------------------------------------------------------ for the QC page
@@ -344,7 +465,35 @@ const Analysis = (() => {
     }).filter(Boolean);
     return bits.length ? bits.join(' · ') + (r.simulated ? ' (simulated)' : '') : 'Not analysed';
   }
-  window.addEventListener('qc-videos-changed', () => { if (built && !$('#anaModal').hidden) refresh(); });
+  window.addEventListener('qc-videos-changed', () => {
+    if (built && !$('#anaModal').hidden && !WINDOW) refresh();
+    // results files already in the QC videos folder (made by the Mac app, here or on another machine)
+    else if (state.vidHandle) readDataDir(state.vidHandle).then(() => window.dispatchEvent(new CustomEvent('analysis-updated', { detail: {} }))).catch(() => {});
+  });
+  if (NATIVE) {
+    // another window of the app has just saved results
+    Native.on('analysisFile', d => {
+      const mine = WINDOW ? sourceHandle : state.vidHandle;
+      if (!mine || !mine.path || !d || !d.json) return;
+      const tail = p => String(p || '').replace(/\/+$/, '');
+      if (tail(d.folder) !== tail(mine.path) && !tail(d.folder).endsWith(tail(mine.path))) return;
+      if (takeResult(d.json)) window.dispatchEvent(new CustomEvent('analysis-updated', { detail: {} }));
+    });
+  }
+  if (WINDOW) {
+    Native.on('analysisShow', () => { if (!running) refresh(); });      // the window was brought back: look at the folder again
+    Native.on('analysisStop', () => stop());                            // the window is closing
+    document.addEventListener('DOMContentLoaded', async () => {
+      window.onNativeDrop = async items => {                            // a folder dropped on the window
+        const d = (items || []).find(i => i.isDir);
+        if (d && !running) await setWindowFolder(d.path, true);
+      };
+      build(); $('#anaModal').hidden = false; render();
+      const own = Store.get('ana:folder'), p = own || await qcFolderPath();
+      if (p) await setWindowFolder(p, false); else render();
+      ownFolder = !!own; render();
+    });
+  }
 
   return { open, close, forVideo, statusLine, fingerprint, TYPES, DATA_DIR };
 })();

@@ -25,5 +25,14 @@ ffmpeg -hide_banner -loglevel error -y \
   -filter_complex "[1:a]pan=7.1|c0=c0|c1=c0|c2=c0|c3=c0|c4=c0|c5=c0|c6=c0|c7=c0[a]" -map 0:v -map "[a]" -c:a pcm_s24le \
   -timecode 01:00:00:00 \
   "$V/StressTest_S1_T2003_Hr0_UHD_2398_HEVC10_V1-R0.mov"
+# Video analysis: one test episode (see make_analysis_media.py) as H.264 + AAC stereo, and the same as
+# ProRes 422 HQ with two mono PCM tracks. Its own folder, so the playback tests don't run on it.
+A="$OUT/Analysis"; mkdir -p "$A"
+python3 "$(dirname "$0")/make_analysis_media.py" "$A/AnalysisTest_S1_T3001_Hr0_HD_2398_H264_V1-R0.mp4" 1280x720
+mv "$A/AnalysisTest_S1_T3001_Hr0_HD_2398_H264_V1-R0.mp4.json" "$A/expected.json"
+ffmpeg -hide_banner -loglevel error -y -i "$A/AnalysisTest_S1_T3001_Hr0_HD_2398_H264_V1-R0.mp4" \
+  -filter_complex "[0:a]channelsplit=channel_layout=stereo[l][r]" -map 0:v -map "[l]" -map "[r]" \
+  -c:v prores_ks -profile:v 3 -vendor apl0 -pix_fmt yuv422p10le -c:a pcm_s24le -timecode 01:00:00:00 \
+  "$A/AnalysisTest_S1_T3002_Hr0_HD_2398_ProResHQ_2trk_V1-R0.mov"
 python3 "$(dirname "$0")/make_subs.py" "$OUT/Subtitles"
-ls -la "$V" "$OUT/Subtitles"
+ls -la "$V" "$OUT/Subtitles" "$A"
