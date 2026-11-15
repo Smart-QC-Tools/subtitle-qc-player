@@ -102,7 +102,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   credits) | title (centred, tall) | text (captions: time words, digits). In/out by frame bisection.
   Cards < 0.5 s and pieces of a longer card (same place, same time) dropped. Runs = credits ≤ 30 s apart.
   Known: short role words ("With", "And") over very bright scenes can be missed (the name is read).
-  Speed on the CI Mac: ~100 s per file for 3.5 min scanned (both test files). On-screen text: later.
+  Speed: CI Mac ~100 s per file for 3.5 min scanned; the user's Mac, 1080p H.264 test episode: blacks ~18 s,
+  credits ~24 s. The user renamed that episode T1104 (their older T1103 is kept). On-screen text: later.
 - Web version = preview with a simulated engine (`web/src/analysis.js`), results in localStorage, marked
   `simulated`. The Mac app never simulates and ignores localStorage.
 - Results: format `subtitle-qc-analysis` v1, one file per video,
