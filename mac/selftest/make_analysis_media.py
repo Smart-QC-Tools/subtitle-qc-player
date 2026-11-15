@@ -5,9 +5,14 @@
   - a dark night scene that isn't black, and a black head and tail
   - opening credits (14 lower-third cards ending in "Directed by"), a main title and two captions
 Usage: make_analysis_media.py OUT.mp4 [WIDTHxHEIGHT]   -> also writes OUT.mp4.json (what is where).
+Text: drawn by ffmpeg (drawtext) when it can; otherwise the cards are overlaid from pictures in
+cards/<WIDTHxHEIGHT>/ next to this script (Homebrew's ffmpeg has no drawtext). Those pictures are made with
+  make_analysis_media.py --render-cards WIDTHxHEIGHT      (needs Python's Pillow and the Inter font)
 """
 import subprocess, sys, json, os
-out=sys.argv[1]; SZ=sys.argv[2] if len(sys.argv)>2 else '1920x1080'
+RENDER=len(sys.argv)>1 and sys.argv[1]=='--render-cards'
+if RENDER: out=None; SZ=sys.argv[2] if len(sys.argv)>2 else '1280x720'
+else: out=sys.argv[1]; SZ=sys.argv[2] if len(sys.argv)>2 else '1920x1080'
 W,H=map(int,SZ.split('x')); R='24000/1001'
 def font(*names):
     for n in names:
@@ -15,7 +20,7 @@ def font(*names):
     return None
 REG=font('/usr/share/fonts/opentype/inter/Inter-Regular.otf','/System/Library/Fonts/Supplemental/Arial.ttf','/Library/Fonts/Arial.ttf','/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
 BOLD=font('/usr/share/fonts/opentype/inter/Inter-SemiBold.otf','/System/Library/Fonts/Supplemental/Arial Bold.ttf','/Library/Fonts/Arial Bold.ttf','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf') or REG
-TEXT=bool(REG) and 'drawtext' in subprocess.run(['ffmpeg','-hide_banner','-filters'],capture_output=True,text=True).stdout
+TEXT=not os.environ.get('NO_DRAWTEXT') and bool(REG) and 'drawtext' in subprocess.run(['ffmpeg','-hide_banner','-filters'],capture_output=True,text=True).stdout
 # ---- picture: scenes and full blacks, in order. ('scene', seconds, source, fade_in, fade_out) | ('black', seconds, kind)
 g=lambda c,t,sp,seed: f"gradients=s={SZ}:r={R}:c0={c[0]}:c1={c[1]}:c2={c[2]}:c3={c[3]}:n=4:type={t}:speed={sp}:seed={seed}"
 SC=[
@@ -57,8 +62,9 @@ chain="".join(parts)+f"concat=n={len(parts)}:v=1:a=0[vc];[vc]"
 chain+=",".join(f"drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='between(t,{a},{b-0.001})'" for a,b,k in INNER)
 # ---- text
 def esc(s): return s.replace('\\','\\\\').replace(':','\\:').replace("'","\u2019").replace(',','\\,')
-texts=[]
+texts=[]; specs=[]
 def card(t0,dur,lines,side,y0=0.76):
+    specs.append((t0,dur,lines,side,y0))
     # lines: [(text, size_frac, bold)] ; fades 0.4 s
     y=y0
     for txt,sz,bold in lines:
@@ -81,14 +87,38 @@ for i,(role,name) in enumerate(CR):
     cards.append(card(t0,3.5,[(role,0.03,False),(name,0.05,True)],side)+('credit',))
     t0+=7.0 if i!=7 else 14.0     # one longer break in the middle
 cards.append(card(160.0,3.0,[('HARBOUR OFFICE — 6\u200940 AM',0.036,False)],'left',0.80)+('caption after the credits (not a credit)',))
-chain+=(","+",".join(texts) if TEXT else "")+"[v]"
+CARDS=os.path.join(os.path.dirname(os.path.abspath(__file__)),'cards',SZ)
+def card_png(i): return os.path.join(CARDS,f'card_{i:02d}.png')
+if RENDER:   # the cards as pictures (transparent, full frame), for an ffmpeg without drawtext
+    from PIL import Image, ImageDraw, ImageFont
+    os.makedirs(CARDS,exist_ok=True)
+    for i,(t0,dur,lines,side,y0) in enumerate(specs):
+        im=Image.new('RGBA',(W,H),(0,0,0,0)); d=ImageDraw.Draw(im); y=y0
+        for txt,sz,bold in lines:
+            f=ImageFont.truetype(BOLD if bold else REG,int(H*sz))
+            tw=d.textlength(txt,font=f); x={'left':int(W*0.09),'right':int(W-tw-W*0.09),'mid':int((W-tw)/2)}[side]
+            d.text((x+2,int(H*y)+2),txt,font=f,fill=(0,0,0,150)); d.text((x,int(H*y)),txt,font=f,fill=(255,255,255,255))
+            y+=sz*1.35
+        im.save(card_png(i),optimize=True)
+    print('cards written to',CARDS); sys.exit(0)
+PNG=not TEXT and all(os.path.exists(card_png(i)) for i in range(len(specs)))
+inputs=[]
+if TEXT: chain+=","+",".join(texts)+"[v]"
+elif PNG:
+    chain+="[v0]"
+    for i,(t0,dur,lines,side,y0) in enumerate(specs):
+        inputs+=['-loop','1','-framerate',R,'-t',str(dur),'-i',card_png(i)]
+        chain+=(f";[{i}:v]format=rgba,fade=t=in:st=0:d=0.4:alpha=1,fade=t=out:st={dur-0.4}:d=0.4:alpha=1,setpts=PTS+{t0}/TB[c{i}]"
+                f";[v{i}][c{i}]overlay=eof_action=pass:repeatlast=0[v{i+1}]")
+    chain+=f";[v{len(specs)}]null[v]"
+else: chain+="[v]"
 # ---- sound: ambience + a tone per section; silent in the silent blacks (0.3 s ramps), untouched in the others
 sil=[(a,b) for a,b,k,kind in blacks if kind=='silent']
 gain="*".join(f"clip((abs(t-{(a+b)/2})-{(b-a)/2})/0.3\\,0\\,1)" for a,b in sil)
 af=(f"anoisesrc=d={total}:c=pink:r=48000:a=0.06[n];sine=f=196:r=48000:d={total},tremolo=f=0.3:d=0.6,volume=0.12[s1];"
     f"sine=f=294:r=48000:d={total},tremolo=f=0.17:d=0.8,volume=0.08[s2];[n][s1][s2]amix=inputs=3:normalize=0,"
     f"volume='{gain}':eval=frame,aformat=channel_layouts=stereo[a]")
-cmd=['ffmpeg','-y','-v','error','-filter_complex',";".join(fc)+";"+chain+";"+af,'-map','[v]','-map','[a]','-t',str(total),
+cmd=['ffmpeg','-y','-v','error']+inputs+['-filter_complex',";".join(fc)+";"+chain+";"+af,'-map','[v]','-map','[a]','-t',str(total),
      '-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p','-g','24','-c:a','aac','-b:a','160k','-movflags','+faststart',out]
-json.dump({'total':total,'text':TEXT,'blacks':blacks,'cards':cards},open(out+'.json','w'),indent=1)
+json.dump({'total':total,'text':TEXT or PNG,'blacks':blacks,'cards':cards},open(out+'.json','w'),indent=1)
 subprocess.run(cmd,check=True)

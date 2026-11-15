@@ -97,7 +97,7 @@
         const id = ++jid, t = now();
         const res = await new Promise((resolve, reject) => {
           Native.on('analysis', m => { if (m.id !== id) return; if (m.type === 'done') resolve(m.result); else if (m.type !== 'progress') reject(new Error(m.message || m.type)); });
-          Native.call('analysisStart', { id, path: f.path, type: 'credits', settings: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20 } }).catch(reject);
+          Native.call('analysisStart', { id, path: f.path, type: 'credits', settings: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20, minCardSeconds: 0.5 } }).catch(reject);
         }).catch(e => ({ error: String(e && e.message || e) }));
         step('analysis: credits', { file: f.name, ms: round(now() - t, 0), result: res });
         if (res.error) { problem('credits analysis failed', { file: f.name, error: res.error }); continue; }
@@ -120,11 +120,12 @@
       }
       // the window's own run: wait for its results files
       const t = now(); let texts = [];
-      while (now() - t < 600000) { texts = await Native.call('analysisReadAll', { folder: CFG.analysis }).catch(() => []); if (texts.length >= vids.length) break; await sleep(1000); }
+      const complete = x => { try { const r = JSON.parse(x); return r.blacks && (r.credits || (expected && expected.text === false)); } catch (e) { return false; } };
+      while (now() - t < 600000) { texts = await Native.call('analysisReadAll', { folder: CFG.analysis }).catch(() => []); if (texts.filter(complete).length >= vids.length) break; await sleep(1000); }
       const written = texts.map(x => { try { const r = JSON.parse(x); return { name: r.video && r.video.name, format: r.format, version: r.version, app: r.app, simulated: r.simulated, fingerprint: r.video && r.video.fingerprint, duration: r.video && r.video.duration, blacks: r.blacks && { settings: r.blacks.settings, n: (r.blacks.items || []).length, commercial: (r.blacks.items || []).filter(b => b.kind === 'commercial').length }, credits: r.credits && { confirmed: r.credits.confirmed, cards: (r.credits.cards || []).length, credits: (r.credits.cards || []).filter(c => c.kind === 'credit').length, runs: r.credits.runs, seconds: r.credits.seconds } }; } catch (e) { return { bad: String(e) }; } });
       step('analysis: results files written by the window', { waitedMs: round(now() - t, 0), files: written });
       if (written.length < vids.length) problem('analysis window wrote fewer results files than videos', { written: written.length, videos: vids.length });
-      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3 || !w.credits || !w.credits.confirmed || w.credits.credits !== 14) problem('analysis window: unexpected results file', w);
+      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3 || (expected && expected.text !== false && (!w.credits || !w.credits.confirmed || w.credits.credits !== 14))) problem('analysis window: unexpected results file', w);
     }
 
     const order = CFG.only === 'analysis' ? [] : [...state.videos];

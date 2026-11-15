@@ -26,7 +26,7 @@ const Analysis = (() => {
     // One frame a second from the start; stops a minute after "Directed by" (or at 20 min). Text staying longer
     // than staticMaxSeconds (logos, burnt-in timecode) isn't a card. Each card: in, out, text, lines, kind
     // (credit | title | text), box and line boxes [x, y, w, h] (0…1, from the top left). Runs: credits ≤ joinGap apart.
-    credits: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20 },
+    credits: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20, minCardSeconds: 0.5 },
   };
   const SIMULATED = !NATIVE;                 // the web version simulates; the Mac app analyses for real
   const WINDOW = NATIVE && !!window.__analysisWindow;   // this page is the Mac app's Video Analysis window

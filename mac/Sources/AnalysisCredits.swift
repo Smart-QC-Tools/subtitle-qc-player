@@ -35,7 +35,7 @@ extension AnalysisJob {
 
         let step = max(0.25, setting("coarseStepSeconds", 1))
         let joinGap = setting("joinGapSeconds", 30), afterDirected = setting("afterDirectedSeconds", 60)
-        let staticMax = setting("staticMaxSeconds", 20)
+        let staticMax = setting("staticMaxSeconds", 20), minSeconds = setting("minCardSeconds", 0.5)
         var scanEnd = min(duration, setting("searchMinutes", 20) * 60)
         let fullEnd = scanEnd
 
@@ -131,6 +131,8 @@ extension AnalysisJob {
             c.tout = min(duration, AnalysisJob.frameTime(hiOut, fd))
             post(["type": "progress", "p": 0.85 + 0.14 * Double(i + 1) / Double(max(1, cards.count))])
         }
+        // Shorter than half a second: a misread, not a card.
+        cards = cards.filter { $0.tout - $0.tin >= minSeconds }
         cards.sort { $0.tin < $1.tin }
 
         let credits = cards.filter { $0.kind == "credit" }
@@ -157,6 +159,23 @@ extension AnalysisJob {
 
     static func frameTime(_ n: Double, _ fd: Double) -> Double { max(0, n) * fd }
 
+    /// At least one real-looking word: three letters or more with a vowel (any letter outside the Latin
+    /// alphabets counts, so other scripts aren't thrown out).
+    static func hasWord(_ s: String) -> Bool {
+        let vowels = Set("aeiouyàáâãäåæèéêëìíîïòóôõöøùúûüýÿœ")
+        var run = 0, vowel = false
+        for ch in s.lowercased() + " " {
+            if ch.isLetter {
+                run += 1
+                if vowels.contains(ch) || (ch.unicodeScalars.first?.value ?? 0) > 0x24F { vowel = true }
+            } else {
+                if run >= 3 && vowel { return true }
+                run = 0; vowel = false
+            }
+        }
+        return false
+    }
+
     // MARK: - reading text
 
     private static func observations(_ img: CGImage, level: VNRequestTextRecognitionLevel, roi: CGRect? = nil) -> [VNRecognizedTextObservation] {
@@ -181,7 +200,7 @@ extension AnalysisJob {
         for o in observations(img, level: level) {
             guard let cand = o.topCandidates(1).first, cand.confidence >= 0.3 else { continue }
             let s = cand.string.trimmingCharacters(in: .whitespaces)
-            if s.filter({ $0.isLetter }).count < 2 { continue }
+            if !AnalysisJob.hasWord(s) { continue }   // pattern noise read as "rr", "TfT" …
             if let tc = tc, tc.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil { continue }
             let b = o.boundingBox
             let box = CGRect(x: b.minX, y: 1 - b.maxY, width: b.width, height: b.height)

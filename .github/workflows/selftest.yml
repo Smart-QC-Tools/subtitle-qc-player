@@ -28,7 +28,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/media
-          key: selftest-media-${{ hashFiles('mac/selftest/make_media.sh', 'mac/selftest/make_subs.py', 'mac/selftest/make_analysis_media.py') }}
+          key: selftest-media-${{ hashFiles('mac/selftest/make_media.sh', 'mac/selftest/make_subs.py', 'mac/selftest/make_analysis_media.py', 'mac/selftest/cards/**') }}
       - name: Tools
         if: steps.media.outputs.cache-hit != 'true'
         run: brew install ffmpeg
