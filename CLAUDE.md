@@ -81,16 +81,32 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - The user iterates on fine details; show mock-ups when asked before changing code, keep answers concrete.
 
 ## Video analysis (video-analysis branch, in progress)
-- Its own window ("Analyse videos" in the header; Mac: later a separate window + Window menu), not a tab.
-  Lists every video in the folder (ignores "Matched only"), checkboxes, per-type status columns
-  (Blacks, Opening credits, On-screen text = later), Start/Stop, time left, skip analysed, keep Mac awake.
-- Web version = preview with a simulated engine (`web/src/analysis.js`), results in localStorage;
-  real fingerprints (size + SHA-256 of 3×64 KB pieces). Results format `subtitle-qc-analysis` v1, one file per
-  video in `Subtitle QC Data/<video>.analysis.json` next to the videos (Mac app writes; web can read).
+- Mac app: its own window, **Window ▸ Video Analysis** (⇧⌘A; `AnalysisWindow` in `mac/Sources/Analysis.swift`): a second
+  WKWebView with the same page in "window" mode (`window.__analysisWindow`, `html.ana-window`: only the panel).
+  No header button in the app. Own folder (starts as the QC videos folder; Change… / drop a folder;
+  setting `ana:folder`). Lists every video, checkboxes, per-type status columns, Start/Stop, time left, skip
+  analysed, keep Mac awake (real: `analysisBusy`), short clips (<60 s) unticked. Closing mid-run asks first.
+  A click on an analysed row lists the blacks. Web version: the same panel as a modal from the header button.
+- Engines: **blacks are real in the Mac app** (`AnalysisJob.runBlacks`): every frame decoded once
+  (AVAssetReader), black = 98% of sampled luma ≤ 10% (same as ffmpeg blackdetect, so the darkest frames of
+  a fade count too), runs ≥ 0.25 s, frame-exact; sound RMS over the middle half of each black, ≤ −60 dBFS =
+  silent. Items: in, out, frames, audio (silent | sound | none), level, kind (start | end | commercial |
+  other = black with sound inside a scene). `SETTINGS.blacks.v` = 2. **Opening credits: not built in the app
+  yet** (column shows "later" there). On-screen text: later everywhere.
+- Web version = preview with a simulated engine (`web/src/analysis.js`), results in localStorage, marked
+  `simulated`. The Mac app never simulates and ignores localStorage.
+- Results: format `subtitle-qc-analysis` v1, one file per video,
+  `Subtitle QC Data/<video file name incl. extension>.analysis.json` next to the videos (Mac app writes via
+  `analysisWrite`; the other window hears `analysisFile`; main window reads the folder's files on load; web
+  can read them). Fingerprint = size + SHA-256 of 3×64 KB pieces.
+- Testing: `selftest.yml` with input `only: analysis` (about 12 min, mostly queue + build) makes a test episode
+  (`mac/selftest/make_analysis_media.py`: 3 commercial blacks, 2 blacks with sound, dark scene, credits,
+  captions; H.264 and ProRes), checks the engine against it, opens the real window, presses Start and
+  collects its results files and screenshots on the `selftest-results` branch. The user has the 1080p
+  version as "Harbor Lights T1103" (+ ENG .itt with events on / off the credits and blacks, + answer sheet).
 - Credits design (IDEAS.md): scan from 0 every ~4 s for credit-like static aligned text, read text only on hits,
   stop at "Directed by" (+1 min), limit 20 min, card in/out by bisection, compare with rendered subtitle box;
   raised-with-no-credits window 20 s; margins as future "Advanced" settings.
-- Next steps: (1) use results on the QC page (credits band + black ticks on the index bar, credit checks in
-  the events table, status in the video info box); (2) Mac: separate window, write results files, real engine
-  (AVAssetReader + Vision), keep-awake.
+- Next steps: (1) opening-credits engine in the Mac app (Vision); (2) use results on the QC page (credits
+  band + black ticks on the index bar, credit / black checks in the events table).
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).

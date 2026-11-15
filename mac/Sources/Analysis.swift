@@ -116,8 +116,11 @@ final class AnalysisJob {
             var item: [String: Any] = ["in": r3(r.tin), "out": r3(r.tout), "frames": r.n]
             var audio = "none"
             if !audioTracks.isEmpty {
-                // Just inside the black, so the tail of a fade on either side doesn't count.
-                let pad = min(frameDur, (r.tout - r.tin) / 4)
+                // The middle half of the black: the picture is "black" for the last frames of a fade out and
+                // the first of a fade in, while the sound is still on its way down or up. A commercial black is
+                // silent at its core; a black inside a scene has sound all the way through.
+                let len = r.tout - r.tin
+                let pad = len > frameDur * 4 ? len / 4 : min(frameDur, len / 4)
                 if let db = audioLevel(asset: asset, tracks: audioTracks, from: r.tin + pad, to: r.tout - pad) {
                     item["level"] = (db * 10).rounded() / 10
                     audio = db <= silenceDb ? "silent" : "sound"

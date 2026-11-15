@@ -82,7 +82,10 @@
           want.forEach((w, i) => {
             const g = got.find(x => Math.abs(x.in - w.in) < 0.3);
             if (!g) { problem('analysis: black not found', { file: f.name, want: w }); return; }
-            if (Math.abs(g.in - w.in) > fr * 1.01 || Math.abs(g.out - w.out) > fr * 1.01) problem('analysis: black off by more than a frame', { file: f.name, got: g, want: w });
+            // A black with fades also takes in the darkest frames of the fades (below 10%), a few frames each side;
+            // a hard cut to black must be right to the frame.
+            const tolIn = w.silent && i > 0 ? 0.2 : fr * 1.01, tolOut = w.silent && i < want.length - 1 ? 0.2 : fr * 1.01;
+            if (g.in > w.in + fr * 1.01 || g.in < w.in - tolIn || g.out < w.out - fr * 1.01 || g.out > w.out + tolOut) problem('analysis: black off by more than a frame', { file: f.name, got: g, want: w });
             if ((g.audio === 'silent') !== w.silent) problem('analysis: sound of a black misjudged', { file: f.name, got: g, want: w });
             const kind = i === 0 ? 'start' : i === want.length - 1 ? 'end' : w.silent ? 'commercial' : 'other';
             if (g.kind !== kind) problem('analysis: kind of black', { file: f.name, got: g, wantKind: kind });
