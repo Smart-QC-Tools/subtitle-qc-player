@@ -92,13 +92,39 @@
           });
         }
       }
+      // opening credits, compared with the cards make_analysis_media.py drew (when it could draw text)
+      if (expected && expected.text !== false) for (const f of vids) {
+        const id = ++jid, t = now();
+        const res = await new Promise((resolve, reject) => {
+          Native.on('analysis', m => { if (m.id !== id) return; if (m.type === 'done') resolve(m.result); else if (m.type !== 'progress') reject(new Error(m.message || m.type)); });
+          Native.call('analysisStart', { id, path: f.path, type: 'credits', settings: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20 } }).catch(reject);
+        }).catch(e => ({ error: String(e && e.message || e) }));
+        step('analysis: credits', { file: f.name, ms: round(now() - t, 0), result: res });
+        if (res.error) { problem('credits analysis failed', { file: f.name, error: res.error }); continue; }
+        if (!res.confirmed) problem('credits: "Directed by" not found', { file: f.name });
+        const got = res.cards || [];
+        for (const [a, b, txt, side, kind] of expected.cards) {
+          const g = got.find(x => x.in < b && x.out > a);
+          const wantKind = kind === 'credit' ? 'credit' : kind === 'main title' ? 'title' : 'text';
+          if (!g) { problem('credits: card not found', { file: f.name, want: [a, b, txt] }); continue; }
+          // each card fades in and out over 0.4 s: the reader picks it up somewhere in the fade
+          if (Math.abs(g.in - a) > 0.5 || Math.abs(g.out - b) > 0.5) problem('credits: card in / out off', { file: f.name, want: [a, b, txt], got: [g.in, g.out, g.text] });
+          if (g.kind !== wantKind) problem('credits: card kind', { file: f.name, text: txt, got: g.kind, want: wantKind, read: g.text });
+          const words = txt.toUpperCase().split(/[^A-Z]+/).filter(w => w.length > 2);
+          const read = String(g.text || '').toUpperCase();
+          const missed = words.filter(w => !read.includes(w));
+          if (missed.length) problem('credits: text misread', { file: f.name, want: txt, read: g.text });
+        }
+        const extra = got.filter(g => !expected.cards.some(([a, b]) => g.in < b && g.out > a));
+        if (extra.length) problem('credits: text found where there is none', { file: f.name, extra });
+      }
       // the window's own run: wait for its results files
       const t = now(); let texts = [];
-      while (now() - t < 240000) { texts = await Native.call('analysisReadAll', { folder: CFG.analysis }).catch(() => []); if (texts.length >= vids.length) break; await sleep(1000); }
-      const written = texts.map(x => { try { const r = JSON.parse(x); return { name: r.video && r.video.name, format: r.format, version: r.version, app: r.app, simulated: r.simulated, fingerprint: r.video && r.video.fingerprint, duration: r.video && r.video.duration, blacks: r.blacks && { settings: r.blacks.settings, n: (r.blacks.items || []).length, commercial: (r.blacks.items || []).filter(b => b.kind === 'commercial').length }, credits: !!r.credits }; } catch (e) { return { bad: String(e) }; } });
+      while (now() - t < 600000) { texts = await Native.call('analysisReadAll', { folder: CFG.analysis }).catch(() => []); if (texts.length >= vids.length) break; await sleep(1000); }
+      const written = texts.map(x => { try { const r = JSON.parse(x); return { name: r.video && r.video.name, format: r.format, version: r.version, app: r.app, simulated: r.simulated, fingerprint: r.video && r.video.fingerprint, duration: r.video && r.video.duration, blacks: r.blacks && { settings: r.blacks.settings, n: (r.blacks.items || []).length, commercial: (r.blacks.items || []).filter(b => b.kind === 'commercial').length }, credits: r.credits && { confirmed: r.credits.confirmed, cards: (r.credits.cards || []).length, credits: (r.credits.cards || []).filter(c => c.kind === 'credit').length, runs: r.credits.runs, seconds: r.credits.seconds } }; } catch (e) { return { bad: String(e) }; } });
       step('analysis: results files written by the window', { waitedMs: round(now() - t, 0), files: written });
       if (written.length < vids.length) problem('analysis window wrote fewer results files than videos', { written: written.length, videos: vids.length });
-      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3) problem('analysis window: unexpected results file', w);
+      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3 || !w.credits || !w.credits.confirmed || w.credits.credits !== 14) problem('analysis window: unexpected results file', w);
     }
 
     const order = CFG.only === 'analysis' ? [] : [...state.videos];

@@ -8,13 +8,13 @@
 
    Mac app: the analysis has its own window (Window ▸ Video Analysis), which is this same
    page in "window" mode: only this panel, with its own folder. The engine is native
-   (mac/Sources/Analysis.swift). Blacks are real; opening credits are still to come there.
+   (mac/Sources/Analysis.swift, AnalysisCredits.swift).
    ========================================================================== */
 const Analysis = (() => {
   const FORMAT = 'subtitle-qc-analysis', VERSION = 1, DATA_DIR = 'Subtitle QC Data';
   const TYPES = [
     { key: 'blacks', label: 'Commercial blacks', head: 'Blacks' },
-    { key: 'credits', label: 'Opening credits', head: 'Opening credits', later: NATIVE },   // Mac app: not built yet
+    { key: 'credits', label: 'Opening credits', head: 'Opening credits' },
     { key: 'text', label: 'On-screen text', head: 'On-screen text', later: true },
   ];
   // Settings each result is made with; a result made with older settings shows as Outdated.
@@ -23,7 +23,10 @@ const Analysis = (() => {
     // below silenceDb (dBFS, RMS) across the black. Each item: in, out, frames, audio (silent | sound | none),
     // level, kind (start | end | commercial | other = a black with sound, inside a scene).
     blacks: { v: 2, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -60 },
-    credits: { v: 1, searchMinutes: 20, coarseStepSeconds: 4, joinGapSeconds: 30 },
+    // One frame a second from the start; stops a minute after "Directed by" (or at 20 min). Text staying longer
+    // than staticMaxSeconds (logos, burnt-in timecode) isn't a card. Each card: in, out, text, lines, kind
+    // (credit | title | text), box and line boxes [x, y, w, h] (0…1, from the top left). Runs: credits ≤ joinGap apart.
+    credits: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20 },
   };
   const SIMULATED = !NATIVE;                 // the web version simulates; the Mac app analyses for real
   const WINDOW = NATIVE && !!window.__analysisWindow;   // this page is the Mac app's Video Analysis window
@@ -129,7 +132,7 @@ const Analysis = (() => {
     const cards = [];
     const card = (t, len, text, place) => {
       const y = place === 'mid' ? 0.45 : 0.78 + R() * 0.06, x = place === 'left' ? 0.07 : place === 'right' ? 0.6 : 0.33;
-      cards.push({ in: r3(t), out: r3(t + len), text, boxes: [[r3(x), r3(y), place === 'mid' ? 0.34 : 0.3, 0.05], [r3(x + 0.02), r3(y + 0.055), 0.24, 0.04]] });
+      cards.push({ in: r3(t), out: r3(t + len), text, kind: place === 'mid' ? 'title' : 'credit', boxes: [[r3(x), r3(y), place === 'mid' ? 0.34 : 0.3, 0.05], [r3(x + 0.02), r3(y + 0.055), 0.24, 0.04]] });
     };
     // main titles: a few cards with the show's title
     let t = 30 + R() * 40;
@@ -232,7 +235,7 @@ const Analysis = (() => {
     $('#anaBody').addEventListener('click', e => {
       if (e.target.closest('input') || e.target.closest('tr.ana-detail')) return;
       const tr = e.target.closest('tr[data-i]'); if (!tr) return;
-      const r = rows[+tr.dataset.i]; if (!r || !(store.get(r.name) && store.get(r.name).blacks)) return;
+      const r = rows[+tr.dataset.i]; if (!r || !hasResults(store.get(r.name))) return;
       r.open = !r.open; $('#anaBody').innerHTML = rows.map(rowHtml).join('');
     });
     $('#anaStart').onclick = start;
@@ -332,7 +335,10 @@ const Analysis = (() => {
       const it = t.items || [], c = it.filter(b => b.kind === 'commercial').length, o = it.length - c;
       return `${c} commercial${o ? ` · ${o} other` : ''}`;
     }
-    if (key === 'credits') return t.cards && t.cards.length ? `${t.cards.length} cards${t.confirmed ? '' : ' (unconfirmed)'}` : 'none found';
+    if (key === 'credits') {
+      const n = (t.cards || []).filter(c => !c.kind || c.kind === 'credit').length;
+      return n ? `${n} credit${n === 1 ? '' : 's'}${t.confirmed ? '' : ' (no “Directed by”)'}` : 'none found';
+    }
     return '';
   }
   const KIND = { commercial: 'Commercial black', start: 'Start of the file', end: 'End of the file', other: 'Black with sound (inside a scene)' };
@@ -340,8 +346,23 @@ const Analysis = (() => {
     const f = Math.round(fps) || 24, n = Math.max(0, Math.round(sec * fps)), p = x => String(x).padStart(2, '0');
     return `${Math.floor(n / (f * 3600))}:${p(Math.floor(n / (f * 60)) % 60)}:${p(Math.floor(n / f) % 60)}:${p(n % f)}`;
   }
+  const hasResults = res => !!(res && (res.blacks || res.credits));
+  const CARD_KIND = { credit: 'Credit', title: 'Main title', text: 'Other text (not a credit)' };
+  function creditsHtml(res, r) {
+    const c = res && res.credits; if (!c) return '';
+    const fps = c.fps || r.fps || (res.video && res.video.fps) || 24, cards = c.cards || [];
+    const runs = (c.runs || []).map(x => `${fmtFrames(x.in, fps)} – ${fmtFrames(x.out, fps)}`).join(' · ');
+    const lines = cards.map(x => `<tr class="k-${esc(x.kind || 'credit')}"><td>${fmtFrames(x.in, fps)}</td><td>${fmtFrames(x.out, fps)}</td><td>${esc(CARD_KIND[x.kind || 'credit'] || '')}</td><td>${esc(x.text || '')}</td></tr>`).join('');
+    return `<div class="ana-dh">Opening credits <span class="ana-dim">· ${c.confirmed ? 'ends with “Directed by”' : 'no “Directed by” found'}${runs ? ` · credits ${runs}` : ''}${res.simulated ? ' · simulated' : ''}</span></div>${
+      cards.length ? `<table class="ana-dt"><thead><tr><th>In</th><th>Out</th><th>What it is</th><th>Text</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No on-screen text found.</div>'}`;
+  }
   function detailHtml(r) {
-    const res = store.get(r.name), b = res && res.blacks;
+    const res = store.get(r.name);
+    if (!hasResults(res)) return '';
+    return `<tr class="ana-detail"><td></td><td colspan="${2 + TYPES.length}">${blacksHtml(res, r)}${creditsHtml(res, r)}</td></tr>`;
+  }
+  function blacksHtml(res, r) {
+    const b = res && res.blacks;
     if (!b) return '';
     const fps = b.fps || r.fps || (res.video && res.video.fps) || 24, items = b.items || [];
     const lines = items.map(x => {
@@ -350,14 +371,14 @@ const Analysis = (() => {
       const snd = x.audio === 'sound' ? `Sound${x.level != null ? ` (${Math.round(x.level)} dB)` : ''}` : x.audio === 'silent' ? 'Silent' : x.audio === 'none' ? 'No audio' : '';
       return `<tr class="k-${esc(x.kind || '')}"><td>${fmtFrames(x.in, fps)}</td><td>${fmtFrames(x.out, fps)}</td><td>${len}</td><td>${snd}</td><td>${esc(KIND[x.kind] || '')}</td></tr>`;
     }).join('');
-    return `<tr class="ana-detail"><td></td><td colspan="${2 + TYPES.length}"><div class="ana-dh">Blacks <span class="ana-dim">· times from the start of the file (h:mm:ss:frames)${res.simulated ? ' · simulated' : ''}</span></div>${
-      items.length ? `<table class="ana-dt"><thead><tr><th>In</th><th>Out</th><th>Length</th><th>Sound</th><th>What it is</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No blacks found.</div>'}</td></tr>`;
+    return `<div class="ana-dh">Blacks <span class="ana-dim">· times from the start of the file (h:mm:ss:frames)${res.simulated ? ' · simulated' : ''}</span></div>${
+      items.length ? `<table class="ana-dt"><thead><tr><th>In</th><th>Out</th><th>Length</th><th>Sound</th><th>What it is</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No blacks found.</div>'}`;
   }
   function rowHtml(r, i) {
     return rowMain(r, i) + (r.open ? detailHtml(r) : '');
   }
   function rowMain(r, i) {
-    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${store.get(r.name) && store.get(r.name).blacks ? ' has-res' : ''}${r.open ? ' open' : ''}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running ? ' disabled' : ''}></td>
+    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${hasResults(store.get(r.name)) ? ' has-res' : ''}${r.open ? ' open' : ''}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running ? ' disabled' : ''}></td>
       <td class="ana-file"><div>${esc(r.name)}</div>${r.short ? `<div class="ana-note">${esc(r.short)}</div>` : ''}${r.err ? `<div class="ana-note bad">${esc(r.err)}</div>` : ''}</td>
       <td class="ana-len">${fmtLen(r.duration)}</td>${TYPES.map(t => `<td class="${t.later ? 'later' : ''}">${cellHtml(r, t)}</td>`).join('')}</tr>`;
   }

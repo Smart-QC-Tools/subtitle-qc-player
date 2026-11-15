@@ -9,6 +9,8 @@ import WebKit
 /// least `pictureShare` of the picture is at or below `pixelLevel` (10% above video black, like ffmpeg's
 /// blackdetect). Runs of black frames of `minSeconds` or more are kept, frame-exact. For each one the
 /// sound level across it is measured: a commercial black is silent, a black inside a scene usually isn't.
+///
+/// Opening credits: see AnalysisCredits.swift.
 final class AnalysisJob {
     let id: Int
     let path: String
@@ -23,16 +25,16 @@ final class AnalysisJob {
     }
 
     func cancel() { lock.lock(); cancelled = true; lock.unlock() }
-    private var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+    var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
 
-    private func post(_ msg: [String: Any]) {
+    func post(_ msg: [String: Any]) {
         var m = msg; m["id"] = id
         DispatchQueue.main.async { [send] in send(m) }
     }
-    private func fail(_ message: String) -> NSError {
+    func fail(_ message: String) -> NSError {
         NSError(domain: "analysis", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
-    private func setting(_ key: String, _ fallback: Double) -> Double {
+    func setting(_ key: String, _ fallback: Double) -> Double {
         (settings[key] as? NSNumber)?.doubleValue ?? fallback
     }
 
@@ -43,6 +45,7 @@ final class AnalysisJob {
                 let result: [String: Any]
                 switch self.type {
                 case "blacks": result = try await self.runBlacks()
+                case "credits": result = try await self.runCredits()
                 default: throw self.fail("This analysis isn't available yet.")
                 }
                 if self.isCancelled { self.post(["type": "cancelled"]) } else { self.post(["type": "done", "result": result]) }
@@ -138,7 +141,7 @@ final class AnalysisJob {
         return ["items": items, "frameCount": frames.count, "fps": r3(nominal), "seconds": (Date().timeIntervalSince(t0) * 10).rounded() / 10]
     }
 
-    private func r3(_ x: Double) -> Double { (x * 1000).rounded() / 1000 }
+    func r3(_ x: Double) -> Double { (x * 1000).rounded() / 1000 }
 
     /// Black when at most (1 - share) of the sampled pixels are brighter than `limit`. Samples about every
     /// 8th pixel each way (some 30,000 per HD frame), and stops at once on a frame that clearly isn't black.
