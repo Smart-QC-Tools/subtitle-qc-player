@@ -108,7 +108,7 @@
     const user = e.isTrusted || e.userEdit;
     if (user) { offsetNote = 'remembered for this video'; baseOffset = { tc: offsetInput.value.trim(), note: offsetNote }; }
     if (user && currentVideoName && parseOffset(offsetInput.value) !== null) Store.set('offset:' + currentVideoName, offsetInput.value.trim());
-    if (cueList.length) setTimeout(() => { renderSidebarList(); }, 0);   // event times are shown relative to the video start
+    if (cueList.length) setTimeout(() => { requalify(); }, 0);   // event times (and Past end) depend on the offset
   });
   offsetFlip.addEventListener('click', () => {
     baseOffset = { tc: offsetInput.value.trim(), note: 'remembered for this video' };
