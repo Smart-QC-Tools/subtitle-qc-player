@@ -116,6 +116,11 @@
       c.gapWarn = c.gap != null && c.gap > 0.001 && c.gap < frame * 1.5;
       c.gapNext = c.gapWarn ? nx.begin : null;
       c.mixedAlign = !!(c.placement && c.placement.h === 'mixed');
+      // Still on screen after the last frame of the video (usually the last event, by a few frames). Only for the
+      // file in the player: the Conform page checks other files, not against this video.
+      const d = list === cueList ? tlDuration() : 0, [, ve] = cueVideoTime(c);
+      c.pastEnd = !!(d > 0 && isFinite(ve) && ve > d + frame * 0.5);
+      c.videoEnd = d > 0 ? d + effectiveOffset() : null;
     });
     // Which side of an event collides: its start (with an earlier event) and/or its end (with a later one).
     let runEnd = -Infinity;
@@ -145,6 +150,7 @@
     else if (c.tooShort) add('duration', `Short ${secs(c.duration)}s`, `Under ${SHORT_DURATION_SECONDS}s on screen (${c.duration.toFixed(3)}s)`);
     else if (c.tooLong) add('duration', `Long ${secs(c.duration)}s`, `Over ${MAX_DURATION_SECONDS}s on screen (${c.duration.toFixed(3)}s)`);
     if (c.hasSuspiciousChars) add('suspicious', 'Odd char', 'Contains an invisible / control / replacement character');
+    if (c.pastEnd) add('pastEnd', 'Past end', `Still on screen after the video ends (the event ends ${formatVideoTC(c.end)}, the video at ${formatVideoTC(c.videoEnd)})`);
     return out;
   }
   // Amber: worth a look, not a broken rule. Reading speed over the limit is often still readable.
@@ -186,6 +192,7 @@
     { key: 'overlap', label: 'Overlaps', cls: 'f-issue', test: c => !!c.overlap },
     { key: 'duration', label: 'Duration', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s or over ${MAX_DURATION_SECONDS}s on screen`, test: c => !!(c.tooShort || c.tooLong) },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
+    { key: 'pastEnd', label: 'Past end', cls: 'f-issue', title: 'Still on screen after the video ends', test: c => !!c.pastEnd },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'mixed', label: 'Mixed align', cls: 'f-warn', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
     { key: 'gaps', label: 'Gaps', cls: 'f-warn', title: '1-frame gaps (the subtitle blinks off for a frame)', test: c => !!c.gapWarn },
@@ -193,6 +200,8 @@
     { key: 'top', label: 'Top', cls: 'f-neutral', title: 'Placed at the top', test: c => !!(c.placement && c.placement.v === 'top') },
   );
 
+  // Checks that depend on the video (its length, the offset) are made again when those change.
+  function requalify() { if (cueList.length) { renderSidebarList(); tlDirty = true; } }   // (renderSidebarList re-checks)
   // Limits: changing them re-checks the loaded file at once (the Conform page re-counts too).
   function setLimits({ cps, cpl, lines }) {
     if (cps > 0) CPS_LIMIT = +cps;
