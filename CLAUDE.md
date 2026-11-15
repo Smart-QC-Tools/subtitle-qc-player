@@ -91,22 +91,33 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   (AVAssetReader), black = 98% of sampled luma ≤ 10% (same as ffmpeg blackdetect, so the darkest frames of
   a fade count too), runs ≥ 0.25 s, frame-exact; sound RMS over the middle half of each black, ≤ −60 dBFS =
   silent. Items: in, out, frames, audio (silent | sound | none), level, kind (start | end | commercial |
-  other = black with sound inside a scene). `SETTINGS.blacks.v` = 2. **Opening credits: not built in the app
-  yet** (column shows "later" there). On-screen text: later everywhere.
+  other = black with sound inside a scene). `SETTINGS.blacks.v` = 2.
+  **Opening credits are real in the Mac app** (`mac/Sources/AnalysisCredits.swift`, `SETTINGS.credits.v` = 2):
+  Vision fast text read every 1 s from 0 (AVAssetImageGenerator 1280×720), each frame read twice (as is +
+  a "white text" version: dark where min(R,G,B) is high, for white credits on pale scenes); lines grouped
+  into blocks; a block followed across frames (same place + similar letters) = a card; one missed frame
+  forgiven; fragments joined; text staying > 20 s dropped (logos, BITC); "rr"-like noise dropped (needs a
+  3+ letter word with a vowel). Stops 60 s after "Directed by" (other languages too) or at 20 min. Each card
+  read with Vision accurate on an enlarged crop; kind = credit (role vocabulary, or names within 30 s of
+  credits) | title (centred, tall) | text (captions: time words, digits). In/out by frame bisection.
+  Cards < 0.5 s and pieces of a longer card (same place, same time) dropped. Runs = credits ≤ 30 s apart.
+  Known: short role words ("With", "And") over very bright scenes can be missed (the name is read).
+  Speed on the CI Mac: ~100 s per file for 3.5 min scanned (both test files). On-screen text: later.
 - Web version = preview with a simulated engine (`web/src/analysis.js`), results in localStorage, marked
   `simulated`. The Mac app never simulates and ignores localStorage.
 - Results: format `subtitle-qc-analysis` v1, one file per video,
   `Subtitle QC Data/<video file name incl. extension>.analysis.json` next to the videos (Mac app writes via
   `analysisWrite`; the other window hears `analysisFile`; main window reads the folder's files on load; web
   can read them). Fingerprint = size + SHA-256 of 3×64 KB pieces.
-- Testing: `selftest.yml` with input `only: analysis` (about 12 min, mostly queue + build) makes a test episode
+- Testing: `selftest.yml` with input `only: analysis` (about 15 min, mostly queue + build) makes a test episode
   (`mac/selftest/make_analysis_media.py`: 3 commercial blacks, 2 blacks with sound, dark scene, credits,
-  captions; H.264 and ProRes), checks the engine against it, opens the real window, presses Start and
+  captions; H.264 and ProRes; Homebrew ffmpeg has no drawtext, so the cards come from
+  `mac/selftest/cards/1280x720/*.png`, made with `--render-cards`), checks both engines against it, opens the real window, presses Start and
   collects its results files and screenshots on the `selftest-results` branch. The user has the 1080p
   version as "Harbor Lights T1103" (+ ENG .itt with events on / off the credits and blacks, + answer sheet).
 - Credits design (IDEAS.md): scan from 0 every ~4 s for credit-like static aligned text, read text only on hits,
   stop at "Directed by" (+1 min), limit 20 min, card in/out by bisection, compare with rendered subtitle box;
   raised-with-no-credits window 20 s; margins as future "Advanced" settings.
-- Next steps: (1) opening-credits engine in the Mac app (Vision); (2) use results on the QC page (credits
-  band + black ticks on the index bar, credit / black checks in the events table).
+- Next step: use the results on the QC page (credits band + black ticks on the index bar, credit / black
+  checks in the events table: subtitle box vs credit boxes, raised subs with no credit near).
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).
