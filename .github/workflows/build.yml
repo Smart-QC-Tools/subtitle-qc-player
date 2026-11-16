@@ -79,5 +79,5 @@ jobs:
           gh release delete analysis-preview --yes --cleanup-tag || true
           gh release create analysis-preview build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Video analysis — test build ${{ github.run_number }}" \
+            --title "Video analysis $(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js) — test build ${{ github.run_number }}" \
             --notes "Work in progress, for testing only (commit ${GITHUB_SHA::7}). The stable version is on the download page."

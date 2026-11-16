@@ -167,10 +167,11 @@ footer { color: var(--dim); font-size: 13px; border-top: 1px solid var(--line); 
       const webSec = document.querySelector('.get.web');
       if (!web && webSec) webSec.hidden = true;   // not published yet
       else if (web) document.getElementById('webInfo').textContent = 'Subtitle_QC_Player.html · ' + (web.size / 1048576).toFixed(1) + ' MB';
-      const build = (rel.name || '').match(/build\s+(\d+)/i);
+      const build = (rel.name || '').match(/build\s+(\d+)/i), ver = (rel.name || '').match(/\b(\d+\.\d+\.\d+)\b/);
       const date = new Date(rel.published_at || rel.created_at);
       const parts = [];
-      if (build) parts.push('PREVIEW BUILD ' + build[1]);
+      if (ver) parts.push('VERSION ' + ver[1]);
+      if (build) parts.push((ver ? 'BUILD ' : 'PREVIEW BUILD ') + build[1]);
       if (!isNaN(date)) parts.push(date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }));
       if (asset) parts.push((asset.size / 1048576).toFixed(1) + ' MB');
       if (parts.length) document.getElementById('buildInfo').textContent = parts.join(' · ');
