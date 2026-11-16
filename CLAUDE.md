@@ -64,14 +64,14 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   count as a badge; "All issues" (red + amber, not placement/top) first with a divider; zero-hit checks on a
   "✓ Clean: …" line. Mixed align is amber. No "Critical" filter.
 - Limits (Lines 2–4, CPS 3–40 default 20 amber, CPL 10–60): plain blue values, drag or click-to-type.
-- Keys: ←/→ frame, Shift (or ⌥) + ←/→ ±5 min (no ±5 s any more), Shift (or ⌥) + ↑/↓ start / end of the video,
+- Keys: ←/→ frame, Shift + ←/→ ±5 min (no ±5 s any more), Shift + ↑/↓ start / end of the video (⌥ + arrows: nothing),
   ↑/↓ previous / next event. "Past end" (red, its own filter): event still on screen after the video's last frame
   (QC page only; `requalify()` re-checks when the video's length or the offset changes).
 - Waveform bar: background `#1b4560`, blue-grey top/bottom lines `#4f7393`, light smoothing, no scanlines,
   no colour coding of events. Zoom 10 s – 1.5 min (default 1 min); playing pages the view at 97%, playhead lands at 5%; Ctrl/⌘+scroll anywhere over the player
   column zooms; browser zoom blocked elsewhere on the QC page.
 - Index bar under it: 18px, `#101216`, subtitle coverage blocks (2px min, gaps <3px closed), view box with
-  22%/34% fill, no playhead, no times, hover readout.
+  22%/34% fill, no playhead, no times, hover readout (also over the view box; the cursor there is a grab hand).
 - Subtitle info under the player: off by default, toggled by a text button "Show subtitle info" (top right;
   grey, blue on hover / when on); hidden until an event is selected; space stays the same.
 - Conform page: Checks (errors/warnings or ✓ OK) + Notes column (info); File 520px, Type/Label/Detected 170/Checks
