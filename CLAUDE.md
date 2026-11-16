@@ -14,7 +14,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Ideas discussed but not built: `IDEAS.md` (commercial blacks, opening-credits detection, etc.).
 
 ## Branches, versions, releases
-- `main`: stable line (1.0.x). `APP_VERSION` in `web/src/config.js` (currently 1.0.0).
+- `main`: stable line (1.0.x). `APP_VERSION` in `web/src/config.js` (1.0.0 on main / release, 1.1.0 on video-analysis).
 - `release/1.0.0`: permanent stable 1.0.0 → release `v1.0.0` (never replaced by normal pushes;
   manual workflow input `replace_release` rebuilds it in place).
 - `video-analysis`: work in progress → pre-release `analysis-preview` ("Video analysis — test build N").
@@ -122,11 +122,18 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Credits design (IDEAS.md): scan from 0 every ~4 s for credit-like static aligned text, read text only on hits,
   stop at "Directed by" (+1 min), limit 20 min, card in/out by bisection, compare with rendered subtitle box;
   raised-with-no-credits window 20 s; margins as future "Advanced" settings.
-- QC page (index bar only, for now): credits = gold strip `#d9b85f` in the lower third, credits < 20 s apart
-  joined (`Analysis.marks`); commercial blacks = red `#ff5c5c` full-height marks (min 3 px); nothing for
-  start / end blacks. Hover label adds "Credits 0:50 – 2:31" / "Commercial black". Help (Waveform & timing)
-  explains the colours. `Player.setAnalysisMarks` from ui.js renderLibrary (only for the video in the player).
+- QC page: credits = soft yellow `#f2d675` solid 3 px line, along the top of the waveform bar and the bottom
+  of the index bar (credits < 20 s apart joined, `Analysis.marks`); commercial blacks = red full height on both
+  (index `#ff5c5c`, min 3 px; waveform see-through .78). Hover label on the index adds "Credits 0:50 – 2:31" /
+  "Commercial black". Help explains the colours. `Player.setAnalysisMarks(Analysis.marks(r))` from ui.js
+  renderLibrary (only for the video in the player; carries cards with boxes, blacks, scannedTo), re-checks events.
+  Checks (cueinfo.js `analysisChecks`, only with analysis results): red "On credit/title/text" (estimated
+  subtitle box, `subBox`, overlaps a card's box while both are on screen, ±0.2 s), red "Over black" (runs across
+  a commercial black), amber "Near credits" (< 5% of picture height apart), amber "Raised, no credit"
+  (raised or top, no credit/title within 20 s and no on-screen text at the time, inside the scanned range).
+  Subtitle box estimate: region + lines × (100/rows × 1.25)% high, longest line × 0.5 cell × 9/16 wide.
   Blacks engine v3: silence = RMS ≤ −50 dBFS (a low noise floor counts); blacks with sound are dropped.
-- Next: checks in the events table (subtitle box vs credit boxes, raised subs with no credit near, events
-  across a commercial black); maybe marks on the waveform bar later.
+- Results folder stays visible ("Subtitle QC Data" next to the videos): sharing results is crucial to the user
+  (not hidden, not in Application Support).
+- Version: this branch is 1.1.0 (`APP_VERSION`); main / release stay 1.0.0 until it's merged.
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).

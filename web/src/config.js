@@ -1,5 +1,5 @@
 // Version of Subtitle QC Player (shown in Help; the Mac app and the download page use it too).
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 /* ==========================================================================
    REFERENCE LANGUAGE LIST  (edit here)

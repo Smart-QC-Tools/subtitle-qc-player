@@ -330,9 +330,8 @@
     // video analysis: credits (see-through strip, lower third) and commercial blacks (red, full height)
     const am = marksNow();
     if (am) {
-      const sh = Math.round((h - RULER) / 3);
-      ctx.fillStyle = ANA_CREDITS_WAVE;
-      for (const [a, b] of am.credits) if (b > view.start && a < view.end) { const x0 = x(a); ctx.fillRect(x0, h - 1 - sh, Math.max(2, x(b) - x0), sh); }
+      ctx.fillStyle = ANA_CREDITS;
+      for (const [a, b] of am.credits) if (b > view.start && a < view.end) { const x0 = x(a); ctx.fillRect(x0, RULER, Math.max(2, x(b) - x0), ANA_CREDITS_PX); }
       ctx.fillStyle = ANA_BLACK_WAVE;
       for (const [a, b] of am.blacks) if (b > view.start && a < view.end) { const x0 = x(a); ctx.fillRect(x0, RULER + 1, Math.max(3, x(b) - x0), h - RULER - 2); }
     }
@@ -586,7 +585,8 @@
   // Video analysis results for the video in the player (set from the QC page): credits as strips in the lower
   // third (credits under 20 s apart join into one), commercial blacks as red full-height marks.
   let anaMarks = null, anaSeq = 0;
-  const ANA_CREDITS_SEE = 'rgba(217,184,95,0.72)', ANA_CREDITS_WAVE = 'rgba(217,184,95,0.42)', ANA_BLACK = '#ff5c5c', ANA_BLACK_WAVE = 'rgba(255,92,92,0.78)';
+  // Credits: a thin soft-yellow line, along the top of the waveform bar and the bottom of the index bar.
+  const ANA_CREDITS = '#f2d675', ANA_CREDITS_PX = 3, ANA_BLACK = '#ff5c5c', ANA_BLACK_WAVE = 'rgba(255,92,92,0.78)';
   window.Player.setAnalysisMarks = (m) => { anaMarks = m; anaSeq++; tlDirty = true; requalify(); };
   const marksNow = () => (anaMarks && anaMarks.video === currentVideoName) ? anaMarks : null;
   // What the analysis marks under the pointer (x in px of a w-wide bar), for the hover label.
@@ -649,9 +649,8 @@
     }
     const m = marksNow();
     if (m) {
-      ctx.fillStyle = ANA_CREDITS_SEE;
-      const sh = Math.round(h / 3);
-      for (const [a, b] of m.credits) { const x0 = Math.floor(a / d * w); ctx.fillRect(x0, h - sh, Math.max(2, Math.ceil(b / d * w) - x0), sh); }
+      ctx.fillStyle = ANA_CREDITS;
+      for (const [a, b] of m.credits) { const x0 = Math.floor(a / d * w); ctx.fillRect(x0, h - ANA_CREDITS_PX, Math.max(2, Math.ceil(b / d * w) - x0), ANA_CREDITS_PX); }
       ctx.fillStyle = ANA_BLACK;
       for (const [a, b] of m.blacks) { const x0 = Math.floor(a / d * w); ctx.fillRect(x0, 0, Math.max(3, Math.ceil(b / d * w) - x0), h); }
     }
