@@ -640,7 +640,7 @@
     if (!loaded || !d || !ensureView()) { ctx.fillStyle = loaded ? HANDLE_TRACK : EMPTY_BG; ctx.fillRect(0, 0, w, h); return; }
     ctx.drawImage(ovStatic(w, h, d), 0, 0, w, h);
     // the part the bar above shows
-    const { x0, x1 } = boxGeom(w), act = ovHover === 'box' || (ovDrag && ovDrag.mode === 'move');
+    const { x0, x1 } = boxGeom(w), act = !!(ovHover && ovHover.box) || (ovDrag && ovDrag.mode === 'move');
     ctx.fillStyle = act ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.34)'; ctx.fillRect(x0, 0, x1 - x0, h);
     ctx.strokeStyle = act ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.max(1, Math.round(x1 - x0) - 1), h - 1);
@@ -668,8 +668,9 @@
     if (!ovDrag) {
       const d = tlDuration(); if (!d || scrub) return;
       const inside = !(e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right);
-      const hv = !inside ? null : ovHitBox(e.clientX - r.left, r.width) ? 'box' : { x: e.clientX - r.left };
-      tlOv.style.cursor = hv === 'box' ? 'grab' : 'default';
+      // over the box too: the time label shows (the cursor says the box can be dragged)
+      const hv = !inside ? null : { x: e.clientX - r.left, box: ovHitBox(e.clientX - r.left, r.width) };
+      tlOv.style.cursor = hv && hv.box ? 'grab' : 'default';
       if (JSON.stringify(hv) !== JSON.stringify(ovHover)) { ovHover = hv; tlDirty = true; }
       return;
     }
@@ -702,9 +703,10 @@
     if (k === 'k') { setSpeed(0); return; }
     if (k === 'j') { if (!e.repeat) stepSpeed(-1); return; }
     if (k === 'l') { if (!e.repeat) stepSpeed(1); return; }
+    if (e.altKey) return;   // ⌥ Option + ← / →: nothing (not a shortcut)
     const dir = k === 'ArrowRight' ? 1 : -1;
     setSpeed(0);
-    if (e.shiftKey || e.altKey) seekTo(video.currentTime + dir * 300);   // Shift (or ⌥ Option): 5 minutes
+    if (e.shiftKey) seekTo(video.currentTime + dir * 300);   // Shift: 5 minutes
     else { stepFrame(dir); return; }
     keepInView(); tlDirty = true;
   }, true);
@@ -745,7 +747,8 @@
     if (document.body.dataset.tab !== 'player' || !video || isTyping(e.target) || e.metaKey || e.ctrlKey) return;
     if (e.target && e.target.tagName === 'SELECT') return;
     e.preventDefault(); e.stopImmediatePropagation();
-    if (e.shiftKey || e.altKey) {   // Shift (or ⌥ Option) + ↑ / ↓: the first / last frame of the video
+    if (e.altKey) return;           // ⌥ Option + ↑ / ↓: nothing (not a shortcut)
+    if (e.shiftKey) {               // Shift + ↑ / ↓: the first / last frame of the video
       setSpeed(0);
       const d = tlDuration();
       evRevealPending = true;
