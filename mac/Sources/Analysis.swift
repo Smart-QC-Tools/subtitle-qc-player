@@ -304,7 +304,9 @@ final class AnalysisWindow: NSObject, NSWindowDelegate {
         web.setValue(false, forKey: "drawsBackground")
         web.navigationDelegate = navGuard
         web.uiDelegate = navGuard
-        if #available(macOS 13.3, *) { web.isInspectable = true }
+        #if SELFTEST
+        if #available(macOS 13.3, *) { web.isInspectable = true }   // test builds only
+        #endif
         web.onDrop = { [weak b] items in
             for it in items {
                 guard let p = it["path"] as? String else { continue }
