@@ -216,15 +216,15 @@
       key('l'); await sample('L', 1500);
       key('l'); await sample('L L (2x)', 1500);
       key('l'); await sample('L L L (4x)', 1500);
-      key('l'); await sample('4×L (6x)', 1500);
+      key('l'); await sample('4×L (8x)', 1500);
       key('k'); await sleep(300);
       key('j'); await sample('J (-2x)', 2000);
       key('j'); await sample('J J (-4x)', 2000);
-      key('j'); await sample('J J J (-6x)', 2000);
+      key('j'); await sample('J J J (-8x)', 2000);
       key('k'); await sleep(400);
       const st2 = await stats(false);
       step('shuttle', { file: v.name, shuttle, canReverse: V().canPlayReverse, canFastReverse: V().canPlayFastReverse, after: { paused: V().paused, rate: st2.rate } });
-      const expect = [1, 2, 4, 6, -2, -4, -6];
+      const expect = [1, 2, 4, 8, -2, -4, -8];
       shuttle.forEach((s, i) => { if (Math.abs(s.speed - expect[i]) > Math.max(0.35, Math.abs(expect[i]) * 0.25)) problem('shuttle speed off', { file: v.name, label: s.label, speed: s.speed, expected: expect[i] }); });
       if (!V().paused || st2.rate !== 0) problem('K did not stop playback', { file: v.name, rate: st2.rate });
 

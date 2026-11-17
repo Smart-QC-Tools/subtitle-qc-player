@@ -21,7 +21,9 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   When done: merge to main, release as 1.1.0, point the main download page at it.
 - `latest` release = rolling build of main. Build: `.github/workflows/build.yml` (macos-15).
   `selftest.yml` (manual) runs the Mac app against generated ProRes/H.264/HEVC media.
-- Mac bundle ID: `com.smartqctools.subtitleqc`. App is ad-hoc signed, not sandboxed.
+- Mac bundle ID: `com.smartqctools.subtitleqc`. App is ad-hoc signed, not sandboxed. Never touches the network:
+  web requests blocked (content rules), no CDN fallback for imscJS (bundled), no URLSession; Web Inspector only
+  in self-test builds; the self-test logs any connection (`network.txt`, lsof + nettop).
 - Commits end with the attribution lines the session provides. Don't push to main without being asked
   for things the user is still deciding.
 
@@ -64,6 +66,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   count as a badge; "All issues" (red + amber, not placement/top) first with a divider; zero-hit checks on a
   "✓ Clean: …" line. Mixed align is amber. No "Critical" filter.
 - Limits (Lines 2–4, CPS 3–40 default 20 amber, CPL 10–60): plain blue values, drag or click-to-type.
+- Speeds (J / L): 2× → 4× → 8× both ways.
 - Keys: ←/→ frame, Shift + ←/→ ±5 min (no ±5 s any more), Shift + ↑/↓ start / end of the video (⌥ + arrows: nothing),
   ↑/↓ previous / next event. "Past end" (red, its own filter): event still on screen after the video's last frame
   (QC page only; `requalify()` re-checks when the video's length or the offset changes).

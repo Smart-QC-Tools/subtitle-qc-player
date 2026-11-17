@@ -31,13 +31,19 @@ rep("""      showBanner(
       );""","""      showBanner(
         'Full subtitle rendering (imscJS) could not be loaded, so the player is using basic rendering: ' +
         'subtitles are placed in their regions (top, bottom, sides), but without fonts, colours, italics, ruby or vertical text. ' +
-        'For full rendering, put imsc.all.min.js in the same folder as this HTML file, or open the page with internet access.',
+        'For full rendering, put imsc.all.min.js in the same folder as this HTML file.',
         'warn'
       );""")
 rep("""    banner.style.background = kind === 'error' ? '#3a1f1f' : '#1f2e1f';""","""    if (kind === 'warn') { banner.style.background = '#2e2716'; banner.style.border = '1px solid #4d4020'; banner.style.color = '#e8c77a'; return; }
     banner.style.background = kind === 'error' ? '#3a1f1f' : '#1f2e1f';""")
 rep("    const rateNote = ttmlDoc\n","    const rateNote = (ttmlDoc || cueList.length)\n")
 rep("(function loadImscLibrary() {","(function loadImscLibrary() {\n  if (typeof window.imsc !== 'undefined') return; // bundled into this file")
+# Never anything from the internet: no CDN fallback (the library is bundled; a local copy is the only other source).
+rep("""    './imsc.all.min.js',
+    'https://unpkg.com/imsc@1.1.5/dist/imsc.all.min.js',
+    'https://cdn.jsdelivr.net/npm/imsc@1.1.5/dist/imsc.all.min.js'
+  ];""", """    './imsc.all.min.js'
+  ];""")
 rep("""    overlay.style.width = video.clientWidth + 'px';
     overlay.style.height = video.clientHeight + 'px';""","""    // 5% safe area on every side, so subtitles never sit on the edge of the picture.
     const SAFE = 0.05, w = video.clientWidth, h = video.clientHeight;
