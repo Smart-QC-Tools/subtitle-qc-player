@@ -24,6 +24,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Mac bundle ID: `com.smartqctools.subtitleqc`. App is ad-hoc signed, not sandboxed. Never touches the network:
   web requests blocked (content rules), no CDN fallback for imscJS (bundled), no URLSession; Web Inspector only
   in self-test builds; the self-test logs any connection (`network.txt`, lsof + nettop).
+  Every build has a GitHub build attestation (actions/attest-build-provenance) for the zip and the web .html:
+  `gh attestation verify Subtitle-QC-Player.zip --repo Smart-QC-Tools/subtitle-qc-player`.
 - Commits end with the attribution lines the session provides. Don't push to main without being asked
   for things the user is still deciding.
 
