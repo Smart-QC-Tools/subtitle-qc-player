@@ -24,7 +24,7 @@ enum SelfTest {
     /// The Video Analysis window, driven from outside: open it on the test folder, press Start, and log
     /// what the window says whenever that changes.
     static func afterLaunch() {
-        guard let a = env["SQC_ANALYSIS"], !a.isEmpty else { return }
+        guard let a = env["SQC_ANALYSIS"], !a.isEmpty, env["SQC_ONLY"] != "basic" else { return }
         Settings.set("ana:folder", a)
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
             AnalysisWindow.shared.show()

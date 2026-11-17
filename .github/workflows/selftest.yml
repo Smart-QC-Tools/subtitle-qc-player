@@ -9,7 +9,7 @@ on:
         required: false
         default: run
       only:
-        description: 'Leave empty for everything, or "analysis" for the video analysis tests only'
+        description: 'Leave empty for everything; "basic" = one video''s playback tests + network log; "analysis" = the video analysis tests only'
         required: false
         default: ''
 permissions:

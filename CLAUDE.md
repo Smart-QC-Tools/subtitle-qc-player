@@ -116,7 +116,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   `Subtitle QC Data/<video file name incl. extension>.analysis.json` next to the videos (Mac app writes via
   `analysisWrite`; the other window hears `analysisFile`; main window reads the folder's files on load; web
   can read them). Fingerprint = size + SHA-256 of 3×64 KB pieces.
-- Testing: `selftest.yml` with input `only: analysis` (about 15 min, mostly queue + build) makes a test episode
+- Testing: `selftest.yml` with input `only: basic` (one video's playback tests + network log; the quick check)
+  or `only: analysis` (about 15 min, mostly queue + build) makes a test episode
   (`mac/selftest/make_analysis_media.py`: 3 commercial blacks, 2 blacks with sound, dark scene, credits,
   captions; H.264 and ProRes; Homebrew ffmpeg has no drawtext, so the cards come from
   `mac/selftest/cards/1280x720/*.png`, made with `--render-cards`), checks both engines against it, opens the real window, presses Start and

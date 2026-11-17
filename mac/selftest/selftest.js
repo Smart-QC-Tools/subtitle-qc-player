@@ -58,7 +58,7 @@
     // ---------------------------------------------------------------- video analysis
     // The engine, asked directly: blacks in each test file, compared with what make_analysis_media.py put there.
     // Meanwhile the app's own Video Analysis window runs the same folder (see SelfTest.swift) and writes its files.
-    if (CFG.analysis) {
+    if (CFG.analysis && CFG.only !== 'basic') {
       const files = await Native.listFolder(CFG.analysis);
       let expected = null;
       const ex = files.find(f => f.name === 'expected.json');
@@ -131,7 +131,7 @@
       for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3 || (expected && expected.text !== false && (!w.credits || !w.credits.confirmed || w.credits.credits !== 14))) problem('analysis window: unexpected results file', w);
     }
 
-    const order = CFG.only === 'analysis' ? [] : [...state.videos];
+    const order = CFG.only === 'analysis' ? [] : CFG.only === 'basic' ? state.videos.slice(0, 1) : [...state.videos];
     for (const v of order) {
       const fps = (v.probe && v.probe.fps) || 24;
       const F = { file: v.name };
