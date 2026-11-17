@@ -461,7 +461,7 @@
   btnPlay.innerHTML = ICON_PLAY; volIcon.innerHTML = ICON_VOL;
   let transportBound = false;
   // ---------------------------------------------------------------- speed: one scale for J / K / L
-  // -6/-4/-2 = reverse, 0 = paused, 1 = normal, 2/4/6 = fast-forward (see stepSpeed).
+  // -8/-4/-2 = reverse, 0 = paused, 1 = normal, 2/4/8 = fast-forward (see stepSpeed).
   // Browsers can't play backwards, so reverse is done by seeking back in small steps (no sound).
   let speed = 0, rwRaf = 0, rwLast = 0, rwPos = 0, ownPause = false;
   const speedBadge = document.getElementById('speedBadge');
@@ -499,7 +499,7 @@
     if (rwPos <= 0) { setSpeed(0); return; }
     rwRaf = requestAnimationFrame(reverseLoop);
   }
-  const SPEEDS = [-6, -4, -2, 1, 2, 4, 6];   // pause (0) sits between -2 and 1
+  const SPEEDS = [-8, -4, -2, 1, 2, 4, 8];   // pause (0) sits between -2 and 1
   // L: from a pause play at 1×, otherwise one step faster forward (from reverse straight to 1×).
   // J: from a pause rewind at 2×, otherwise one step towards reverse (from 1× straight to ◀◀ 2×).
   function stepSpeed(dir) {

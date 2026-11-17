@@ -12,14 +12,21 @@ export SQC_SELFTEST="$(pwd)/mac/selftest/selftest.js" SQC_VIDEOS="$MEDIA/Videos"
 PID=$!
 START=$(date +%s)
 i=0
+# Network: the app must never open a connection. Its own process and WebKit's helper processes are listed
+# every 2 s (lsof), and at the end nettop shows any process of ours that ever sent or received anything.
+netcheck() { for p in $PID $(pgrep -f "com.apple.WebKit" 2>/dev/null); do lsof -nP -i -a -p "$p" 2>/dev/null | tail -n +2; done; }
+: > "$OUT/network.txt"
 while kill -0 $PID 2>/dev/null; do
   i=$((i+1))
+  N="$(netcheck)"; [ -n "$N" ] && { echo "== $(( $(date +%s) - START ))s"; echo "$N"; } >> "$OUT/network.txt"
   echo "$(( $(date +%s) - START ))s $(ps -o rss=,%cpu= -p $PID)" >> "$OUT/ps.txt"
   if (( i % 20 == 5 )); then screencapture -x "$OUT/shot_$(printf %03d $i).png" 2>/dev/null || true; fi
   if (( $(date +%s) - START > 1800 )); then echo "TIMEOUT" >> "$OUT/ps.txt"; kill $PID; break; fi
   sleep 2
 done
 wait $PID 2>/dev/null; echo "exit $?" >> "$OUT/ps.txt"
+{ echo "== nettop (processes with any network traffic):"; nettop -P -L 1 -x -n 2>/dev/null | grep -iE "SubtitleQC|WebKit" || echo "(none of ours)"; } >> "$OUT/network.txt"
+[ "$(grep -c '^== [0-9]' "$OUT/network.txt")" = "0" ] && grep -q "(none of ours)" "$OUT/network.txt" && echo "NETWORK: no connections" >> "$OUT/network.txt" || echo "NETWORK: SEE ABOVE" >> "$OUT/network.txt"
 cp "$HOME/Library/Logs/Subtitle QC Player/app.log" "$OUT/" 2>/dev/null || true
 # crash reports, if any
 cp "$HOME"/Library/Logs/DiagnosticReports/SubtitleQC* "$OUT/" 2>/dev/null || true
