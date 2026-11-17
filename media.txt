@@ -1,0 +1,6 @@
+== StressTest_S1_T2001_Hr0_HD_2398_ProResHQ_8trk_V1-R0.mov 1625920518 bytes
+mac/selftest/run.sh: line 9: ffprobe: command not found
+== StressTest_S1_T2002_Hr0_HD_2398_H264_V1-R0.mp4 149746483 bytes
+mac/selftest/run.sh: line 9: ffprobe: command not found
+== StressTest_S1_T2003_Hr0_UHD_2398_HEVC10_V1-R0.mov 189762412 bytes
+mac/selftest/run.sh: line 9: ffprobe: command not found

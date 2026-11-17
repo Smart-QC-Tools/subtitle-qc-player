@@ -1,0 +1,169 @@
+{
+ "total": 412.036627,
+ "text": true,
+ "blacks": [
+  [
+   0,
+   2.002,
+   "head (silent)",
+   "silent"
+  ],
+  [
+   20.02,
+   20.353666999999998,
+   "8 frames, sound carries on",
+   "audio"
+  ],
+  [
+   200.033168,
+   200.53366799999998,
+   "commercial 1 (silent)",
+   "silent"
+  ],
+  [
+   249.99975,
+   251.209292,
+   "1.2 s, sound carries on",
+   "audio"
+  ],
+  [
+   290.03975099999997,
+   291.04075099999994,
+   "commercial 2 (silent)",
+   "silent"
+  ],
+  [
+   360.02633499999996,
+   362.02833499999997,
+   "commercial 3 (silent)",
+   "silent"
+  ],
+  [
+   410.034627,
+   412.036627,
+   "tail (silent)",
+   "silent"
+  ]
+ ],
+ "cards": [
+  [
+   27.0,
+   30.0,
+   "THREE WEEKS EARLIER",
+   "left",
+   "caption (not a credit)"
+  ],
+  [
+   39.5,
+   44.5,
+   "HARBOR LIGHTS",
+   "mid",
+   "main title"
+  ],
+  [
+   50.0,
+   53.5,
+   "Starring / ELENA MARCH",
+   "left",
+   "credit"
+  ],
+  [
+   57.0,
+   60.5,
+   "Starring / TOMAS REY",
+   "right",
+   "credit"
+  ],
+  [
+   64.0,
+   67.5,
+   "Starring / JUNE ADEBAYO",
+   "left",
+   "credit"
+  ],
+  [
+   71.0,
+   74.5,
+   "With / PETER LANGLEY",
+   "right",
+   "credit"
+  ],
+  [
+   78.0,
+   81.5,
+   "And / MARGIT SOLHEIM",
+   "left",
+   "credit"
+  ],
+  [
+   85.0,
+   88.5,
+   "Casting by / RUTH ABELARD",
+   "right",
+   "credit"
+  ],
+  [
+   92.0,
+   95.5,
+   "Music by / IVO KARLSSON",
+   "left",
+   "credit"
+  ],
+  [
+   99.0,
+   102.5,
+   "Edited by / DANA WHITLOCK",
+   "right",
+   "credit"
+  ],
+  [
+   113.0,
+   116.5,
+   "Production Designer / SAM OYELARAN",
+   "left",
+   "credit"
+  ],
+  [
+   120.0,
+   123.5,
+   "Director of Photography / LENA HOLT",
+   "right",
+   "credit"
+  ],
+  [
+   127.0,
+   130.5,
+   "Produced by / MARK DELACROIX",
+   "left",
+   "credit"
+  ],
+  [
+   134.0,
+   137.5,
+   "Executive Producers / NORA FITCH   ALAN BRISCOE",
+   "right",
+   "credit"
+  ],
+  [
+   141.0,
+   144.5,
+   "Written by / CLARE DUNMORE",
+   "left",
+   "credit"
+  ],
+  [
+   148.0,
+   151.5,
+   "Directed by / OSCAR VALE",
+   "right",
+   "credit"
+  ],
+  [
+   160.0,
+   163.0,
+   "HARBOUR OFFICE \u2014 6\u200940 AM",
+   "left",
+   "caption after the credits (not a credit)"
+  ]
+ ]
+}
