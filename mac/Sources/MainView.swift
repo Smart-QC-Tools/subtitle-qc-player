@@ -44,7 +44,9 @@ final class MainView: NSView {
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = navGuard
         webView.uiDelegate = navGuard
-        if #available(macOS 13.3, *) { webView.isInspectable = true }
+        #if SELFTEST
+        if #available(macOS 13.3, *) { webView.isInspectable = true }   // test builds only: no Web Inspector in the app people download
+        #endif
         webView.onDrop = { [weak self] items in
             for it in items {   // dropping something on the window counts as choosing it
                 guard let p = it["path"] as? String else { continue }
