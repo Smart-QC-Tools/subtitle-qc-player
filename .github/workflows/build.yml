@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # build attestation: signs with GitHub's identity for this workflow
+  attestations: write
 
 concurrency:
   group: build-${{ github.ref }}
@@ -26,6 +28,15 @@ jobs:
 
       - name: Build Subtitle QC Player.app
         run: BUILD_NUMBER=${{ github.run_number }} bash mac/build.sh
+
+      # A signed record that these exact files were built by this workflow, in this repository, from this commit.
+      # Anyone can check a download:  gh attestation verify Subtitle-QC-Player.zip --repo Smart-QC-Tools/subtitle-qc-player
+      - name: Build attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            build/Subtitle-QC-Player.zip
+            web/dist/Subtitle_QC_Player.html
 
       - name: Keep the build (Actions tab)
         uses: actions/upload-artifact@v4
