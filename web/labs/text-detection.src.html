@@ -47,10 +47,10 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
   <div class="row" style="margin-top:12px"><button class="primary" id="run" disabled>Run</button><span id="status" class="dim"></span></div>
   <div id="env" class="dim" style="margin-top:8px;font-size:12.5px"></div>
 </div>
-<div class="card" id="summary" hidden>
-  <div class="row" style="justify-content:space-between"><b>All runs</b><span class="row" style="gap:8px"><button id="pics" title="One wide picture per run, plus this summary: readable when sent in a chat">Save pictures</button><button id="copy" title="Every number from every run, ready to paste into a chat">Copy as text</button><button id="savetxt">Save as text</button></span></div>
-  <table style="margin-top:8px"><thead><tr><th>File</th><th>Found text with</th><th class="n">Per frame</th><th class="n">This video</th><th class="n">45 min</th><th>Test episode</th></tr></thead><tbody></tbody></table>
-  <textarea id="sumText" readonly style="width:100%;height:110px;margin-top:10px;background:#0b0c0f;color:#b9c0ca;border:1px solid var(--border);border-radius:8px;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>
+<div class="card" id="summary">
+  <div class="row" style="justify-content:space-between"><b>All runs</b><span class="row" style="gap:8px"><button disabled id="pics" title="One wide picture per run, plus this summary: readable when sent in a chat">Save pictures</button><button disabled id="copy" title="Every number from every run, ready to paste into a chat">Copy as text</button><button disabled id="savetxt">Save as text</button></span></div>
+  <table style="margin-top:8px"><thead><tr><th>File</th><th>Found text with</th><th class="n">Per frame</th><th class="n">This video</th><th class="n">45 min</th><th>Test episode</th></tr></thead><tbody><tr id="noRuns"><td colspan="6" class="dim">Nothing yet: each run adds a line here. The buttons save or copy every run.</td></tr></tbody></table>
+  <textarea hidden id="sumText" readonly style="width:100%;height:110px;margin-top:10px;background:#0b0c0f;color:#b9c0ca;border:1px solid var(--border);border-radius:8px;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>
 </div>
 <div id="results"></div>
 <h2>Log</h2>
@@ -442,7 +442,7 @@ async function runFile(file, det) {
   const how = det === 'model' ? `model ${W}×${H} on ${sessionEp === 'webgpu' ? 'graphics chip' : 'processor'}` : 'image checks';
   const offs = check ? check.rows.filter(r => r.c).flatMap(r => [Math.abs(r.c.inT - r.a), Math.abs(r.c.outT - r.b)].map(v => Math.round(v * m.fps))) : [];
   const testTxt = check ? `${check.found}/${TRUTH.length} found, ${check.extra.length} extra, in/out off ≤ ${Math.max(...offs)} fr (median ${median(offs)})` : `${final.length} pieces of text`;
-  $('#summary').hidden = false;
+  $('#noRuns')?.remove(); $('#sumText').hidden = false; ['#pics', '#copy', '#savetxt'].forEach(b => $(b).disabled = false);
   $('#summary tbody').insertAdjacentHTML('beforeend', `<tr><td>${file.name}</td><td>${how}</td><td class="n">${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)}</td><td class="n">${fmtDur(totalMs / 1000)}</td><td class="n"><b>${win === 'all' ? fmtDur(est) : '–'}</b></td><td>${check ? (check.found === TRUTH.length && !check.extra.length ? '<span class="ok">' : '<span class="warn">') + testTxt + '</span>' : testTxt}</td></tr>`);
   $('#sumText').value += `${file.name} | ${m.kind} ${m.width}x${m.height} ${fmtDur(m.duration)} | ${how}, every ${step} s | per frame ${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)} (get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find ${fmtMs(tm.detect / tm.n)}) | scan ${samples} fr ${fmtDur(scanMs / 1000)}, in/out ${refineN} fr ${fmtDur(refineMs / 1000)}, total ${fmtDur(totalMs / 1000)}${win === 'all' ? ', 45 min ≈ ' + fmtDur(est) : ''} | ${testTxt}\n`;
   RUNS.push({ file: file.name, sub: `${m.kind === 'prores' ? 'ProRes ' + m.fourcc : m.kind.toUpperCase()} · ${m.width}×${m.height} · ${fmtDur(m.duration)} · ${how} · a frame every ${step} s`, how,
