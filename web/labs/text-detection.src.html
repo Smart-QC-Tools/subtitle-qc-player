@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text detection · lab</title>
+<style>
+:root{--bg:#0f1114;--panel:#16191e;--panel2:#1c2027;--border:#2a2f37;--text:#e8eaee;--dim:#9aa1ab;--val:#7fb0ff;--ok:#4cc38a;--warn:#f0a830;--err:#ff5c5c;--yel:#f2d675}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+main{max-width:1240px;margin:0 auto;padding:22px 24px 60px}
+h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:22px 0 8px;color:var(--val)}
+.dim{color:var(--dim)} .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button,select{font:inherit;border:1px solid var(--border);background:var(--panel2);color:var(--text);padding:6px 12px;border-radius:7px}
+button{cursor:pointer} button:hover{border-color:#4f86e8} button:disabled{opacity:.45;cursor:default}
+button.primary{background:#42607a;border-color:#42607a}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+td.n{text-align:right;white-space:nowrap}
+.files label{display:flex;gap:8px;align-items:center;padding:2px 0}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumbs figure{margin:0} .thumbs canvas{display:block;width:240px;height:auto;border:1px solid var(--border);border-radius:5px;background:#000}
+.thumbs figcaption{font-size:11.5px;color:var(--dim);margin-top:2px;max-width:240px}
+pre#log{background:#0b0c0f;border:1px solid var(--border);border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,Menlo,monospace;max-height:260px;overflow:auto;white-space:pre-wrap;color:#b9c0ca}
+.big{font-size:22px;font-weight:650}
+label.opt{display:inline-flex;gap:6px;align-items:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Finding on-screen text without reading it: lab</h1>
+<p class="dim">Looks at one frame every few seconds, finds every piece of text on the picture (credits, captions, titles: anything), follows each one from frame to frame, then finds where it appears and disappears to the frame. Nothing is read and nothing is uploaded. Two ways of finding text are compared: <b>image checks</b> (sharp, aligned strokes; no download) and a <b>text-detection model</b> (PaddleOCR's PP-OCRv4 detector, 4.6 MB, run on the graphics chip when Chrome allows). On the Harbor Lights test episode (T1103 / T1104) the results are checked against what is really there.</p>
+<div class="card">
+  <div class="row"><button class="primary" id="pick">Choose a folder…</button><span class="dim">or</span><label class="dim">pick files <input type="file" id="fileInput" multiple accept=".mp4,.mov,.m4v,video/*"></label></div>
+  <div id="folder" class="dim" style="margin-top:8px"></div>
+  <div class="files" id="files" style="margin-top:6px"></div>
+  <div class="row" style="margin-top:12px">
+    <label class="opt">Find text with <select id="det"><option value="model">the model</option><option value="image">image checks</option><option value="both">both (one after the other)</option></select></label>
+    <label class="opt">Model size <select id="msize"><option value="640">640 × 352 (faster)</option><option value="960">960 × 544</option></select></label>
+    <label class="opt">Model runs on <select id="ep"><option value="auto">graphics chip if possible</option><option value="wasm">processor</option></select></label>
+    <label class="opt">One frame every <select id="step"><option>2</option><option>1</option><option>3</option><option>4</option></select> s</label>
+    <label class="opt">Look at <select id="win"><option value="all">the whole video</option><option value="1200">the first 20 minutes</option></select></label>
+  </div>
+  <div class="row" style="margin-top:12px"><button class="primary" id="run" disabled>Run</button><span id="status" class="dim"></span></div>
+  <div id="env" class="dim" style="margin-top:8px;font-size:12.5px"></div>
+</div>
+<div id="results"></div>
+<h2>Log</h2>
+<pre id="log"></pre>
+</main>
+<script>
+'use strict';
+const PRORES_WASM_B64 = '__PRORES_WASM_B64__';
+const ORT_MJS_B64 = '__ORT_MJS_B64__', ORT_WASM_B64 = '__ORT_WASM_B64__', DET_MODEL_B64 = '__DET_MODEL_B64__';
+const $ = s => document.querySelector(s);
+const log = (...a) => { const s = a.join(' '); $('#log').textContent += s + '\n'; $('#log').scrollTop = 1e9; console.log(s); };
+const now = () => performance.now();
+const fmtMs = ms => ms < 1 ? ms.toFixed(2) + ' ms' : ms < 100 ? ms.toFixed(1) + ' ms' : Math.round(ms) + ' ms';
+const fmtDur = s => { s = Math.round(s); if (s < 90) return s + ' s'; const m = Math.floor(s / 60), r = s % 60; return m < 90 ? `${m} min ${String(r).padStart(2, '0')} s` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const fmtMB = b => (b / 1048576).toFixed(b < 10 * 1048576 ? 1 : 0) + ' MB';
+const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : NaN; };
+const tc = (s, fps = 24) => { const n = Math.round(s * fps), f = Math.round(fps); return `${Math.floor(n / (f * 60))}:${String(Math.floor(n / f) % 60).padStart(2, '0')}:${String(n % f).padStart(2, '0')}`; };
+const b64bytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+/*@include lab-video.js*/
+
+// ------------------------------------------------------------ the frame as a small RGB picture
+function frameToImage(frame, W, H) {
+  const c = new OffscreenCanvas(W, H), g = c.getContext('2d', { willReadFrequently: true });
+  if (frame.kind === 'yuv') {
+    const p = frame, img = g.createImageData(W, H), d = img.data, k = 1 << (p.bits - 8);
+    for (let y = 0; y < H; y++) {
+      const sy = Math.floor((y + 0.5) * p.h / H);
+      for (let x = 0; x < W; x++) {
+        const sx = Math.floor((x + 0.5) * p.w / W), cx = p.c444 ? sx : sx >> 1;
+        const Y = (p.Y[sy * p.ys + sx] / k - 16) / 219, Cb = (p.U[sy * p.cs + cx] / k - 128) / 224, Cr = (p.V[sy * p.cs + cx] / k - 128) / 224, o = (y * W + x) * 4;
+        d[o] = 255 * (Y + 1.5748 * Cr); d[o + 1] = 255 * (Y - 0.1873 * Cb - 0.4681 * Cr); d[o + 2] = 255 * (Y + 1.8556 * Cb); d[o + 3] = 255;
+      }
+    }
+    return img;
+  }
+  g.drawImage(frame, 0, 0, W, H);
+  return g.getImageData(0, 0, W, H);
+}
+
+// ------------------------------------------------------------ finding text: the model (PP-OCRv4 detector)
+let ort = null, session = null, sessionEp = '';
+async function loadModel(want) {
+  if (session && (want === 'auto' || want === sessionEp)) return;
+  const t = now();
+  if (!ort) {
+    // The library finds its files next to itself (import.meta.url); inlined here it has no address, so it gets the page's.
+    const src = new TextDecoder().decode(b64bytes(ORT_MJS_B64)).replaceAll('import.meta.url', JSON.stringify(location.href));
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    ort = await import(url);
+    ort.env.wasm.wasmBinary = b64bytes(ORT_WASM_B64).buffer;
+    ort.env.wasm.numThreads = 1; ort.env.wasm.proxy = false;
+  }
+  const model = b64bytes(DET_MODEL_B64);
+  const eps = want === 'wasm' ? ['wasm'] : (navigator.gpu ? ['webgpu', 'wasm'] : ['wasm']);
+  for (const ep of eps) {
+    try { session = await ort.InferenceSession.create(model, { executionProviders: [ep] }); sessionEp = ep; break; }
+    catch (e) { log(`model on ${ep}: ${e.message}`); }
+  }
+  if (!session) throw new Error('The text-detection model did not load');
+  log(`text-detection model ready on ${sessionEp === 'webgpu' ? 'the graphics chip (WebGPU)' : 'the processor (WebAssembly, 1 thread)'} in ${fmtMs(now() - t)}`);
+}
+const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
+async function detectModel(img) {
+  const W = img.width, H = img.height, d = img.data, n = W * H, x = new Float32Array(3 * n);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) x[c * n + i] = (d[4 * i + c] / 255 - MEAN[c]) / STD[c];
+  const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, H, W]) });
+  const prob = out[session.outputNames[0]].data;
+  return dbBoxes(prob, W, H);
+}
+// DB post-processing: text pixels (probability > 0.3), joined into regions, kept if confident, then grown back
+// (the model marks a shrunk core of each text line).
+function dbBoxes(prob, W, H) {
+  const lab = new Int32Array(W * H), boxes = [], stack = [];
+  let id = 0;
+  for (let i = 0; i < W * H; i++) {
+    if (prob[i] <= 0.3 || lab[i]) continue;
+    id++; let x0 = W, y0 = H, x1 = 0, y1 = 0, sum = 0, cnt = 0;
+    stack.push(i); lab[i] = id;
+    while (stack.length) {
+      const p = stack.pop(), px = p % W, py = (p - px) / W;
+      sum += prob[p]; cnt++;
+      if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+      if (px > 0 && !lab[p - 1] && prob[p - 1] > 0.3) { lab[p - 1] = id; stack.push(p - 1); }
+      if (px < W - 1 && !lab[p + 1] && prob[p + 1] > 0.3) { lab[p + 1] = id; stack.push(p + 1); }
+      if (py > 0 && !lab[p - W] && prob[p - W] > 0.3) { lab[p - W] = id; stack.push(p - W); }
+      if (py < H - 1 && !lab[p + W] && prob[p + W] > 0.3) { lab[p + W] = id; stack.push(p + W); }
+    }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    if (cnt < 6 || h < 2 || sum / cnt < 0.6) continue;
+    const grow = (w * h * 1.5) / (2 * (w + h));
+    boxes.push({ x: Math.max(0, x0 - grow) / W, y: Math.max(0, y0 - grow) / H, w: Math.min(W, w + 2 * grow) / W, h: Math.min(H, h + 2 * grow) / H });
+  }
+  return boxes;
+}
+
+// ------------------------------------------------------------ finding text: image checks (no model)
+// Text = many short, sharp, high-contrast strokes packed along a line. Edges are found on the brightness, joined
+// sideways into line-shaped regions, and kept if their size, shape and density look like lettering.
+function detectImage(img, thr = 70) {
+  const W = img.width, H = img.height, d = img.data, L = new Uint8Array(W * H), E = new Uint8Array(W * H), M = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) L[i] = (d[4 * i] * 54 + d[4 * i + 1] * 183 + d[4 * i + 2] * 19) >> 8;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const i = y * W + x, g = Math.abs(L[i + 1] - L[i - 1]) + Math.abs(L[i + W] - L[i - W]);
+    if (g > thr) E[i] = 1;
+  }
+  const RX = 4, RY = 1;
+  for (let y = 0; y < H; y++) { let run = -1e9; for (let x = 0; x < W; x++) { if (E[y * W + x]) run = x; if (x - run <= RX) M[y * W + x] = 1; } let r2 = 1e9; for (let x = W - 1; x >= 0; x--) { if (E[y * W + x]) r2 = x; if (r2 - x <= RX) M[y * W + x] |= 1; } }
+  const M2 = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let on = 0; for (let k = -RY; k <= RY && !on; k++) { const yy = y + k; if (yy >= 0 && yy < H && M[yy * W + x]) on = 1; } M2[y * W + x] = on; }
+  const lab = new Int32Array(W * H), boxes = [], stack = [];
+  let id = 0;
+  for (let i = 0; i < W * H; i++) {
+    if (!M2[i] || lab[i]) continue;
+    id++; let x0 = W, y0 = H, x1 = 0, y1 = 0, edges = 0, area = 0;
+    stack.push(i); lab[i] = id;
+    while (stack.length) {
+      const p = stack.pop(), px = p % W, py = (p - px) / W; area++; edges += E[p];
+      if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+      if (px > 0 && M2[p - 1] && !lab[p - 1]) { lab[p - 1] = id; stack.push(p - 1); }
+      if (px < W - 1 && M2[p + 1] && !lab[p + 1]) { lab[p + 1] = id; stack.push(p + 1); }
+      if (py > 0 && M2[p - W] && !lab[p - W]) { lab[p - W] = id; stack.push(p - W); }
+      if (py < H - 1 && M2[p + W] && !lab[p + W]) { lab[p + W] = id; stack.push(p + W); }
+    }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, dens = edges / (w * h);
+    if (h < 5 || h > H * 0.2 || w < 12 || w < h * 1.3 || edges < 30 || dens < 0.1 || dens > 0.7) continue;
+    boxes.push({ x: x0 / W, y: y0 / H, w: w / W, h: h / H });
+  }
+  return boxes;
+}
+
+// ------------------------------------------------------------ from boxes to cards
+const overlap = (a, b) => { const ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y); if (ix <= 0 || iy <= 0) return 0; return ix * iy / Math.min(a.w * a.h, b.w * b.h); };
+const union = (a, b) => { const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }; };
+// Lines that belong together (a role above a name; words on one line) make one block.
+function blocks(boxes) {
+  const ls = boxes.filter(b => b.h >= 0.012).sort((a, b) => a.y - b.y), out = [];
+  for (const l of ls) {
+    const k = out.findLastIndex(b => {
+      const lh = Math.max(b.lh, l.h), gap = l.y - (b.y + b.h);
+      const sameRow = Math.min(b.y + b.h, l.y + l.h) - Math.max(b.y, l.y) > lh * 0.5;
+      const hGap = Math.max(b.x, l.x) - Math.min(b.x + b.w, l.x + l.w);
+      if (sameRow) return hGap < 0.08;
+      const aligned = hGap < 0 || Math.abs(b.x - l.x) < 0.04 || Math.abs(b.x + b.w - l.x - l.w) < 0.04 || Math.abs(b.x + b.w / 2 - l.x - l.w / 2) < 0.04;
+      return gap > -lh * 0.5 && gap < lh * 1.6 && aligned;
+    });
+    if (k >= 0) { const u = union(out[k], l); Object.assign(out[k], u, { lh: Math.max(out[k].lh, l.h), n: out[k].n + 1 }); }
+    else out.push({ ...l, lh: l.h, n: 1 });
+  }
+  // Text is wider than tall (in picture pixels): drops rings, balls, faces.
+  return out.filter(b => b.w * 16 / 9 >= b.h * 1.6);
+}
+
+// ------------------------------------------------------------ the Harbor Lights test episode: what is really there
+const TRUTH_DURATION = 412.04;
+const TRUTH = [[27.0, 30.0, "THREE WEEKS EARLIER"], [39.5, 44.5, "HARBOR LIGHTS"], [50.0, 53.5, "Starring / ELENA MARCH"], [57.0, 60.5, "Starring / TOMAS REY"], [64.0, 67.5, "Starring / JUNE ADEBAYO"], [71.0, 74.5, "With / PETER LANGLEY"], [78.0, 81.5, "And / MARGIT SOLHEIM"], [85.0, 88.5, "Casting by / RUTH ABELARD"], [92.0, 95.5, "Music by / IVO KARLSSON"], [99.0, 102.5, "Edited by / DANA WHITLOCK"], [113.0, 116.5, "Production Designer / SAM OYELARAN"], [120.0, 123.5, "Director of Photography / LENA HOLT"], [127.0, 130.5, "Produced by / MARK DELACROIX"], [134.0, 137.5, "Executive Producers / NORA FITCH   ALAN BRISCOE"], [141.0, 144.5, "Written by / CLARE DUNMORE"], [148.0, 151.5, "Directed by / OSCAR VALE"], [160.0, 163.0, "HARBOUR OFFICE — 6 40 AM"]];
+
+// ------------------------------------------------------------ page
+const files = [];
+const VIDEO = /\.(mp4|mov|m4v)$/i;
+function showFiles(list, where) {
+  files.length = 0; files.push(...list.filter(f => VIDEO.test(f.name)).sort((a, b) => a.name.localeCompare(b.name)));
+  $('#folder').textContent = where;
+  $('#files').innerHTML = files.length ? files.map((f, i) => `<label><input type="checkbox" data-i="${i}" ${i < 1 ? 'checked' : ''}> ${f.name} <span class="dim">${fmtMB(f.size)}</span></label>`).join('') : '<span class="warn">No .mp4 / .mov files here.</span>';
+  $('#run').disabled = !files.length;
+}
+$('#pick').onclick = async () => {
+  if (!window.showDirectoryPicker) { alert('This Chrome has no folder picker: use "pick files" instead.'); return; }
+  let dir; try { dir = await showDirectoryPicker({ id: 'textlab' }); } catch (e) { return; }
+  const list = []; for await (const [name, h] of dir.entries()) if (h.kind === 'file' && VIDEO.test(name) && !name.startsWith('._')) list.push(await h.getFile());
+  showFiles(list, 'Folder: ' + dir.name);
+};
+$('#fileInput').onchange = e => showFiles([...e.target.files], 'Files picked');
+$('#env').innerHTML = [`${navigator.hardwareConcurrency} CPU threads`, `graphics chip for the model (WebGPU): ${navigator.gpu ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`].join(' · ');
+$('#run').onclick = async () => {
+  const pick = [...document.querySelectorAll('#files input:checked')].map(c => files[+c.dataset.i]);
+  if (!pick.length) return;
+  $('#run').disabled = true;
+  const dets = $('#det').value === 'both' ? ['image', 'model'] : [$('#det').value];
+  for (const f of pick) for (const det of dets) {
+    try { await runFile(f, det); } catch (e) { log('ERROR', f.name, e.message); const d = document.createElement('div'); d.className = 'card'; d.innerHTML = `<b>${f.name}</b><div class="err">${e.message}</div>`; $('#results').prepend(d); }
+  }
+  $('#status').textContent = 'Done.'; $('#run').disabled = false;
+};
+
+async function runFile(file, det) {
+  const step = +$('#step').value, win = $('#win').value, msz = +$('#msize').value;
+  const W = det === 'model' ? msz : 640, H = det === 'model' ? (msz === 640 ? 352 : 544) : 360;
+  $('#status').textContent = `${file.name}: ${det === 'model' ? 'model' : 'image checks'}…`;
+  log(`\n== ${file.name} · ${det === 'model' ? `model ${W}×${H}` : 'image checks 640×360'} · a frame every ${step} s`);
+  if (det === 'model') await loadModel($('#ep').value);
+  bytesRead = 0; readMs = 0; readCount = 0;
+  const T0 = now();
+  const m = await parseMovie(file);
+  const dec = m.kind === 'prores' ? new ProresDecoder(m) : (m.kind === 'h264' || m.kind === 'hevc') ? new WcDecoder(m) : null;
+  if (!dec) throw new Error(`Not tested: ${m.fourcc} video`);
+  await dec.open();
+  const pts = m.order.map(s => (m.cts[s] - m.mediaTime) / m.timescale), fd = 1 / m.fps;
+  const posAt = t => { let lo = 0, hi = pts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (pts[mid] <= t + 1e-6) lo = mid; else hi = mid - 1; } return lo; };
+  const end = win === 'all' ? m.duration : Math.min(m.duration, +win);
+  const tm = { frame: 0, image: 0, detect: 0, n: 0 };
+  const findAt = async (p, thr) => {
+    let t = now(); const r = await dec.frameAt(p); tm.frame += now() - t;
+    if (!r.frame) return [];
+    t = now(); const img = frameToImage(r.frame, W, H); tm.image += now() - t;
+    if (r.frame.close) r.frame.close();
+    t = now(); const boxes = det === 'model' ? await detectModel(img) : detectImage(img, thr); tm.detect += now() - t;
+    tm.n++;
+    return blocks(boxes);
+  };
+  // 1. scan
+  const cards = []; let active = [], prevP = null, samples = 0;
+  for (let t = 0; t < end; t += step) {
+    const p = posAt(t), found = await findAt(p); samples++;
+    const still = [], used = new Set();
+    for (const c of active) {
+      const k = found.findIndex((b, i) => !used.has(i) && overlap(c.box, b) > 0.5);
+      if (k >= 0) { used.add(k); c.lastP = p; if (found[k].w * found[k].h > c.box.w * c.box.h) c.box = found[k]; still.push(c); }
+      else { c.afterP = p; cards.push(c); }
+    }
+    found.forEach((b, i) => { if (!used.has(i)) still.push({ box: b, firstP: p, lastP: p, beforeP: prevP, afterP: null }); });
+    active = still; prevP = p;
+    if (samples % 10 === 0) $('#status').textContent = `${file.name}: ${fmtDur(t)} of ${fmtDur(end)} looked at, ${cards.length + active.length} pieces of text so far`;
+  }
+  cards.push(...active);
+  const scanMs = now() - T0, scanN = tm.n;
+  // drop logos / burnt-in timecode (on screen for more than 20 s)
+  const kept = cards.filter(c => pts[c.lastP] - pts[c.firstP] <= 20);
+  // 2. in and out to the frame
+  const T1 = now();
+  for (const c of kept) {
+    // image checks: more sensitive here (we know where to look), so faint text in a fade counts
+    const present = async p => (await findAt(p, 30)).some(b => overlap(c.box, b) > 0.3);
+    let lo = c.beforeP == null ? -1 : c.beforeP, hi = c.firstP;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (await present(mid)) hi = mid; else lo = mid; }
+    c.inP = hi;
+    lo = c.lastP; let hi2 = c.afterP == null ? pts.length : c.afterP;
+    while (hi2 - lo > 1) { const mid = (lo + hi2) >> 1; if (await present(mid)) lo = mid; else hi2 = mid; }
+    c.outT = hi2 < pts.length ? pts[hi2] : m.duration; c.inT = pts[c.inP];
+  }
+  const refineMs = now() - T1, refineN = tm.n - scanN;
+  // shorter than half a second: a flicker, not text on screen
+  let final = kept.filter(c => c.outT - c.inT >= 0.5).sort((a, b) => a.inT - b.inT);
+  // pieces of one card (on screen together, touching or overlapping): joined into one
+  const grown = b => ({ x: b.x - 0.02, y: b.y - 0.02, w: b.w + 0.04, h: b.h + 0.04 });
+  for (let i = 0; i < final.length; i++) for (let j = i + 1; j < final.length; j++) {
+    const c = final[i], o = final[j], both = Math.min(o.outT, c.outT) - Math.max(o.inT, c.inT);
+    if (both < Math.min(c.outT - c.inT, o.outT - o.inT) * 0.7 || !overlap(grown(c.box), o.box)) continue;
+    c.box = union(c.box, o.box); c.inT = Math.min(c.inT, o.inT); c.outT = Math.max(c.outT, o.outT); final.splice(j, 1); j = i;
+  }
+  const totalMs = now() - T0;
+  log(`scan: ${samples} frames in ${fmtDur(scanMs / 1000)} · refine: ${refineN} frames in ${fmtDur(refineMs / 1000)} · per frame: get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find text ${fmtMs(tm.detect / tm.n)} · ${final.length} pieces of text`);
+
+  // 3. compare with the test episode
+  let check = null;
+  if (Math.abs(m.duration - TRUTH_DURATION) < 1) {
+    const rows = TRUTH.map(([a, b, txt]) => { const ov = c => Math.min(b, c.outT) - Math.max(a, c.inT); const c = final.filter(c => ov(c) > 0).sort((x, y) => ov(y) - ov(x))[0]; return { a, b, txt, c }; });
+    const extra = final.filter(c => !TRUTH.some(([a, b]) => c.inT < b && c.outT > a));
+    check = { rows, extra, found: rows.filter(r => r.c).length };
+    log(`test episode: ${check.found} of ${TRUTH.length} found, ${extra.length} extra`);
+  }
+  // 4. show
+  const per45 = 2700 / (win === 'all' ? m.duration : end);
+  const est = totalMs / 1000 * (win === 'all' ? per45 : 1);
+  const card = document.createElement('div'); card.className = 'card'; $('#results').prepend(card);
+  card.innerHTML = `
+    <div class="row" style="justify-content:space-between"><b>${file.name}</b><span class="dim">${m.kind === 'prores' ? 'ProRes ' + m.fourcc : m.kind.toUpperCase()} · ${m.width}×${m.height} · ${fmtDur(m.duration)} · ${det === 'model' ? `model ${W}×${H} on ${sessionEp === 'webgpu' ? 'the graphics chip' : 'the processor'}` : 'image checks'} · a frame every ${step} s</span></div>
+    <table style="margin-top:10px">
+      <tr><th>Step</th><th class="n">Time</th><th>Notes</th></tr>
+      <tr><td>Looking for text</td><td class="n">${fmtDur(scanMs / 1000)}</td><td class="dim">${samples} frames over ${fmtDur(end)}</td></tr>
+      <tr><td>In and out to the frame</td><td class="n">${fmtDur(refineMs / 1000)}</td><td class="dim">${refineN} more frames for ${kept.length} pieces of text</td></tr>
+      <tr><td>Per frame</td><td class="n">${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)}</td><td class="dim">get the frame ${fmtMs(tm.frame / tm.n)} + shrink it ${fmtMs(tm.image / tm.n)} + find text ${fmtMs(tm.detect / tm.n)}</td></tr>
+      <tr><td><b>All of it</b></td><td class="n"><b>${fmtDur(totalMs / 1000)}</b></td><td class="dim">for ${fmtDur(end)} of video</td></tr>
+      ${win === 'all' ? `<tr><td><b>A 45-minute episode like this one</b></td><td class="n big">${fmtDur(est)}</td><td class="dim">this run scaled to 45 minutes (the in / out part grows with the amount of text)</td></tr>` : ''}
+    </table>
+    ${check ? `<h2>Against what's really on screen</h2>
+    <div>${check.found === TRUTH.length ? '<span class="ok">All ' + TRUTH.length + ' found.</span>' : `<span class="warn">${check.found} of ${TRUTH.length} found.</span>`} ${check.extra.length ? `<span class="warn">${check.extra.length} extra (text where there is none).</span>` : '<span class="ok">Nothing extra.</span>'}</div>
+    <table style="margin-top:6px"><tr><th>Really there</th><th>In</th><th>Out</th><th>Found</th><th class="n">In off by</th><th class="n">Out off by</th></tr>
+    ${check.rows.map(r => `<tr><td>${r.txt}</td><td>${tc(r.a)}</td><td>${tc(r.b)}</td><td>${r.c ? `${tc(r.c.inT)} – ${tc(r.c.outT)}` : '<span class="err">missed</span>'}</td><td class="n">${r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : ''}</td><td class="n">${r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : ''}</td></tr>`).join('')}
+    </table><div class="dim" style="font-size:12px;margin-top:4px">Each card fades in and out over 0.4 s (about 10 frames), so a few frames either way is expected.</div>` : ''}
+    <h2>What was found (${final.length})</h2>
+    <table><tr><th>#</th><th>In</th><th>Out</th><th>Length</th><th>Where (x, y, width, height)</th></tr>
+    ${final.map((c, i) => `<tr><td>${i + 1}</td><td>${tc(c.inT, m.fps)}</td><td>${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
+    </table>
+    <div class="thumbs"></div>`;
+  // pictures of what was found (not timed)
+  const th = card.querySelector('.thumbs');
+  for (const [i, c] of final.slice(0, 48).entries()) {
+    const p = posAt((c.inT + c.outT) / 2), r = await dec.frameAt(p);
+    if (!r.frame) continue;
+    const cv = document.createElement('canvas'); cv.width = 480; cv.height = 270;
+    const g = cv.getContext('2d');
+    if (r.frame.kind === 'yuv') g.putImageData(frameToImage(r.frame, 480, 270), 0, 0); else { g.drawImage(r.frame, 0, 0, 480, 270); r.frame.close(); }
+    g.strokeStyle = '#f2d675'; g.lineWidth = 2; g.strokeRect(c.box.x * 480, c.box.y * 270, c.box.w * 480, c.box.h * 270);
+    const fig = document.createElement('figure'); fig.appendChild(cv);
+    const cap = document.createElement('figcaption'); cap.textContent = `${i + 1} · ${tc(c.inT, m.fps)} – ${tc(c.outT, m.fps)}`; fig.appendChild(cap); th.appendChild(fig);
+  }
+  dec.close();
+  window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, 'missed']) } });
+}
+</script>
+</body>
+</html>
