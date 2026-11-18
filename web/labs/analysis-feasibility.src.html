@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analysis in Chrome · feasibility test</title>
+<style>
+:root{--bg:#0f1114;--panel:#16191e;--panel2:#1c2027;--border:#2a2f37;--text:#e8eaee;--dim:#9aa1ab;--val:#7fb0ff;--ok:#4cc38a;--warn:#f0a830;--err:#ff5c5c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:22px 24px 60px}
+h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:26px 0 10px;color:var(--val)}
+.dim{color:var(--dim)} .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{font:inherit;border:1px solid var(--border);background:var(--panel2);color:var(--text);padding:6px 14px;border-radius:7px;cursor:pointer}
+button:hover{border-color:#4f86e8} button:disabled{opacity:.45;cursor:default}
+button.primary{background:#42607a;border-color:#42607a}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+td.n{text-align:right;white-space:nowrap}
+.files label{display:flex;gap:8px;align-items:center;padding:3px 0}
+.frames{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.frames figure{margin:0} .frames canvas{display:block;width:240px;height:auto;border:1px solid var(--border);border-radius:6px;background:#000}
+.frames figcaption{font-size:11.5px;color:var(--dim);margin-top:3px}
+pre#log{background:#0b0c0f;border:1px solid var(--border);border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,Menlo,monospace;max-height:260px;overflow:auto;white-space:pre-wrap;color:#b9c0ca}
+.big{font-size:22px;font-weight:650}
+.est td{padding:8px 10px}
+</style>
+</head>
+<body>
+<main>
+<h1>Video analysis in Chrome: feasibility test</h1>
+<p class="dim">Reads a video straight from a folder you pick (nothing is uploaded), decodes single frames and times every step, then estimates how long the planned analysis of a 45-minute episode would take in Chrome. H.264 / HEVC: Chrome's own decoder (WebCodecs). ProRes: a small ProRes-only decoder built from FFmpeg (<span id="wasmSize"></span>). For a network drive, pick a folder on it.</p>
+<div class="card">
+  <div class="row"><button class="primary" id="pick">Choose a folder…</button><span class="dim">or</span><label class="dim">pick files <input type="file" id="fileInput" multiple accept=".mp4,.mov,.m4v,video/*"></label></div>
+  <div id="folder" class="dim" style="margin-top:8px"></div>
+  <div class="files" id="files" style="margin-top:6px"></div>
+  <div class="row" style="margin-top:10px"><button class="primary" id="run" disabled>Run the test</button><span id="status" class="dim"></span></div>
+  <div id="env" class="dim" style="margin-top:8px;font-size:12.5px"></div>
+</div>
+<div id="results"></div>
+<h2>Log</h2>
+<pre id="log"></pre>
+</main>
+<script>
+'use strict';
+const PRORES_WASM_B64 = '__PRORES_WASM_B64__';
+const $ = s => document.querySelector(s);
+const log = (...a) => { const s = a.join(' '); $('#log').textContent += s + '\n'; $('#log').scrollTop = 1e9; console.log(s); };
+const now = () => performance.now();
+const fmtMs = ms => ms < 1 ? ms.toFixed(2) + ' ms' : ms < 100 ? ms.toFixed(1) + ' ms' : Math.round(ms) + ' ms';
+const fmtDur = s => { s = Math.round(s); if (s < 90) return s + ' s'; const m = Math.floor(s / 60), r = s % 60; return m < 90 ? `${m} min ${String(r).padStart(2, '0')} s` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const fmtMB = b => (b / 1048576).toFixed(b < 10 * 1048576 ? 1 : 0) + ' MB';
+const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : NaN; };
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+
+// ------------------------------------------------------------ reading the file (by byte range)
+let bytesRead = 0, readMs = 0, readCount = 0;
+async function readRange(file, start, end) {
+  const t = now();
+  const buf = await file.slice(start, end).arrayBuffer();
+  readMs += now() - t; bytesRead += buf.byteLength; readCount++;
+  return buf;
+}
+
+// ------------------------------------------------------------ MP4 / MOV sample tables
+async function parseMovie(file) {
+  // top-level boxes: find moov (at the start or the end of the file)
+  let off = 0, moov = null;
+  while (off < file.size) {
+    const h = new DataView(await readRange(file, off, Math.min(file.size, off + 16)));
+    let size = h.getUint32(0), type = String.fromCharCode(h.getUint8(4), h.getUint8(5), h.getUint8(6), h.getUint8(7)), hdr = 8;
+    if (size === 1) { size = Number(h.getBigUint64(8)); hdr = 16; } else if (size === 0) size = file.size - off;
+    if (size < 8) throw new Error('Damaged file (box size)');
+    if (type === 'moov') { moov = new DataView(await readRange(file, off + hdr, off + size)); break; }
+    off += size;
+  }
+  if (!moov) throw new Error('No moov box: not an MP4 / MOV file, or not finished');
+  const boxes = (dv, start, end) => {
+    const out = []; let p = start;
+    while (p + 8 <= end) {
+      let size = dv.getUint32(p), hdr = 8;
+      const type = String.fromCharCode(dv.getUint8(p + 4), dv.getUint8(p + 5), dv.getUint8(p + 6), dv.getUint8(p + 7));
+      if (size === 1) { size = Number(dv.getBigUint64(p + 8)); hdr = 16; } else if (size === 0) size = end - p;
+      if (size < 8) break;
+      out.push({ type, start: p + hdr, end: p + size, box: p });
+      p += size;
+    }
+    return out;
+  };
+  const child = (dv, b, t) => boxes(dv, b.start, b.end).find(x => x.type === t);
+  const path = (dv, b, ...ts) => { for (const t of ts) { b = b && child(dv, b, t); } return b; };
+  const dv = moov;
+  const top = { start: 0, end: dv.byteLength };
+  for (const trak of boxes(dv, 0, dv.byteLength).filter(b => b.type === 'trak')) {
+    const mdia = child(dv, trak, 'mdia'); if (!mdia) continue;
+    const hdlr = child(dv, mdia, 'hdlr'); if (!hdlr) continue;
+    const handler = String.fromCharCode(...new Uint8Array(dv.buffer, dv.byteOffset + hdlr.start + 8, 4));
+    if (handler !== 'vide') continue;
+    const mdhd = child(dv, mdia, 'mdhd'), v = dv.getUint8(mdhd.start);
+    const timescale = dv.getUint32(mdhd.start + (v ? 20 : 12));
+    const mDuration = v ? Number(dv.getBigUint64(mdhd.start + 24)) : dv.getUint32(mdhd.start + 16);
+    let mediaTime = 0;
+    const elst = path(dv, trak, 'edts', 'elst');
+    if (elst) { const ev = dv.getUint8(elst.start), n = dv.getUint32(elst.start + 4); if (n) mediaTime = ev ? Number(dv.getBigInt64(elst.start + 16)) : dv.getInt32(elst.start + 12); if (mediaTime < 0) mediaTime = 0; }
+    const stbl = path(dv, mdia, 'minf', 'stbl');
+    const stsd = child(dv, stbl, 'stsd');
+    const entry = boxes(dv, stsd.start + 8, stsd.end)[0];
+    const fourcc = entry.type;
+    const width = dv.getUint16(entry.start + 24), height = dv.getUint16(entry.start + 26);
+    let description = null, codec = null, kind = 'other';
+    const kids = boxes(dv, entry.start + 78, entry.end);
+    const cfg = kids.find(k => k.type === 'avcC' || k.type === 'hvcC');
+    if (cfg) description = new Uint8Array(dv.buffer.slice(dv.byteOffset + cfg.start, dv.byteOffset + cfg.end));
+    if (fourcc === 'avc1' || fourcc === 'avc3') {
+      kind = 'h264';
+      codec = description ? 'avc1.' + [1, 2, 3].map(i => description[i].toString(16).padStart(2, '0')).join('') : 'avc1.640028';
+    } else if (fourcc === 'hvc1' || fourcc === 'hev1') {
+      kind = 'hevc'; codec = description ? hevcCodecString(fourcc, description) : fourcc + '.1.6.L120.B0';
+    } else if (/^ap(ch|cn|cs|co|4h|4x)$/.test(fourcc)) kind = 'prores';
+    // sample table
+    const u32 = (b, i) => dv.getUint32(b.start + i);
+    const stsz = child(dv, stbl, 'stsz'), fixed = u32(stsz, 4), count = u32(stsz, 8);
+    const size = new Uint32Array(count);
+    for (let i = 0; i < count; i++) size[i] = fixed || u32(stsz, 12 + 4 * i);
+    const stco = child(dv, stbl, 'stco'), co64 = child(dv, stbl, 'co64');
+    const chunks = [];
+    if (stco) { const n = u32(stco, 4); for (let i = 0; i < n; i++) chunks.push(u32(stco, 8 + 4 * i)); }
+    else { const n = u32(co64, 4); for (let i = 0; i < n; i++) chunks.push(Number(dv.getBigUint64(co64.start + 8 + 8 * i))); }
+    const stsc = child(dv, stbl, 'stsc'), scn = u32(stsc, 4), sc = [];
+    for (let i = 0; i < scn; i++) sc.push([u32(stsc, 8 + 12 * i), u32(stsc, 12 + 12 * i)]);
+    const offset = new Float64Array(count);
+    let s = 0;
+    for (let ci = 0; ci < chunks.length && s < count; ci++) {
+      let per = 0; for (const [first, n] of sc) if (first <= ci + 1) per = n;
+      let o = chunks[ci];
+      for (let k = 0; k < per && s < count; k++) { offset[s] = o; o += size[s]; s++; }
+    }
+    const dts = new Float64Array(count), cts = new Float64Array(count);
+    const stts = child(dv, stbl, 'stts'); let t = 0, si = 0;
+    for (let i = 0, n = u32(stts, 4); i < n; i++) { const c = u32(stts, 8 + 8 * i), d = u32(stts, 12 + 8 * i); for (let k = 0; k < c && si < count; k++) { dts[si++] = t; t += d; } }
+    cts.set(dts);
+    const ctts = child(dv, stbl, 'ctts');
+    if (ctts) { const cv = dv.getUint8(ctts.start); si = 0; for (let i = 0, n = u32(ctts, 4); i < n; i++) { const c = u32(ctts, 8 + 8 * i), o = cv ? dv.getInt32(ctts.start + 12 + 8 * i) : u32(ctts, 12 + 8 * i); for (let k = 0; k < c && si < count; k++) cts[si] = dts[si++] + o; } }
+    const key = new Uint8Array(count);
+    const stss = child(dv, stbl, 'stss');
+    if (stss) { for (let i = 0, n = u32(stss, 4); i < n; i++) key[u32(stss, 8 + 4 * i) - 1] = 1; } else key.fill(1);
+    // display order
+    const order = Array.from({ length: count }, (_, i) => i).sort((a, b) => cts[a] - cts[b]);
+    const keyCount = key.reduce((a, b) => a + b, 0);
+    return { file, kind, fourcc, codec, description, width, height, timescale, mediaTime, count, size, offset, dts, cts, key, order,
+      duration: mDuration / timescale, fps: count / (mDuration / timescale), gop: count / Math.max(1, keyCount), keyCount,
+      bytes: Array.from(size).reduce((a, b) => a + b, 0) };
+  }
+  throw new Error('No video track');
+}
+function hevcCodecString(fourcc, d) {
+  // ISO/IEC 14496-15 Annex E: hvc1.<profile>.<compat, reversed bits>.<tier+level>.<constraints>
+  const space = d[1] >> 6, tier = (d[1] >> 5) & 1, profile = d[1] & 31;
+  const compat = ((d[2] << 24) | (d[3] << 16) | (d[4] << 8) | d[5]) >>> 0;   // big-endian in hvcC
+  let rev = 0; for (let i = 0; i < 32; i++) if (compat & (1 << i)) rev |= 1 << (31 - i);
+  rev >>>= 0;
+  const cons = []; for (let i = 0; i < 6; i++) cons.push(d[6 + i]);
+  while (cons.length > 1 && cons[cons.length - 1] === 0) cons.pop();
+  return `${fourcc}.${['', 'A', 'B', 'C'][space]}${profile}.${rev.toString(16).toUpperCase()}.${tier ? 'H' : 'L'}${d[12]}.${cons.map(x => x.toString(16).toUpperCase()).join('.')}`;
+}
+
+// ------------------------------------------------------------ WebCodecs (H.264, HEVC)
+class WcDecoder {
+  constructor(m) { this.m = m; this.out = []; this.err = null; }
+  async open() {
+    const m = this.m;
+    this.config = { codec: m.codec, codedWidth: m.width, codedHeight: m.height, hardwareAcceleration: 'no-preference' };
+    if (m.description) this.config.description = m.description;
+    const sup = await VideoDecoder.isConfigSupported(this.config);
+    if (!sup.supported) throw new Error(`Chrome can't decode ${m.codec} on this computer`);
+    this.dec = new VideoDecoder({ output: f => this.out.push(f), error: e => { this.err = e; } });
+    this.dec.configure(this.config);
+  }
+  close() { try { this.dec.close(); } catch (e) {} }
+  // The frame shown at display position i: decode from the keyframe before it, up to it.
+  async frameAt(i, keep) {
+    const m = this.m, target = m.order[i];
+    let k = target; while (k > 0 && !m.key[k]) k--;
+    const lo = m.offset[k], hi = Math.max(...Array.from({ length: target - k + 1 }, (_, j) => m.offset[k + j] + m.size[k + j]));
+    let span = null, spanStart = 0;
+    const t0 = now(), r0 = readMs;
+    if (hi - lo < 256 * 1048576) { span = await readRange(m.file, lo, hi); spanStart = lo; }
+    const tRead = readMs - r0;
+    const td = now();
+    for (let j = k; j <= target; j++) {
+      const data = span ? new Uint8Array(span, m.offset[j] - spanStart, m.size[j]) : new Uint8Array(await readRange(m.file, m.offset[j], m.offset[j] + m.size[j]));
+      this.dec.decode(new EncodedVideoChunk({ type: m.key[j] ? 'key' : 'delta', timestamp: Math.round(m.cts[j] / m.timescale * 1e6), data }));
+    }
+    await this.dec.flush();
+    if (this.err) throw this.err;
+    const want = Math.round(m.cts[target] / m.timescale * 1e6);
+    let frame = null;
+    for (const f of this.out) { if (!frame && f.timestamp === want) frame = f; else f.close(); }
+    this.out = [];
+    const tDecode = now() - td;
+    return { frame, decoded: target - k + 1, readMs: tRead, decodeMs: tDecode, totalMs: now() - t0, bytes: hi - lo };
+  }
+  // Straight through: n frames in decode order from the first keyframe (bytes read first, then timed separately).
+  async sequential(n) {
+    const m = this.m; n = Math.min(n, m.count);
+    const lo = m.offset[0], hi = Math.max(...Array.from({ length: n }, (_, j) => m.offset[j] + m.size[j]));
+    const r0 = readMs, span = await readRange(m.file, lo, hi), tRead = readMs - r0;
+    let got = 0; this.dec.reset(); this.dec.configure(this.config);
+    const t = now();
+    for (let j = 0; j < n; j++) {
+      this.dec.decode(new EncodedVideoChunk({ type: m.key[j] ? 'key' : 'delta', timestamp: Math.round(m.cts[j] / m.timescale * 1e6), data: new Uint8Array(span, m.offset[j] - lo, m.size[j]) }));
+      while (this.out.length) { this.out.shift().close(); got++; }
+      if (this.dec.decodeQueueSize > 8) await new Promise(r => setTimeout(r, 0));
+    }
+    await this.dec.flush();
+    got += this.out.length; this.out.forEach(f => f.close()); this.out = [];
+    return { frames: got, decodeMs: now() - t, readMs: tRead, bytes: hi - lo };
+  }
+}
+// Black check on a decoded frame: copy the picture out and look at about 30,000 luma samples.
+async function blackCheckFrame(frame) {
+  const t = now();
+  const fmt = frame.format;
+  let black = null;
+  if (fmt && /^(I420|I420A|I422|I444|NV12)/.test(fmt)) {
+    const buf = new Uint8Array(frame.allocationSize());
+    const layout = await frame.copyTo(buf);
+    black = isBlack8(buf, layout[0].offset, layout[0].stride, frame.codedWidth, frame.codedHeight);
+  } else {
+    const c = new OffscreenCanvas(480, 270), g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(frame, 0, 0, 480, 270);
+    const d = g.getImageData(0, 0, 480, 270).data; let bright = 0;
+    for (let i = 0; i < d.length; i += 16) { const y = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; if (y > 25.5) bright++; }
+    black = bright <= d.length / 16 * 0.02;
+  }
+  return { black, ms: now() - t, path: fmt || 'canvas' };
+}
+function isBlack8(y, off, stride, w, h) {
+  const step = Math.max(1, Math.floor(Math.min(w, h) / 135)), limit = 16 + 0.1 * 219;
+  let n = 0, bright = 0;
+  for (let r = 0; r < h; r += step) { const p = off + r * stride; for (let c = 0; c < w; c += step) { n++; if (y[p + c] > limit) bright++; } }
+  return bright <= n * 0.02;
+}
+
+// ------------------------------------------------------------ ProRes (FFmpeg's decoder, WebAssembly)
+let proresModule = null;
+async function proresInstance() {
+  if (!proresModule) {
+    const bin = Uint8Array.from(atob(PRORES_WASM_B64), c => c.charCodeAt(0));
+    const t = now(); proresModule = await WebAssembly.compile(bin);
+    log(`ProRes decoder: ${(bin.length / 1024).toFixed(0)} KB, compiled in ${fmtMs(now() - t)}`);
+  }
+  let mem;
+  const wasi = new Proxy({
+    fd_write: (fd, iov, n, out) => { const v = new DataView(mem.buffer); let s = '', tot = 0; for (let i = 0; i < n; i++) { const p = v.getUint32(iov + 8 * i, true), l = v.getUint32(iov + 8 * i + 4, true); s += new TextDecoder().decode(new Uint8Array(mem.buffer, p, l)); tot += l; } v.setUint32(out, tot, true); if (s.trim()) log('[prores] ' + s.trim()); return 0; },
+    clock_time_get: (id, prec, out) => { new DataView(mem.buffer).setBigUint64(out, BigInt(Math.round(performance.now() * 1e6)), true); return 0; },
+    environ_sizes_get: (a, b) => { const v = new DataView(mem.buffer); v.setUint32(a, 0, true); v.setUint32(b, 0, true); return 0; },
+    environ_get: () => 0, fd_prestat_get: () => 8, proc_exit: c => { throw new Error('ProRes decoder exited ' + c); },
+  }, { get: (t, k) => t[k] || (() => 52) });
+  const inst = await WebAssembly.instantiate(proresModule, { wasi_snapshot_preview1: wasi });
+  mem = inst.exports.memory; inst.exports._initialize();
+  return inst.exports;
+}
+class ProresDecoder {
+  constructor(m) { this.m = m; }
+  async open() {
+    this.e = await proresInstance();
+    const f = this.m.fourcc, tag = f.charCodeAt(0) | f.charCodeAt(1) << 8 | f.charCodeAt(2) << 16 | f.charCodeAt(3) << 24;
+    if (this.e.pr_open(this.m.width, this.m.height, tag >>> 0) < 0) throw new Error('ProRes decoder did not open');
+    this.cap = 0; this.ptr = 0;
+  }
+  close() {}
+  async frameAt(i) {
+    const m = this.m, s = m.order[i], e = this.e;
+    const t0 = now(), r0 = readMs;
+    const buf = await readRange(m.file, m.offset[s], m.offset[s] + m.size[s]);
+    const tRead = readMs - r0;
+    const td = now();
+    if (buf.byteLength > this.cap) { if (this.ptr) e.pr_free(this.ptr); this.cap = buf.byteLength * 1.5 | 0; this.ptr = e.pr_alloc(this.cap); }
+    new Uint8Array(e.memory.buffer, this.ptr, buf.byteLength).set(new Uint8Array(buf));
+    const r = e.pr_decode(this.ptr, buf.byteLength);
+    if (r < 0) throw new Error('ProRes decode failed (' + r + ')');
+    return { frame: this.picture(), decoded: 1, readMs: tRead, decodeMs: now() - td, totalMs: now() - t0, bytes: buf.byteLength };
+  }
+  picture() {
+    const e = this.e, f = e.pr_format();
+    const bits = (f === e.pr_fmt_yuv422p12() || f === e.pr_fmt_yuv444p12() || f === e.pr_fmt_yuva444p12()) ? 12 : 10;
+    const c444 = f !== e.pr_fmt_yuv422p10() && f !== e.pr_fmt_yuv422p12();
+    const w = e.pr_width(), h = e.pr_height();
+    const plane = k => new Uint16Array(e.memory.buffer, e.pr_plane(k), e.pr_linesize(k) / 2 * h);
+    return { kind: 'yuv', w, h, bits, c444, Y: plane(0), U: plane(1), V: plane(2), ys: e.pr_linesize(0) / 2, cs: e.pr_linesize(1) / 2 };
+  }
+}
+function blackCheckYuv(p) {
+  const t = now(), sh = p.bits - 8, step = Math.max(1, Math.floor(Math.min(p.w, p.h) / 135)), limit = (16 + 0.1 * 219) * (1 << sh);
+  let n = 0, bright = 0;
+  for (let r = 0; r < p.h; r += step) { const o = r * p.ys; for (let c = 0; c < p.w; c += step) { n++; if (p.Y[o + c] > limit) bright++; } }
+  return { black: bright <= n * 0.02, ms: now() - t, path: 'YUV ' + p.bits + '-bit' };
+}
+function yuvToCanvas(p, cv) {
+  const W = 480, H = Math.round(480 * p.h / p.w); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d'), img = g.createImageData(W, H), d = img.data, sh = p.bits - 8, k = 1 << sh;
+  for (let y = 0; y < H; y++) {
+    const sy = Math.floor(y * p.h / H);
+    for (let x = 0; x < W; x++) {
+      const sx = Math.floor(x * p.w / W), cx = p.c444 ? sx : sx >> 1;
+      const Y = (p.Y[sy * p.ys + sx] / k - 16) / 219, Cb = (p.U[sy * p.cs + cx] / k - 128) / 224, Cr = (p.V[sy * p.cs + cx] / k - 128) / 224;
+      const o = (y * W + x) * 4;
+      d[o] = 255 * (Y + 1.5748 * Cr); d[o + 1] = 255 * (Y - 0.1873 * Cb - 0.4681 * Cr); d[o + 2] = 255 * (Y + 1.8556 * Cb); d[o + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+}
+
+// ------------------------------------------------------------ the test
+const files = [];
+const VIDEO = /\.(mp4|mov|m4v)$/i;
+function showFiles(list, where) {
+  files.length = 0; files.push(...list.filter(f => VIDEO.test(f.name)).sort((a, b) => a.name.localeCompare(b.name)));
+  $('#folder').textContent = where;
+  $('#files').innerHTML = files.length ? files.map((f, i) => `<label><input type="checkbox" data-i="${i}" ${i < 3 ? 'checked' : ''}> ${f.name} <span class="dim">${fmtMB(f.size)}</span></label>`).join('') : '<span class="warn">No .mp4 / .mov files here.</span>';
+  $('#run').disabled = !files.length;
+}
+$('#pick').onclick = async () => {
+  if (!window.showDirectoryPicker) { alert('This Chrome has no folder picker: use "pick files" instead.'); return; }
+  let dir; try { dir = await showDirectoryPicker({ id: 'feasibility' }); } catch (e) { return; }
+  const list = [];
+  for await (const [name, h] of dir.entries()) if (h.kind === 'file' && VIDEO.test(name) && !name.startsWith('._')) list.push(await h.getFile());
+  showFiles(list, 'Folder: ' + dir.name);
+};
+$('#fileInput').onchange = e => showFiles([...e.target.files], 'Files picked');
+$('#wasmSize').textContent = Math.round(PRORES_WASM_B64.length * 3 / 4 / 1024) + ' KB, ProRes decoder only';
+(async () => {
+  const env = [`Chrome ${(navigator.userAgentData && navigator.userAgentData.brands.map(b => b.brand + ' ' + b.version).join(', ')) || navigator.userAgent}`, `${navigator.hardwareConcurrency} CPU threads`];
+  if (typeof VideoDecoder === 'undefined') env.push('<span class="err">no WebCodecs</span>');
+  else for (const [n, c] of [['H.264', 'avc1.640028'], ['HEVC', 'hvc1.1.6.L120.B0']]) {
+    let ok = false; try { ok = (await VideoDecoder.isConfigSupported({ codec: c, codedWidth: 1920, codedHeight: 1080 })).supported; } catch (e) {}
+    env.push(`${n}: ${ok ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`);
+  }
+  env.push(`On-device text reading (TextDetector): ${typeof TextDetector !== 'undefined' ? '<span class="ok">available</span>' : '<span class="warn">not available</span>'}`);
+  $('#env').innerHTML = env.join(' · ');
+})();
+
+$('#run').onclick = async () => {
+  const pick = [...document.querySelectorAll('#files input:checked')].map(c => files[+c.dataset.i]);
+  if (!pick.length) return;
+  $('#run').disabled = true; $('#results').innerHTML = '';
+  for (const f of pick) {
+    try { await testFile(f); } catch (e) { log('ERROR', f.name, e.message); const d = document.createElement('div'); d.className = 'card'; d.innerHTML = `<b>${f.name}</b><div class="err">${e.message}</div>`; $('#results').appendChild(d); }
+  }
+  $('#status').textContent = 'Done.'; $('#run').disabled = false;
+};
+
+async function testFile(file) {
+  $('#status').textContent = 'Testing ' + file.name + '…';
+  log(`\n== ${file.name} (${fmtMB(file.size)})`);
+  bytesRead = 0; readMs = 0; readCount = 0;
+  const card = document.createElement('div'); card.className = 'card'; $('#results').appendChild(card);
+  // 1. open: find and parse the sample tables
+  let t = now();
+  const m = await parseMovie(file);
+  const openMs = now() - t, openReads = readCount, openBytes = bytesRead;
+  log(`open: ${fmtMs(openMs)} (${openReads} reads, ${fmtMB(openBytes)}), ${m.kind} ${m.fourcc} ${m.codec || ''} ${m.width}x${m.height}, ${m.count} frames, ${m.fps.toFixed(3)} fps, ${m.duration.toFixed(1)} s, keyframe every ${m.gop.toFixed(1)} frames`);
+  // 2. read speed: one long read, and small reads at random places (what random access costs)
+  const big = Math.min(file.size, 64 * 1048576), bigStart = Math.max(0, Math.floor(file.size / 2 - big / 2));
+  let r0 = readMs; await readRange(file, bigStart, bigStart + big); const mbps = big / 1048576 / ((readMs - r0) / 1000);
+  const small = [];
+  for (let i = 0; i < 12; i++) { const o = Math.floor(Math.random() * Math.max(1, file.size - 65536)); r0 = readMs; await readRange(file, o, o + 65536); small.push(readMs - r0); }
+  const latency = median(small);
+  log(`read: ${mbps.toFixed(0)} MB/s in one long read, ${fmtMs(latency)} for a small read at a random place`);
+  // 3. decode single frames
+  const dec = m.kind === 'prores' ? new ProresDecoder(m) : (m.kind === 'h264' || m.kind === 'hevc') ? new WcDecoder(m) : null;
+  if (!dec) throw new Error(`Not tested: ${m.fourcc} video (only H.264, HEVC and ProRes)`);
+  t = now(); await dec.open(); const decOpenMs = now() - t;
+  const N = m.count, keyIdx = [], midIdx = [];
+  // display positions: frames that are keyframes, and frames halfway between two keyframes
+  for (let p = 0; p < N && keyIdx.length < 400; p++) if (m.key[m.order[p]]) keyIdx.push(p);
+  const spread = (arr, n) => arr.length <= n ? arr : Array.from({ length: n }, (_, i) => arr[Math.floor((i + 0.5) * arr.length / n)]);
+  const keys = spread(keyIdx, 12);
+  const mids = m.kind === 'prores' ? [] : spread(keyIdx.slice(0, -1).map((p, i) => Math.floor((p + keyIdx[i + 1]) / 2)), 12);
+  const rnd = spread(Array.from({ length: N }, (_, i) => i), 24);
+  const timesKey = [], timesMid = [], timesRnd = [], blackMs = [], shown = [];
+  const one = async (p, into, show) => {
+    const r = await dec.frameAt(p);
+    into.push(r);
+    const b = r.frame && (r.frame.kind === 'yuv' ? blackCheckYuv(r.frame) : await blackCheckFrame(r.frame));
+    if (b) blackMs.push(b.ms);
+    if (show && r.frame) {
+      const cv = document.createElement('canvas');
+      if (r.frame.kind === 'yuv') yuvToCanvas(r.frame, cv); else { cv.width = 480; cv.height = Math.round(480 * r.frame.displayHeight / r.frame.displayWidth); cv.getContext('2d').drawImage(r.frame, 0, 0, cv.width, cv.height); }
+      shown.push({ cv, t: m.cts[m.order[p]] / m.timescale - m.mediaTime / m.timescale, black: b && b.black });
+    }
+    if (r.frame && r.frame.close) r.frame.close();
+  };
+  for (let i = 0; i < keys.length; i++) await one(keys[i], timesKey, i % 4 === 1);
+  for (let i = 0; i < mids.length; i++) await one(mids[i], timesMid, i % 6 === 2);
+  for (const p of rnd) await one(p, timesRnd, false);
+  // 4. straight through (WebCodecs): the fastest way to look at every frame
+  let seq = null;
+  if (dec.sequential) { seq = await dec.sequential(Math.min(N, Math.round(m.fps * 20))); log(`straight through: ${seq.frames} frames in ${fmtMs(seq.decodeMs)} = ${(seq.frames / seq.decodeMs * 1000).toFixed(0)} frames/s decoding`); }
+  dec.close();
+  // 5. on-device text reading, if Chrome offers it (needed for the credits)
+  let ocrMs = null;
+  if (typeof TextDetector !== 'undefined' && shown.length) { try { const td = new TextDetector(); const t1 = now(); await td.detect(shown[0].cv); ocrMs = now() - t1; } catch (e) { log('TextDetector:', e.message); } }
+
+  const stat = (arr, k) => median(arr.map(x => x[k]));
+  const keyT = stat(timesKey, 'totalMs'), midT = mids.length ? stat(timesMid, 'totalMs') : null, rndT = mean(timesRnd.map(x => x.totalMs));
+  const keyDec = stat(timesKey, 'decodeMs'), keyRead = stat(timesKey, 'readMs');
+  const midDec = mids.length ? stat(timesMid, 'decodeMs') : null, midRead = mids.length ? stat(timesMid, 'readMs') : null, midFrames = mids.length ? stat(timesMid, 'decoded') : null;
+  const chk = median(blackMs);
+  log(`keyframe: ${fmtMs(keyT)} (read ${fmtMs(keyRead)}, decode ${fmtMs(keyDec)})` + (mids.length ? ` · between keyframes: ${fmtMs(midT)} (read ${fmtMs(midRead)}, decode ${fmtMs(midDec)}, ${midFrames} frames decoded)` : '') + ` · any frame, on average: ${fmtMs(rndT)} · black check ${fmtMs(chk)}`);
+
+  // 6. estimate for a 45-minute episode, as planned:
+  //    blacks: 4 frames a second, then about 80 frames to refine; credits: one frame every 4 s over the first 20 minutes,
+  //    then about 200 frames to refine (in and out of each card).
+  const D = 45 * 60, fps = m.fps, perFrameRandom = rndT + chk;
+  const blackSamples = D * 4, refineBlacks = 80, creditSamples = 20 * 60 / 4, refineCredits = 200;
+  const bytesPerSec = m.bytes / m.duration;
+  let blacksRandom = (blackSamples + refineBlacks) * perFrameRandom / 1000;
+  let blacksSeq = null;
+  if (seq) {
+    const decSec = D * fps / (seq.frames / seq.decodeMs * 1000), readSec = D * bytesPerSec / 1048576 / mbps, checkSec = blackSamples * chk / 1000;
+    blacksSeq = Math.max(decSec, readSec) + checkSec + refineBlacks * perFrameRandom / 1000;
+  }
+  const blacks = blacksSeq != null ? Math.min(blacksRandom, blacksSeq) : blacksRandom;
+  const creditsFrames = (creditSamples + refineCredits) * perFrameRandom / 1000;
+  const ocrEach = ocrMs;
+  const credits = creditsFrames + (ocrEach != null ? (creditSamples * 2 + refineCredits) * ocrEach / 1000 : 0);
+  const fullBytes = D * bytesPerSec;
+
+  card.innerHTML = `
+    <div class="row" style="justify-content:space-between"><b>${file.name}</b><span class="dim">${m.kind === 'prores' ? 'ProRes ' + m.fourcc : m.kind.toUpperCase() + ' ' + m.codec} · ${m.width}×${m.height} · ${m.fps.toFixed(3)} fps · ${fmtDur(m.duration)} · ${fmtMB(file.size)} · keyframe every ${m.gop.toFixed(1)} frames</span></div>
+    <table style="margin-top:10px">
+      <tr><th>Step</th><th class="n">Time</th><th>Notes</th></tr>
+      <tr><td>Open the file (find and read its index)</td><td class="n">${fmtMs(openMs)}</td><td class="dim">${openReads} reads, ${fmtMB(openBytes)}; decoder ready in ${fmtMs(decOpenMs)}</td></tr>
+      <tr><td>Read speed</td><td class="n">${mbps.toFixed(0)} MB/s</td><td class="dim">one 64 MB read; a small read at a random place: ${fmtMs(latency)}</td></tr>
+      <tr><td>One frame at a keyframe</td><td class="n">${fmtMs(keyT)}</td><td class="dim">read ${fmtMs(keyRead)} + decode ${fmtMs(keyDec)}</td></tr>
+      ${mids.length ? `<tr><td>One frame between keyframes</td><td class="n">${fmtMs(midT)}</td><td class="dim">read ${fmtMs(midRead)} + decode ${fmtMs(midDec)} (${midFrames} frames decoded to get it)</td></tr>` : ''}
+      <tr><td>Any frame, on average</td><td class="n">${fmtMs(rndT)}</td><td class="dim">${timesRnd.length} frames spread over the file</td></tr>
+      ${seq ? `<tr><td>Every frame, straight through</td><td class="n">${(seq.frames / seq.decodeMs * 1000).toFixed(0)} frames/s</td><td class="dim">decoding only (${(seq.frames / seq.decodeMs * 1000 / fps).toFixed(1)}× real time)</td></tr>` : ''}
+      <tr><td>Black check on a decoded frame</td><td class="n">${fmtMs(chk)}</td><td class="dim">copy the picture out + look at ~30,000 pixels</td></tr>
+      <tr><td>Reading text (for the credits)</td><td class="n">${ocrMs != null ? fmtMs(ocrMs) : '—'}</td><td class="dim">${ocrMs != null ? 'Chrome\'s TextDetector, one frame' : 'not available in this Chrome: the credits would need a text reader built in (e.g. Tesseract, several MB, roughly 0.5–2 s a frame)'}</td></tr>
+    </table>
+    <h2 style="margin-top:16px">Estimate for a 45-minute episode like this one</h2>
+    <table class="est">
+      <tr><td>Commercial blacks <span class="dim">(4 frames a second + refining)</span></td><td class="n big">${fmtDur(blacks)}</td><td class="dim">${blacksSeq != null && blacksSeq < blacksRandom ? `faster to decode every frame in order (reads the whole ${fmtMB(fullBytes)}) than to jump (${fmtDur(blacksRandom)})` : `jumping to ${blackSamples.toLocaleString()} frames${blacksSeq != null ? ` (every frame in order would take ${fmtDur(blacksSeq)})` : ''}; reads about ${fmtMB((blackSamples + refineBlacks) * (m.kind === 'prores' ? bytesPerSec / fps : stat(timesRnd, 'bytes')))}`}</td></tr>
+      <tr><td>Opening credits, getting the frames <span class="dim">(1 every 4 s over 20 min + refining)</span></td><td class="n big">${fmtDur(creditsFrames)}</td><td class="dim">${creditSamples + refineCredits} frames</td></tr>
+      <tr><td>Opening credits, reading the text</td><td class="n big">${ocrEach != null ? fmtDur(credits - creditsFrames) : '?'}</td><td class="dim">${ocrEach != null ? 'TextDetector, read twice per frame like the Mac app' : 'not measured: no text reader in this Chrome'}</td></tr>
+    </table>
+    <div class="frames">${''}</div>`;
+  const fr = card.querySelector('.frames');
+  for (const s of shown) { const fig = document.createElement('figure'); fig.appendChild(s.cv); const cap = document.createElement('figcaption'); cap.textContent = `${fmtDur(s.t).replace(' s', 's')} · ${s.t.toFixed(2)} s${s.black ? ' · black' : ''}`; fig.appendChild(cap); fr.appendChild(fig); }
+  window.__results = window.__results || []; window.__results.push({ file: file.name, kind: m.kind, codec: m.codec || m.fourcc, size: [m.width, m.height], fps: m.fps, gop: m.gop, openMs, mbps, latency, keyT, midT, rndT, chk, seqFps: seq && seq.frames / seq.decodeMs * 1000, blacks, creditsFrames, ocrMs });
+}
+</script>
+</body>
+</html>
