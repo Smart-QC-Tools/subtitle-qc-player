@@ -47,6 +47,11 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
   <div class="row" style="margin-top:12px"><button class="primary" id="run" disabled>Run</button><span id="status" class="dim"></span></div>
   <div id="env" class="dim" style="margin-top:8px;font-size:12.5px"></div>
 </div>
+<div class="card" id="summary" hidden>
+  <div class="row" style="justify-content:space-between"><b>All runs</b><button id="copy">Copy as text</button></div>
+  <table style="margin-top:8px"><thead><tr><th>File</th><th>Found text with</th><th class="n">Per frame</th><th class="n">This video</th><th class="n">45 min</th><th>Test episode</th></tr></thead><tbody></tbody></table>
+  <textarea id="sumText" readonly style="width:100%;height:110px;margin-top:10px;background:#0b0c0f;color:#b9c0ca;border:1px solid var(--border);border-radius:8px;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>
+</div>
 <div id="results"></div>
 <h2>Log</h2>
 <pre id="log"></pre>
@@ -220,6 +225,11 @@ $('#pick').onclick = async () => {
 };
 $('#fileInput').onchange = e => showFiles([...e.target.files], 'Files picked');
 $('#env').innerHTML = [`${navigator.hardwareConcurrency} CPU threads`, `graphics chip for the model (WebGPU): ${navigator.gpu ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`].join(' · ');
+$('#copy').onclick = async () => {
+  const t = $('#sumText'); t.select();
+  try { await navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); }
+  $('#copy').textContent = 'Copied'; setTimeout(() => $('#copy').textContent = 'Copy as text', 1500);
+};
 $('#run').onclick = async () => {
   const pick = [...document.querySelectorAll('#files input:checked')].map(c => files[+c.dataset.i]);
   if (!pick.length) return;
@@ -344,6 +354,13 @@ async function runFile(file, det) {
     const cap = document.createElement('figcaption'); cap.textContent = `${i + 1} · ${tc(c.inT, m.fps)} – ${tc(c.outT, m.fps)}`; fig.appendChild(cap); th.appendChild(fig);
   }
   dec.close();
+  // one line per run at the top (readable in a small screenshot; Copy as text for the details)
+  const how = det === 'model' ? `model ${W}×${H} on ${sessionEp === 'webgpu' ? 'graphics chip' : 'processor'}` : 'image checks';
+  const offs = check ? check.rows.filter(r => r.c).flatMap(r => [Math.abs(r.c.inT - r.a), Math.abs(r.c.outT - r.b)].map(v => Math.round(v * m.fps))) : [];
+  const testTxt = check ? `${check.found}/${TRUTH.length} found, ${check.extra.length} extra, in/out off ≤ ${Math.max(...offs)} fr (median ${median(offs)})` : `${final.length} pieces of text`;
+  $('#summary').hidden = false;
+  $('#summary tbody').insertAdjacentHTML('beforeend', `<tr><td>${file.name}</td><td>${how}</td><td class="n">${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)}</td><td class="n">${fmtDur(totalMs / 1000)}</td><td class="n"><b>${win === 'all' ? fmtDur(est) : '–'}</b></td><td>${check ? (check.found === TRUTH.length && !check.extra.length ? '<span class="ok">' : '<span class="warn">') + testTxt + '</span>' : testTxt}</td></tr>`);
+  $('#sumText').value += `${file.name} | ${m.kind} ${m.width}x${m.height} ${fmtDur(m.duration)} | ${how}, every ${step} s | per frame ${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)} (get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find ${fmtMs(tm.detect / tm.n)}) | scan ${samples} fr ${fmtDur(scanMs / 1000)}, in/out ${refineN} fr ${fmtDur(refineMs / 1000)}, total ${fmtDur(totalMs / 1000)}${win === 'all' ? ', 45 min ≈ ' + fmtDur(est) : ''} | ${testTxt}\n`;
   window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, 'missed']) } });
 }
 </script>
