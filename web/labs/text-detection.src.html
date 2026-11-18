@@ -48,7 +48,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
   <div id="env" class="dim" style="margin-top:8px;font-size:12.5px"></div>
 </div>
 <div class="card" id="summary" hidden>
-  <div class="row" style="justify-content:space-between"><b>All runs</b><button id="copy">Copy as text</button></div>
+  <div class="row" style="justify-content:space-between"><b>All runs</b><span class="row" style="gap:8px"><button id="pics" title="One wide picture per run, plus this summary: readable when sent in a chat">Save pictures</button><button id="copy">Copy as text</button></span></div>
   <table style="margin-top:8px"><thead><tr><th>File</th><th>Found text with</th><th class="n">Per frame</th><th class="n">This video</th><th class="n">45 min</th><th>Test episode</th></tr></thead><tbody></tbody></table>
   <textarea id="sumText" readonly style="width:100%;height:110px;margin-top:10px;background:#0b0c0f;color:#b9c0ca;border:1px solid var(--border);border-radius:8px;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>
 </div>
@@ -225,6 +225,73 @@ $('#pick').onclick = async () => {
 };
 $('#fileInput').onchange = e => showFiles([...e.target.files], 'Files picked');
 $('#env').innerHTML = [`${navigator.hardwareConcurrency} CPU threads`, `graphics chip for the model (WebGPU): ${navigator.gpu ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`].join(' · ');
+// ------------------------------------------------------------ pictures to send (wide, so a chat doesn't shrink them unreadable)
+const RUNS = [];
+const PIC = { bg: '#0f1114', panel: '#16191e', line: '#2a2f37', text: '#e8eaee', dim: '#9aa1ab', val: '#7fb0ff', ok: '#4cc38a', warn: '#f0a830', err: '#ff5c5c', font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif' };
+function picCanvas(w, h) {
+  const k = 2, c = document.createElement('canvas'); c.width = w * k; c.height = h * k;
+  const g = c.getContext('2d'); g.scale(k, k); g.fillStyle = PIC.bg; g.fillRect(0, 0, w, h); g.textBaseline = 'middle';
+  return [c, g];
+}
+function picText(g, t, x, y, { size = 15, color = PIC.text, bold = false, right = false, max = 0 } = {}) {
+  g.font = `${bold ? 650 : 400} ${size}px ${PIC.font}`; g.fillStyle = color;
+  t = String(t); if (max) while (t.length > 1 && g.measureText(t).width > max) t = t.slice(0, -2) + '…';
+  g.textAlign = right ? 'right' : 'left'; g.fillText(t, x, y); g.textAlign = 'left';
+}
+// cols: [x, width, right-aligned?]
+function picTable(g, x, y, w, cols, head, rows, rowH = 24, colorOf = () => PIC.text) {
+  head.forEach((h, i) => picText(g, h.toUpperCase(), cols[i][2] ? x + cols[i][0] + cols[i][1] : x + cols[i][0], y + rowH / 2, { size: 11.5, color: PIC.dim, bold: true, right: cols[i][2] }));
+  y += rowH;
+  for (const r of rows) {
+    g.fillStyle = PIC.line; g.fillRect(x, y, w, 1);
+    r.forEach((v, i) => picText(g, v, cols[i][2] ? x + cols[i][0] + cols[i][1] : x + cols[i][0], y + rowH / 2 + 1, { size: 13.5, color: colorOf(r, i), right: cols[i][2], max: cols[i][1] - 6 }));
+    y += rowH;
+  }
+  return y;
+}
+function summaryPicture() {
+  const W = 1600, rowH = 30, H = 90 + rowH * (RUNS.length + 1);
+  const [c, g] = picCanvas(W, H);
+  picText(g, 'Finding on-screen text without reading it: all runs', 28, 34, { size: 20, bold: true });
+  picText(g, new Date().toLocaleString(), W - 28, 34, { size: 13, color: PIC.dim, right: true });
+  const cols = [[0, 430], [440, 280], [730, 110, 1], [850, 110, 1], [970, 120, 1], [1110, 434]];
+  picTable(g, 28, 60, W - 56, cols, ['File', 'Found text with', 'Per frame', 'This video', '45 min', 'Test episode'],
+    RUNS.map(r => [r.file, r.how, r.perFrame, r.total, r.est, r.testTxt]), rowH, (row, i) => i === 5 ? (RUNS.find(r => r.testTxt === row[5]).good ? PIC.ok : PIC.warn) : i === 4 ? PIC.val : PIC.text);
+  return c;
+}
+function runPicture(r) {
+  const W = 1600, L = 28, LW = 820, RX = 880, RW = W - RX - 28;
+  const tw = (RW - 3 * 10) / 4, thH = tw * 9 / 16 + 22;
+  const leftRows = 5 + (r.check ? r.check.rows.length + 3 : Math.min(r.found.length, 30) + 2);
+  const H = Math.max(110 + leftRows * 24 + 60, 110 + Math.ceil(Math.min(r.thumbs.length, 24) / 4) * (thH + 8)) + 20;
+  const [c, g] = picCanvas(W, H);
+  picText(g, r.file, L, 32, { size: 19, bold: true, max: W - 56 });
+  picText(g, r.sub, L, 58, { size: 13.5, color: PIC.dim, max: W - 56 });
+  let y = picTable(g, L, 82, LW, [[0, 260], [270, 110, 1], [400, 420]], ['Step', 'Time', 'Notes'], r.timing, 24, (row, i) => i === 2 ? PIC.dim : row[0].startsWith('A 45') && i === 1 ? PIC.val : PIC.text);
+  y += 22;
+  if (r.check) {
+    picText(g, "Against what's really on screen", L, y, { size: 15, bold: true, color: PIC.val }); y += 22;
+    picText(g, r.check.head, L, y, { size: 13.5, color: r.good ? PIC.ok : PIC.warn, max: LW }); y += 14;
+    picTable(g, L, y, LW, [[0, 300], [305, 75], [385, 75], [465, 190], [660, 75, 1], [745, 75, 1]], ['Really there', 'In', 'Out', 'Found', 'In off', 'Out off'], r.check.rows, 24, (row, i) => row[3] === 'missed' ? PIC.err : i >= 4 ? PIC.val : PIC.text);
+  } else {
+    picText(g, `What was found (${r.found.length})`, L, y, { size: 15, bold: true, color: PIC.val }); y += 14;
+    picTable(g, L, y, LW, [[0, 60], [70, 120], [200, 120], [330, 120]], ['#', 'In', 'Out', 'Length'], r.found.slice(0, 30));
+  }
+  r.thumbs.slice(0, 24).forEach((t, i) => {
+    const x = RX + (i % 4) * (tw + 10), ty = 82 + Math.floor(i / 4) * (thH + 8);
+    g.drawImage(t.cv, x, ty, tw, tw * 9 / 16); g.strokeStyle = PIC.line; g.strokeRect(x + 0.5, ty + 0.5, tw - 1, tw * 9 / 16 - 1);
+    picText(g, t.cap, x, ty + tw * 9 / 16 + 11, { size: 12, color: PIC.dim, max: tw });
+  });
+  if (r.thumbs.length > 24) picText(g, `+ ${r.thumbs.length - 24} more on the page`, RX, H - 20, { size: 12.5, color: PIC.dim });
+  return c;
+}
+const savePng = (c, name) => new Promise(res => c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); res(); }, 400); }, 'image/png'));
+$('#pics').onclick = async () => {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  await savePng(summaryPicture(), `Text lab ${stamp} 0 summary.png`);
+  for (const [i, r] of RUNS.entries()) await savePng(runPicture(r), `Text lab ${stamp} ${i + 1} ${r.file.replace(/\.[^.]+$/, '')} ${r.how.split(' on ')[0].replace(/[×]/g, 'x')}.png`);
+};
+window.__pictures = () => [summaryPicture(), ...RUNS.map(runPicture)].map(c => c.toDataURL('image/png'));
 $('#copy').onclick = async () => {
   const t = $('#sumText'); t.select();
   try { await navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); }
@@ -361,6 +428,12 @@ async function runFile(file, det) {
   $('#summary').hidden = false;
   $('#summary tbody').insertAdjacentHTML('beforeend', `<tr><td>${file.name}</td><td>${how}</td><td class="n">${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)}</td><td class="n">${fmtDur(totalMs / 1000)}</td><td class="n"><b>${win === 'all' ? fmtDur(est) : '–'}</b></td><td>${check ? (check.found === TRUTH.length && !check.extra.length ? '<span class="ok">' : '<span class="warn">') + testTxt + '</span>' : testTxt}</td></tr>`);
   $('#sumText').value += `${file.name} | ${m.kind} ${m.width}x${m.height} ${fmtDur(m.duration)} | ${how}, every ${step} s | per frame ${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)} (get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find ${fmtMs(tm.detect / tm.n)}) | scan ${samples} fr ${fmtDur(scanMs / 1000)}, in/out ${refineN} fr ${fmtDur(refineMs / 1000)}, total ${fmtDur(totalMs / 1000)}${win === 'all' ? ', 45 min ≈ ' + fmtDur(est) : ''} | ${testTxt}\n`;
+  RUNS.push({ file: file.name, sub: `${m.kind === 'prores' ? 'ProRes ' + m.fourcc : m.kind.toUpperCase()} · ${m.width}×${m.height} · ${fmtDur(m.duration)} · ${how} · a frame every ${step} s`, how,
+    perFrame: fmtMs((tm.frame + tm.image + tm.detect) / tm.n), total: fmtDur(totalMs / 1000), est: win === 'all' ? fmtDur(est) : '–', testTxt, good: check && check.found === TRUTH.length && !check.extra.length,
+    timing: [...card.querySelectorAll('table')[0].querySelectorAll('tr')].slice(1).map(tr => [...tr.children].map(td => td.textContent.trim())),
+    check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a), tc(r.b), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
+    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s']),
+    thumbs: [...th.querySelectorAll('figure')].map(f => ({ cv: f.querySelector('canvas'), cap: f.querySelector('figcaption').textContent })) });
   window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, 'missed']) } });
 }
 </script>
