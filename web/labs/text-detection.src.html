@@ -48,7 +48,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
   <div id="env" class="dim" style="margin-top:8px;font-size:12.5px"></div>
 </div>
 <div class="card" id="summary" hidden>
-  <div class="row" style="justify-content:space-between"><b>All runs</b><span class="row" style="gap:8px"><button id="pics" title="One wide picture per run, plus this summary: readable when sent in a chat">Save pictures</button><button id="copy">Copy as text</button></span></div>
+  <div class="row" style="justify-content:space-between"><b>All runs</b><span class="row" style="gap:8px"><button id="pics" title="One wide picture per run, plus this summary: readable when sent in a chat">Save pictures</button><button id="copy" title="Every number from every run, ready to paste into a chat">Copy as text</button><button id="savetxt">Save as text</button></span></div>
   <table style="margin-top:8px"><thead><tr><th>File</th><th>Found text with</th><th class="n">Per frame</th><th class="n">This video</th><th class="n">45 min</th><th>Test episode</th></tr></thead><tbody></tbody></table>
   <textarea id="sumText" readonly style="width:100%;height:110px;margin-top:10px;background:#0b0c0f;color:#b9c0ca;border:1px solid var(--border);border-radius:8px;font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px"></textarea>
 </div>
@@ -292,9 +292,26 @@ $('#pics').onclick = async () => {
   for (const [i, r] of RUNS.entries()) await savePng(runPicture(r), `Text lab ${stamp} ${i + 1} ${r.file.replace(/\.[^.]+$/, '')} ${r.how.split(' on ')[0].replace(/[×]/g, 'x')}.png`);
 };
 window.__pictures = () => [summaryPicture(), ...RUNS.map(runPicture)].map(c => c.toDataURL('image/png'));
+function fullText() {
+  const pad = (v, n, right) => { v = String(v); return right ? v.padStart(n) : v.padEnd(n); };
+  const out = [`Text detection lab · ${new Date().toLocaleString()} · ${navigator.hardwareConcurrency} CPU threads · WebGPU ${navigator.gpu ? 'yes' : 'no'} · ${navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0] || ''}`, '', 'ALL RUNS', $('#sumText').value.trim()];
+  RUNS.forEach((r, i) => {
+    out.push('', `== RUN ${i + 1}: ${r.file}`, r.sub, '');
+    r.timing.forEach(t => out.push(`${pad(t[0], 36)}${pad(t[1], 12, 1)}   ${t[2]}`));
+    if (r.check) {
+      out.push('', r.check.head, `${pad('Really there', 46)}${pad('In', 9)}${pad('Out', 9)}${pad('Found', 22)}${pad('In off', 8, 1)}${pad('Out off', 9, 1)}`);
+      r.check.rows.forEach(c => out.push(`${pad(c[0].length > 44 ? c[0].slice(0, 43) + '…' : c[0], 46)}${pad(c[1], 9)}${pad(c[2], 9)}${pad(c[3], 22)}${pad(c[4], 8, 1)}${pad(c[5], 9, 1)}`));
+    }
+    out.push('', `What was found (${r.found.length}):`);
+    r.found.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${f[1]} – ${f[2]}  ${pad(f[3], 7, 1)}  ${f[4]}`));
+  });
+  return out.join('\n') + '\n';
+}
+$('#savetxt').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([fullText()], { type: 'text/plain' })); a.download = `Text lab ${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}.txt`; a.click(); };
+window.__fullText = fullText;
 $('#copy').onclick = async () => {
-  const t = $('#sumText'); t.select();
-  try { await navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); }
+  const txt = fullText();
+  try { await navigator.clipboard.writeText(txt); } catch (e) { const t = $('#sumText'), old = t.value; t.value = txt; t.select(); document.execCommand('copy'); t.value = old; }
   $('#copy').textContent = 'Copied'; setTimeout(() => $('#copy').textContent = 'Copy as text', 1500);
 };
 $('#run').onclick = async () => {
@@ -432,7 +449,7 @@ async function runFile(file, det) {
     perFrame: fmtMs((tm.frame + tm.image + tm.detect) / tm.n), total: fmtDur(totalMs / 1000), est: win === 'all' ? fmtDur(est) : '–', testTxt, good: check && check.found === TRUTH.length && !check.extra.length,
     timing: [...card.querySelectorAll('table')[0].querySelectorAll('tr')].slice(1).map(tr => [...tr.children].map(td => td.textContent.trim())),
     check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a), tc(r.b), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
-    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s']),
+    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
     thumbs: [...th.querySelectorAll('figure')].map(f => ({ cv: f.querySelector('canvas'), cap: f.querySelector('figcaption').textContent })) });
   window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, 'missed']) } });
 }
