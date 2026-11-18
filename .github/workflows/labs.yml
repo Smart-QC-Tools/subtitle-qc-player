@@ -1,0 +1,41 @@
+name: Labs
+
+# Test pages from web/labs (not part of the app), published as the "labs" pre-release
+# for the download page docs/labs.html.
+on:
+  push:
+    branches: [video-analysis]
+    paths: ['web/labs/**', '.github/workflows/labs.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write       # build attestation
+  attestations: write
+
+jobs:
+  labs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch ONNX Runtime Web and the text detector (checksums pinned)
+        run: bash web/labs/fetch_assets.sh
+      - name: Build the pages
+        run: |
+          python3 web/labs/build_lab.py
+          mkdir out
+          cp web/labs/dist/text-detection.html out/Text_Detection_Lab.html
+          cp web/labs/dist/analysis-feasibility.html out/Analysis_Feasibility_Lab.html
+      - name: Build attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: out/*.html
+      - name: Publish the labs pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete labs --yes --cleanup-tag || true
+          gh release create labs out/Text_Detection_Lab.html out/Analysis_Feasibility_Lab.html \
+            --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "Labs: test pages (build ${{ github.run_number }})" \
+            --notes "Test pages from the video-analysis branch, not part of the app. Download page: https://smart-qc-tools.github.io/subtitle-qc-player/labs.html. Each page is one file that runs in Chrome; nothing is uploaded."
