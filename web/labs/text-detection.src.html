@@ -42,7 +42,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
     <label class="opt">Model size <select id="msize"><option value="640">640 × 352 (faster)</option><option value="960">960 × 544</option></select></label>
     <label class="opt">Model runs on <select id="ep"><option value="auto">graphics chip if possible</option><option value="wasm">processor</option></select></label>
     <label class="opt">One frame every <select id="step"><option>2</option><option>1</option><option>3</option><option>4</option></select> s</label>
-    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, centred (within 12% of the middle): main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label></span>
+    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, in the middle of the picture across (within 12%) and up / down (within 20%), or at least 14% anywhere: main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label></span>
     <label class="opt" title="Height of the box around one line of text (about twice the height of its capital letters)">Small = line boxes under <select id="minH"><option value="0.02">2%</option><option value="0.03" selected>3%</option><option value="0.04">4%</option><option value="0.05">5%</option></select> of the picture height</label>
     <label class="opt">Look at <select id="win"><option value="all">the whole video</option><option value="1200">the first 20 minutes</option></select></label>
   </div>
@@ -447,7 +447,8 @@ async function runFile(file, det) {
   const minH = +$('#minH').value, leaveSmall = $('#lvSmall').checked, leaveMoving = $('#lvMoving').checked, leaveTitle = $('#lvTitle').checked;
   const leave = leaveSmall || leaveMoving || leaveTitle ? 'some' : 'none';
   // large centred text: main titles and big logos (a subtitle can't avoid them, so they don't matter here)
-  const TITLE_H = 0.08, isTitle = c => c.lh >= TITLE_H && Math.abs(c.box.x + c.box.w / 2 - 0.5) < 0.12;
+  // a title sits in the middle of the picture both ways; big credits along the bottom are credits, not titles
+  const TITLE_H = 0.08, HUGE_H = 0.14, isTitle = c => c.lh >= HUGE_H || (c.lh >= TITLE_H && Math.abs(c.box.x + c.box.w / 2 - 0.5) < 0.12 && Math.abs(c.box.y + c.box.h / 2 - 0.5) < 0.2);
   const leftOut = [];
   const kept = cards.filter(c => {
     if (pts[c.lastP] - pts[c.firstP] > 20) return false;
@@ -483,9 +484,13 @@ async function runFile(file, det) {
   const refineMs = now() - T1, refineN = tm.n - scanN;
   // How far it moves while on screen: graphics stay put; text in the scene drifts with the camera. Measured on whichever
   // edge is steadiest (left, centre or right; top, middle or bottom), so text that grows as it's typed on still counts as still.
-  const spread = (vals) => Math.max(...vals) - Math.min(...vals);
+  // Only whole sightings count (partly seen text in a fade or a dissolve gives a smaller box that seems to move), and
+  // with 5 or more, the most extreme one each way is ignored.
+  const spread = vals => { const v = [...vals].sort((a, b) => a - b); return v.length >= 5 ? v[v.length - 2] - v[1] : v[v.length - 1] - v[0]; };
   for (const c of [...groups, ...leftOut]) {
-    const o = c.obs;
+    const areas = c.obs.map(b => b.w * b.h), big = median(areas);
+    const o = c.obs.filter((b, i) => areas[i] >= big * 0.7);
+    c.moveN = o.length;
     c.move = o.length < 2 ? 0 : Math.max(
       Math.min(spread(o.map(b => b.x)), spread(o.map(b => b.x + b.w / 2)), spread(o.map(b => b.x + b.w))),
       Math.min(spread(o.map(b => b.y)), spread(o.map(b => b.y + b.h / 2)), spread(o.map(b => b.y + b.h))));
@@ -501,7 +506,7 @@ async function runFile(file, det) {
   }
   if (leaveMoving) final = final.filter(c => c.move <= 0.01 || !leftOut.push(Object.assign(c, { why: 'moving' })));
   leftOut.sort((a, b) => a.inT - b.inT);
-  const attrs = c => `${(c.lh * 100).toFixed(1)}%`, moveTxt = c => c.obs.length < 2 ? '–' : (c.move * 100).toFixed(1) + '%';
+  const attrs = c => `${(c.lh * 100).toFixed(1)}%`, moveTxt = c => c.moveN < 2 ? '–' : (c.move * 100).toFixed(1) + '%';
   const totalMs = now() - T0;
   log(`scan: ${samples} frames in ${fmtDur(scanMs / 1000)} · refine: ${refineN} frames in ${fmtDur(refineMs / 1000)} · per frame: get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find text ${fmtMs(tm.detect / tm.n)} · ${final.length} pieces of text`);
 
@@ -542,7 +547,7 @@ async function runFile(file, det) {
     </table>
     <div class="thumbs keep"></div>
     <h2>Left out (${leftOut.length})</h2>
-    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${TITLE_H * 100}% of the picture height and centred.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.'].filter(Boolean).join(' ')}</div>
+    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${TITLE_H * 100}% of the picture height in the middle of the picture (across and up / down), or at least ${HUGE_H * 100}% anywhere.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.'].filter(Boolean).join(' ')}</div>
     ${leftOut.length ? `<table style="margin-top:6px"><tr><th>#</th><th>Why</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
     ${leftOut.map((c, i) => `<tr><td>${i + 1}</td><td>${c.why}</td><td>${c.approx ? '~' : ''}${tc(c.inT, m.fps)}</td><td>${c.approx ? '~' : ''}${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
     </table>` : ''}
@@ -578,7 +583,7 @@ async function runFile(file, det) {
     check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a, m.fps), tc(r.b, m.fps), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : r.title ? 'left out as a title' : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
     found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
     leftOut: leftOut.map((c, i) => [String(i + 1), c.why, (c.approx ? '~' : '') + tc(c.inT, m.fps), (c.approx ? '~' : '') + tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
-    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large centred titles (line box ≥ ${TITLE_H * 100}%, centred)`].filter(Boolean).join(', '),
+    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large titles (line box ≥ ${TITLE_H * 100}% in the middle both ways, or ≥ ${HUGE_H * 100}% anywhere)`].filter(Boolean).join(', '),
     thumbs, thumbsOut });
   const thisRun = RUNS[RUNS.length - 1];
   card.querySelector('.runpics').onclick = () => savePictures([thisRun]);
