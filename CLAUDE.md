@@ -144,4 +144,9 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Results folder stays visible ("Subtitle QC Data" next to the videos): sharing results is crucial to the user
   (not hidden, not in Application Support).
 - Version: this branch is 1.1.0 (`APP_VERSION`); main / release stay 1.0.0 until it's merged.
+- Web text detection lab (`web/labs/text-detection.src.html`, download page `docs/labs.html`): find all on-screen text
+  without reading it over the whole episode (a frame every 2 s, in/out by bisection). Findings: image checks (edges)
+  rejected (6× extra hits on real footage); PP-OCRv4 det model on WebGPU ≈ 33 ms/frame, a 45-min episode ≈ 2–5 min.
+  User decisions: all text matters (lower thirds, burnt-in subs), except small text, text moving with the camera
+  (screens, maps, signs) and large centred main titles (line box ≥ 8%, centred), which are left out (listed separately).
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).
