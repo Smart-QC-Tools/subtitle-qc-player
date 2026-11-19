@@ -114,12 +114,25 @@ async function loadModel(want) {
   log(`text-detection model ready on ${sessionEp === 'webgpu' ? 'the graphics chip (WebGPU)' : 'the processor (WebAssembly, 1 thread)'} in ${fmtMs(now() - t)}`);
 }
 const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
-async function detectModel(img) {
-  const W = img.width, H = img.height, d = img.data, n = W * H, x = new Float32Array(3 * n);
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) x[c * n + i] = (d[4 * i + c] / 255 - MEAN[c]) / STD[c];
+// near: when we already know where the text is (finding in / out), only a window around it is looked at
+// (fixed sizes, so the graphics chip keeps its prepared work): much less to compute, same detail.
+async function detectModel(img, near) {
+  const IW = img.width, IH = img.height, d = img.data;
+  let cx = 0, cy = 0, W = IW, H = IH;
+  if (near) {
+    const m = 24, x0 = near.x * IW - m, y0 = near.y * IH - m, bw = near.w * IW + 2 * m, bh = near.h * IH + 2 * m;
+    const win = [[320, 192], [IW, 192], [IW, IH]].find(([w, h]) => bw <= w && bh <= h);
+    [W, H] = win;
+    cx = Math.round(Math.min(Math.max(0, x0 + bw / 2 - W / 2), IW - W)); cy = Math.round(Math.min(Math.max(0, y0 + bh / 2 - H / 2), IH - H));
+  }
+  const n = W * H, x = new Float32Array(3 * n);
+  for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+    const i = yy * W + xx, o = 4 * ((yy + cy) * IW + xx + cx);
+    for (let c = 0; c < 3; c++) x[c * n + i] = (d[o + c] / 255 - MEAN[c]) / STD[c];
+  }
   const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, H, W]) });
-  const prob = out[session.outputNames[0]].data;
-  return dbBoxes(prob, W, H);
+  const boxes = dbBoxes(out[session.outputNames[0]].data, W, H);
+  return near ? boxes.map(b => ({ x: (cx + b.x * W) / IW, y: (cy + b.y * H) / IH, w: b.w * W / IW, h: b.h * H / IH })) : boxes;
 }
 // DB post-processing: text pixels (probability > 0.3), joined into regions, kept if confident, then grown back
 // (the model marks a shrunk core of each text line).
@@ -341,19 +354,29 @@ async function runFile(file, det) {
   const posAt = t => { let lo = 0, hi = pts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (pts[mid] <= t + 1e-6) lo = mid; else hi = mid - 1; } return lo; };
   const end = win === 'all' ? m.duration : Math.min(m.duration, +win);
   const tm = { frame: 0, image: 0, detect: 0, n: 0 };
-  const findAt = async (p, thr) => {
-    let t = now(); const r = await dec.frameAt(p); tm.frame += now() - t;
-    if (!r.frame) return [];
-    t = now(); const img = frameToImage(r.frame, W, H); tm.image += now() - t;
+  // timed = false: fetched in the background; only the time spent waiting for it is counted (as "get the frame")
+  const grab = async (p, timed = true) => {
+    let t = now(); const r = await dec.frameAt(p); if (timed) tm.frame += now() - t;
+    if (!r.frame) return null;
+    t = now(); const img = frameToImage(r.frame, W, H); if (timed) tm.image += now() - t;
     if (r.frame.close) r.frame.close();
-    t = now(); const boxes = det === 'model' ? await detectModel(img) : detectImage(img, thr); tm.detect += now() - t;
+    return img;
+  };
+  const find = async (img, thr, near) => {
+    if (!img) return [];
+    const t = now(); const boxes = det === 'model' ? await detectModel(img, near) : detectImage(img, thr); tm.detect += now() - t;
     tm.n++;
     return blocks(boxes);
   };
-  // 1. scan
+  const findAt = async (p, thr, near) => find(await grab(p), thr, near);
+  // 1. scan (the next frame is fetched while the model looks at this one)
   const cards = []; let active = [], prevP = null, samples = 0;
-  for (let t = 0; t < end; t += step) {
-    const p = posAt(t), found = await findAt(p); samples++;
+  const times = []; for (let t = 0; t < end; t += step) times.push(t);
+  let next = grab(posAt(0), false);
+  for (const [k, t] of times.entries()) {
+    const p = posAt(t), tw = now(), img = await next; tm.frame += now() - tw;
+    next = k + 1 < times.length ? grab(posAt(times[k + 1]), false) : null;
+    const found = await find(img); samples++;
     const still = [], used = new Set();
     for (const c of active) {
       const k = found.findIndex((b, i) => !used.has(i) && overlap(c.box, b) > 0.5);
@@ -368,11 +391,19 @@ async function runFile(file, det) {
   const scanMs = now() - T0, scanN = tm.n;
   // drop logos / burnt-in timecode (on screen for more than 20 s)
   const kept = cards.filter(c => pts[c.lastP] - pts[c.firstP] <= 20);
+  // pieces seen on exactly the same frames, touching: one card, so its in and out are found once
+  const touch = (a, b) => overlap({ x: a.x - 0.02, y: a.y - 0.02, w: a.w + 0.04, h: a.h + 0.04 }, b) > 0;
+  const groups = [];
+  for (const c of kept) {
+    const g = groups.find(g => g.firstP === c.firstP && g.lastP === c.lastP && g.parts.some(o => touch(o, c.box)));
+    if (g) { g.parts.push(c.box); g.box = union(g.box, c.box); } else groups.push({ ...c, parts: [c.box] });
+  }
   // 2. in and out to the frame
   const T1 = now();
-  for (const c of kept) {
+  for (const [gi, c] of groups.entries()) {
+    if (gi % 5 === 0) $('#status').textContent = `${file.name}: finding in and out, ${gi} of ${groups.length} pieces of text`;
     // image checks: more sensitive here (we know where to look), so faint text in a fade counts
-    const present = async p => (await findAt(p, 30)).some(b => overlap(c.box, b) > 0.3);
+    const present = async p => (await findAt(p, 30, c.box)).some(b => c.parts.some(o => overlap(o, b) > 0.3));
     let lo = c.beforeP == null ? -1 : c.beforeP, hi = c.firstP;
     while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (await present(mid)) hi = mid; else lo = mid; }
     c.inP = hi;
@@ -382,7 +413,7 @@ async function runFile(file, det) {
   }
   const refineMs = now() - T1, refineN = tm.n - scanN;
   // shorter than half a second: a flicker, not text on screen
-  let final = kept.filter(c => c.outT - c.inT >= 0.5).sort((a, b) => a.inT - b.inT);
+  let final = groups.filter(c => c.outT - c.inT >= 0.5).sort((a, b) => a.inT - b.inT);
   // pieces of one card (on screen together, touching or overlapping): joined into one
   const grown = b => ({ x: b.x - 0.02, y: b.y - 0.02, w: b.w + 0.04, h: b.h + 0.04 });
   for (let i = 0; i < final.length; i++) for (let j = i + 1; j < final.length; j++) {
@@ -410,7 +441,7 @@ async function runFile(file, det) {
     <table style="margin-top:10px">
       <tr><th>Step</th><th class="n">Time</th><th>Notes</th></tr>
       <tr><td>Looking for text</td><td class="n">${fmtDur(scanMs / 1000)}</td><td class="dim">${samples} frames over ${fmtDur(end)}</td></tr>
-      <tr><td>In and out to the frame</td><td class="n">${fmtDur(refineMs / 1000)}</td><td class="dim">${refineN} more frames for ${kept.length} pieces of text</td></tr>
+      <tr><td>In and out to the frame</td><td class="n">${fmtDur(refineMs / 1000)}</td><td class="dim">${refineN} more frames for ${groups.length} pieces of text</td></tr>
       <tr><td>Per frame</td><td class="n">${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)}</td><td class="dim">get the frame ${fmtMs(tm.frame / tm.n)} + shrink it ${fmtMs(tm.image / tm.n)} + find text ${fmtMs(tm.detect / tm.n)}</td></tr>
       <tr><td><b>All of it</b></td><td class="n"><b>${fmtDur(totalMs / 1000)}</b></td><td class="dim">for ${fmtDur(end)} of video</td></tr>
       ${win === 'all' ? `<tr><td><b>A 45-minute episode like this one</b></td><td class="n big">${fmtDur(est)}</td><td class="dim">this run scaled to 45 minutes (the in / out part grows with the amount of text)</td></tr>` : ''}
@@ -427,6 +458,7 @@ async function runFile(file, det) {
     <div class="thumbs"></div>`;
   // pictures of what was found (not timed)
   const th = card.querySelector('.thumbs');
+  $('#status').textContent = `${file.name}: pictures of what was found…`;
   for (const [i, c] of final.slice(0, 48).entries()) {
     const p = posAt((c.inT + c.outT) / 2), r = await dec.frameAt(p);
     if (!r.frame) continue;
