@@ -23,7 +23,7 @@ td.n{text-align:right;white-space:nowrap}
 .files label{display:flex;gap:8px;align-items:center;padding:2px 0}
 .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .thumbs figure{margin:0} .thumbs canvas{display:block;width:240px;height:auto;border:1px solid var(--border);border-radius:5px;background:#000}
-.thumbs figcaption{font-size:11.5px;color:var(--dim);margin-top:2px;max-width:240px}
+.thumbs figure.out canvas{opacity:.85} .thumbs figcaption{font-size:11.5px;color:var(--dim);margin-top:2px;max-width:240px}
 pre#log{background:#0b0c0f;border:1px solid var(--border);border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,Menlo,monospace;max-height:260px;overflow:auto;white-space:pre-wrap;color:#b9c0ca}
 .big{font-size:22px;font-weight:650}
 label.opt{display:inline-flex;gap:6px;align-items:center}
@@ -42,6 +42,8 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
     <label class="opt">Model size <select id="msize"><option value="640">640 × 352 (faster)</option><option value="960">960 × 544</option></select></label>
     <label class="opt">Model runs on <select id="ep"><option value="auto">graphics chip if possible</option><option value="wasm">processor</option></select></label>
     <label class="opt">One frame every <select id="step"><option>2</option><option>1</option><option>3</option><option>4</option></select> s</label>
+    <label class="opt">Leave out <select id="leave"><option value="both">small or moving text</option><option value="small">small text</option><option value="moving">moving text</option><option value="none">nothing</option></select></label>
+    <label class="opt" title="Height of the box around one line of text (about twice the height of its capital letters)">Small = line boxes under <select id="minH"><option value="0.02">2%</option><option value="0.03" selected>3%</option><option value="0.04">4%</option><option value="0.05">5%</option></select> of the picture height</label>
     <label class="opt">Look at <select id="win"><option value="all">the whole video</option><option value="1200">the first 20 minutes</option></select></label>
   </div>
   <div class="row" style="margin-top:12px"><button class="primary" id="run" disabled>Run</button><span id="status" class="dim"></span></div>
@@ -154,8 +156,18 @@ function dbBoxes(prob, W, H) {
     }
     const w = x1 - x0 + 1, h = y1 - y0 + 1;
     if (cnt < 6 || h < 2 || sum / cnt < 0.6) continue;
-    const grow = (w * h * 1.5) / (2 * (w + h));
-    boxes.push({ x: Math.max(0, x0 - grow) / W, y: Math.max(0, y0 - grow) / H, w: Math.min(W, w + 2 * grow) / W, h: Math.min(H, h + 2 * grow) / H });
+    // Lines close together can come out as one region (small text, tight leading): split at the thin rows between them,
+    // so each line is measured on its own.
+    const rows = []; for (let y = y0; y <= y1; y++) { let n = 0; for (let x = x0; x <= x1; x++) if (lab[y * W + x] === id) n++; rows.push(n); }
+    const top = Math.max(...rows), cuts = [y0];
+    for (let k = 2; k < rows.length - 2; k++) if (rows[k] < top * 0.25 && rows[k] <= rows[k - 1] && rows[k] <= rows[k + 1] && y0 + k - cuts[cuts.length - 1] >= 2) cuts.push(y0 + k);
+    cuts.push(y1 + 1);
+    for (let k = 0; k + 1 < cuts.length; k++) {
+      const ya = cuts[k], yb = cuts[k + 1] - 1; if (yb - ya < 1) continue;
+      let xa = W, xb = 0; for (let y = ya; y <= yb; y++) for (let x = x0; x <= x1; x++) if (lab[y * W + x] === id) { if (x < xa) xa = x; if (x > xb) xb = x; }
+      const lw = xb - xa + 1, lh = yb - ya + 1, grow = (lw * lh * 1.5) / (2 * (lw + lh));
+      boxes.push({ x: Math.max(0, xa - grow) / W, y: Math.max(0, ya - grow) / H, w: Math.min(W, lw + 2 * grow) / W, h: Math.min(H, lh + 2 * grow) / H });
+    }
   }
   return boxes;
 }
@@ -288,23 +300,63 @@ function runPicture(r) {
     picTable(g, L, y, LW, [[0, 300], [305, 75], [385, 75], [465, 190], [660, 75, 1], [745, 75, 1]], ['Really there', 'In', 'Out', 'Found', 'In off', 'Out off'], r.check.rows, 24, (row, i) => row[3] === 'missed' ? PIC.err : i >= 4 ? PIC.val : PIC.text);
   } else {
     picText(g, `What was found (${r.found.length})`, L, y, { size: 15, bold: true, color: PIC.val }); y += 14;
-    picTable(g, L, y, LW, [[0, 60], [70, 120], [200, 120], [330, 120]], ['#', 'In', 'Out', 'Length'], r.found.slice(0, 30));
+    picTable(g, L, y, LW, [[0, 50], [55, 110], [170, 110], [285, 80, 1], [375, 90, 1], [475, 80, 1]], ['#', 'In', 'Out', 'Length', 'Height', 'Moves'], r.found.slice(0, 30).map(f => f.slice(0, 6)));
   }
   r.thumbs.slice(0, 24).forEach((t, i) => {
     const x = RX + (i % 4) * (tw + 10), ty = 82 + Math.floor(i / 4) * (thH + 8);
     g.drawImage(t.cv, x, ty, tw, tw * 9 / 16); g.strokeStyle = PIC.line; g.strokeRect(x + 0.5, ty + 0.5, tw - 1, tw * 9 / 16 - 1);
     picText(g, t.cap, x, ty + tw * 9 / 16 + 11, { size: 12, color: PIC.dim, max: tw });
   });
-  if (r.thumbs.length > 24) picText(g, `+ ${r.thumbs.length - 24} more on the page`, RX, H - 20, { size: 12.5, color: PIC.dim });
+  if (r.thumbs.length > 24) picText(g, `More pictures on the next pages (${r.thumbs.length} found, ${r.thumbsOut.length} left out)`, RX, H - 20, { size: 12.5, color: PIC.dim });
   return c;
 }
-const savePng = (c, name) => new Promise(res => c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); res(); }, 400); }, 'image/png'));
-$('#pics').onclick = async () => {
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-  await savePng(summaryPicture(), `Text lab ${stamp} 0 summary.png`);
-  for (const [i, r] of RUNS.entries()) await savePng(runPicture(r), `Text lab ${stamp} ${i + 1} ${r.file.replace(/\.[^.]+$/, '')} ${r.how.split(' on ')[0].replace(/[×]/g, 'x')}.png`);
-};
-window.__pictures = () => [summaryPicture(), ...RUNS.map(runPicture)].map(c => c.toDataURL('image/png'));
+// further pages: 30 pictures each (5 across), what was found, then what was left out
+function thumbPages(r) {
+  const pages = [], per = 30, W = 1600, tw = (W - 56 - 4 * 12) / 5, th = tw * 9 / 16, rowH = th + 30;
+  const sets = [['found', r.thumbs.slice(24)], ['left out', r.thumbsOut]];
+  for (const [what, list] of sets) for (let k = 0; k < list.length; k += per) {
+    const part = list.slice(k, k + per), H = 80 + Math.ceil(part.length / 5) * rowH + 10;
+    const [c, g] = picCanvas(W, H);
+    picText(g, r.file, 28, 30, { size: 17, bold: true, max: 1000 });
+    picText(g, `${what === 'found' ? 'Found' : 'Left out'}: ${what === 'found' ? 25 + k : k + 1}–${what === 'found' ? 24 + k + part.length : k + part.length} of ${what === 'found' ? r.thumbs.length : r.thumbsOut.length} · ${r.how}${what === 'found' ? '' : ' · ' + r.leaveTxt}`, 28, 54, { size: 13, color: PIC.dim, max: W - 56 });
+    part.forEach((t, i) => {
+      const x = 28 + (i % 5) * (tw + 12), y = 72 + Math.floor(i / 5) * rowH;
+      g.drawImage(t.cv, x, y, tw, th); g.strokeStyle = PIC.line; g.strokeRect(x + 0.5, y + 0.5, tw - 1, th - 1);
+      picText(g, t.cap, x, y + th + 12, { size: 12.5, color: PIC.dim, max: tw });
+    });
+    pages.push([c, what === 'found' ? `found ${String(25 + k).padStart(3, '0')}` : `left out ${String(k + 1).padStart(3, '0')}`]);
+  }
+  return pages;
+}
+// Chrome lets a page start only one download per click, so the pictures are written into a folder you pick (one question
+// for all of them). Without the folder picker: one download, the first picture, and a note.
+const pngBlob = c => new Promise(res => c.toBlob(res, 'image/png'));
+function allPictures(runs, withSummary) {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, ''), out = [];
+  if (withSummary) out.push([summaryPicture(), `Text lab ${stamp} 0 summary.png`]);
+  for (const r of runs) {
+    const n = RUNS.indexOf(r) + 1, base = `Text lab ${stamp} ${n} ${r.file.replace(/\.[^.]+$/, '').slice(0, 60)} ${r.how.split(' on ')[0].replace(/[×]/g, 'x')}`;
+    out.push([runPicture(r), base + '.png']);
+    for (const [c, suffix] of thumbPages(r)) out.push([c, `${base} ${suffix}.png`]);
+  }
+  return out;
+}
+async function savePictures(runs, withSummary = false) {
+  const pics = allPictures(runs, withSummary);
+  if (window.showDirectoryPicker) {
+    let dir; try { dir = await showDirectoryPicker({ id: 'textlabpics', mode: 'readwrite', startIn: 'downloads' }); } catch (e) { return; }
+    for (const [i, [c, name]] of pics.entries()) {
+      $('#status').textContent = `Saving pictures: ${i + 1} of ${pics.length}…`;
+      const w = await (await dir.getFileHandle(name, { create: true })).createWritable(); await w.write(await pngBlob(c)); await w.close();
+    }
+    $('#status').textContent = `Saved ${pics.length} pictures in the folder "${dir.name}".`;
+  } else {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await pngBlob(pics[0][0])); a.download = pics[0][1]; a.click();
+    alert('This Chrome can only save one picture per click here: use "Save pictures of this run" on each run.');
+  }
+}
+$('#pics').onclick = () => savePictures(RUNS, true);
+window.__pictures = () => allPictures(RUNS, true).map(([c, name]) => [name, c.toDataURL('image/png')]);
 function fullText() {
   const pad = (v, n, right) => { v = String(v); return right ? v.padStart(n) : v.padEnd(n); };
   const out = [`Text detection lab · ${new Date().toLocaleString()} · ${navigator.hardwareConcurrency} CPU threads · WebGPU ${navigator.gpu ? 'yes' : 'no'} · ${navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0] || ''}`, '', 'ALL RUNS', $('#sumText').value.trim()];
@@ -315,8 +367,10 @@ function fullText() {
       out.push('', r.check.head, `${pad('Really there', 46)}${pad('In', 9)}${pad('Out', 9)}${pad('Found', 22)}${pad('In off', 8, 1)}${pad('Out off', 9, 1)}`);
       r.check.rows.forEach(c => out.push(`${pad(c[0].length > 44 ? c[0].slice(0, 43) + '…' : c[0], 46)}${pad(c[1], 9)}${pad(c[2], 9)}${pad(c[3], 22)}${pad(c[4], 8, 1)}${pad(c[5], 9, 1)}`));
     }
-    out.push('', `What was found (${r.found.length}):`);
-    r.found.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${f[1]} – ${f[2]}  ${pad(f[3], 7, 1)}  ${f[4]}`));
+    out.push('', `What was found (${r.found.length}):`, `   #  In        Out         Length  Height  Moves  Where (x, y, width, height)`);
+    r.found.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${f[1]} – ${f[2]}  ${pad(f[3], 7, 1)}  ${pad(f[4], 6, 1)}  ${pad(f[5], 5, 1)}  ${f[6]}`));
+    out.push('', `Left out (${r.leftOut.length}): ${r.leaveTxt}`);
+    r.leftOut.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${pad(f[1], 7)} ${f[2]} – ${f[3]}  ${pad(f[4], 7, 1)}  ${pad(f[5], 6, 1)}  ${pad(f[6], 5, 1)}  ${f[7]}`));
   });
   return out.join('\n') + '\n';
 }
@@ -380,30 +434,42 @@ async function runFile(file, det) {
     const still = [], used = new Set();
     for (const c of active) {
       const k = found.findIndex((b, i) => !used.has(i) && overlap(c.box, b) > 0.5);
-      if (k >= 0) { used.add(k); c.lastP = p; if (found[k].w * found[k].h > c.box.w * c.box.h) c.box = found[k]; still.push(c); }
+      if (k >= 0) { used.add(k); c.lastP = p; c.obs.push(found[k]); c.lh = Math.max(c.lh, found[k].lh); if (found[k].w * found[k].h > c.box.w * c.box.h) c.box = found[k]; still.push(c); }
       else { c.afterP = p; cards.push(c); }
     }
-    found.forEach((b, i) => { if (!used.has(i)) still.push({ box: b, firstP: p, lastP: p, beforeP: prevP, afterP: null }); });
+    found.forEach((b, i) => { if (!used.has(i)) still.push({ box: b, firstP: p, lastP: p, beforeP: prevP, afterP: null, lh: b.lh, obs: [b] }); });
     active = still; prevP = p;
     if (samples % 10 === 0) $('#status').textContent = `${file.name}: ${fmtDur(t)} of ${fmtDur(end)} looked at, ${cards.length + active.length} pieces of text so far`;
   }
   cards.push(...active);
   const scanMs = now() - T0, scanN = tm.n;
   // drop logos / burnt-in timecode (on screen for more than 20 s)
-  const kept = cards.filter(c => pts[c.lastP] - pts[c.firstP] <= 20);
+  const leave = $('#leave').value, minH = +$('#minH').value;
+  const leaveSmall = leave === 'both' || leave === 'small', leaveMoving = leave === 'both' || leave === 'moving';
+  const leftOut = [];
+  const kept = cards.filter(c => {
+    if (pts[c.lastP] - pts[c.firstP] > 20) return false;
+    // small text (a map on a screen, a newspaper): left out before the in / out step, with times from the scan only
+    if (leaveSmall && c.lh < minH) { leftOut.push(Object.assign(c, { why: 'small', approx: true, inT: pts[c.firstP], outT: Math.min(m.duration, pts[c.lastP] + step) })); return false; }
+    return true;
+  });
   // pieces seen on exactly the same frames, touching: one card, so its in and out are found once
   const touch = (a, b) => overlap({ x: a.x - 0.02, y: a.y - 0.02, w: a.w + 0.04, h: a.h + 0.04 }, b) > 0;
   const groups = [];
   for (const c of kept) {
     const g = groups.find(g => g.firstP === c.firstP && g.lastP === c.lastP && g.parts.some(o => touch(o, c.box)));
-    if (g) { g.parts.push(c.box); g.box = union(g.box, c.box); } else groups.push({ ...c, parts: [c.box] });
+    if (g) { g.parts.push(c.box); g.box = union(g.box, c.box); g.lh = Math.max(g.lh, c.lh); } else groups.push({ ...c, parts: [c.box], obs: [...c.obs] });
   }
   // 2. in and out to the frame
   const T1 = now();
   for (const [gi, c] of groups.entries()) {
     if (gi % 5 === 0) $('#status').textContent = `${file.name}: finding in and out, ${gi} of ${groups.length} pieces of text`;
     // image checks: more sensitive here (we know where to look), so faint text in a fade counts
-    const present = async p => (await findAt(p, 30, c.box)).some(b => c.parts.some(o => overlap(o, b) > 0.3));
+    const present = async p => {
+      const bs = await findAt(p, 30, c.box), main = bs.find(b => overlap(c.parts[0], b) > 0.3);
+      if (main) c.obs.push(main);
+      return !!main || bs.some(b => c.parts.some(o => overlap(o, b) > 0.3));
+    };
     let lo = c.beforeP == null ? -1 : c.beforeP, hi = c.firstP;
     while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (await present(mid)) hi = mid; else lo = mid; }
     c.inP = hi;
@@ -412,6 +478,15 @@ async function runFile(file, det) {
     c.outT = hi2 < pts.length ? pts[hi2] : m.duration; c.inT = pts[c.inP];
   }
   const refineMs = now() - T1, refineN = tm.n - scanN;
+  // How far it moves while on screen: graphics stay put; text in the scene drifts with the camera. Measured on whichever
+  // edge is steadiest (left, centre or right; top, middle or bottom), so text that grows as it's typed on still counts as still.
+  const spread = (vals) => Math.max(...vals) - Math.min(...vals);
+  for (const c of groups) {
+    const o = c.obs;
+    c.move = o.length < 2 ? 0 : Math.max(
+      Math.min(spread(o.map(b => b.x)), spread(o.map(b => b.x + b.w / 2)), spread(o.map(b => b.x + b.w))),
+      Math.min(spread(o.map(b => b.y)), spread(o.map(b => b.y + b.h / 2)), spread(o.map(b => b.y + b.h))));
+  }
   // shorter than half a second: a flicker, not text on screen
   let final = groups.filter(c => c.outT - c.inT >= 0.5).sort((a, b) => a.inT - b.inT);
   // pieces of one card (on screen together, touching or overlapping): joined into one
@@ -419,8 +494,11 @@ async function runFile(file, det) {
   for (let i = 0; i < final.length; i++) for (let j = i + 1; j < final.length; j++) {
     const c = final[i], o = final[j], both = Math.min(o.outT, c.outT) - Math.max(o.inT, c.inT);
     if (both < Math.min(c.outT - c.inT, o.outT - o.inT) * 0.7 || !overlap(grown(c.box), o.box)) continue;
-    c.box = union(c.box, o.box); c.inT = Math.min(c.inT, o.inT); c.outT = Math.max(c.outT, o.outT); final.splice(j, 1); j = i;
+    c.box = union(c.box, o.box); c.inT = Math.min(c.inT, o.inT); c.outT = Math.max(c.outT, o.outT); c.lh = Math.max(c.lh, o.lh); c.move = Math.min(c.move, o.move); final.splice(j, 1); j = i;
   }
+  if (leaveMoving) final = final.filter(c => c.move <= 0.01 || !leftOut.push(Object.assign(c, { why: 'moving' })));
+  leftOut.sort((a, b) => a.inT - b.inT);
+  const attrs = c => `${(c.lh * 100).toFixed(1)}%`, moveTxt = c => c.obs.length < 2 ? '–' : (c.move * 100).toFixed(1) + '%';
   const totalMs = now() - T0;
   log(`scan: ${samples} frames in ${fmtDur(scanMs / 1000)} · refine: ${refineN} frames in ${fmtDur(refineMs / 1000)} · per frame: get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find text ${fmtMs(tm.detect / tm.n)} · ${final.length} pieces of text`);
 
@@ -430,7 +508,7 @@ async function runFile(file, det) {
     const rows = TRUTH.map(([a, b, txt]) => { const ov = c => Math.min(b, c.outT) - Math.max(a, c.inT); const c = final.filter(c => ov(c) > 0).sort((x, y) => ov(y) - ov(x))[0]; return { a, b, txt, c }; });
     const extra = final.filter(c => !TRUTH.some(([a, b]) => c.inT < b && c.outT > a));
     check = { rows, extra, found: rows.filter(r => r.c).length };
-    log(`test episode: ${check.found} of ${TRUTH.length} found, ${extra.length} extra`);
+    log(`test episode: ${check.found} of ${TRUTH.length} found, ${extra.length} extra, ${leftOut.length} left out`);
   }
   // 4. show
   const per45 = 2700 / (win === 'all' ? m.duration : end);
@@ -451,29 +529,39 @@ async function runFile(file, det) {
     <table style="margin-top:6px"><tr><th>Really there</th><th>In</th><th>Out</th><th>Found</th><th class="n">In off by</th><th class="n">Out off by</th></tr>
     ${check.rows.map(r => `<tr><td>${r.txt}</td><td>${tc(r.a, m.fps)}</td><td>${tc(r.b, m.fps)}</td><td>${r.c ? `${tc(r.c.inT)} – ${tc(r.c.outT)}` : '<span class="err">missed</span>'}</td><td class="n">${r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : ''}</td><td class="n">${r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : ''}</td></tr>`).join('')}
     </table><div class="dim" style="font-size:12px;margin-top:4px">Each card fades in and out over 0.4 s (about 10 frames), so a few frames either way is expected.</div>` : ''}
-    <h2>What was found (${final.length})</h2>
-    <table><tr><th>#</th><th>In</th><th>Out</th><th>Length</th><th>Where (x, y, width, height)</th></tr>
-    ${final.map((c, i) => `<tr><td>${i + 1}</td><td>${tc(c.inT, m.fps)}</td><td>${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
+    <div class="row" style="justify-content:space-between"><h2>What was found (${final.length})</h2><button class="runpics">Save pictures of this run</button></div>
+    <table><tr><th>#</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
+    ${final.map((c, i) => `<tr><td>${i + 1}</td><td>${tc(c.inT, m.fps)}</td><td>${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
     </table>
-    <div class="thumbs"></div>`;
+    <div class="thumbs keep"></div>
+    <h2>Left out (${leftOut.length})</h2>
+    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters) (times only approximate: their in / out wasn't looked for). Moving = drifts more than 1% of the picture while on screen.`}</div>
+    ${leftOut.length ? `<table style="margin-top:6px"><tr><th>#</th><th>Why</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
+    ${leftOut.map((c, i) => `<tr><td>${i + 1}</td><td>${c.why}</td><td>${c.approx ? '~' : ''}${tc(c.inT, m.fps)}</td><td>${c.approx ? '~' : ''}${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
+    </table>` : ''}
+    <div class="thumbs out"></div>`;
   // pictures of what was found (not timed)
-  const th = card.querySelector('.thumbs');
-  $('#status').textContent = `${file.name}: pictures of what was found…`;
-  for (const [i, c] of final.slice(0, 48).entries()) {
-    const p = posAt((c.inT + c.outT) / 2), r = await dec.frameAt(p);
+  const th = card.querySelector('.thumbs.keep'), thOut = card.querySelector('.thumbs.out');
+  const thumbs = [], thumbsOut = [];
+  const lists = [[final.slice(0, 300), th, thumbs, '#f2d675', c => ''], [leftOut.slice(0, 150), thOut, thumbsOut, '#ff9a5c', c => ' · ' + c.why]];
+  for (const [list, box, store, colour, why] of lists) for (const [i, c] of list.entries()) {
+    if (i % 10 === 0) $('#status').textContent = `${file.name}: pictures of what was found, ${i} of ${list.length}${box === thOut ? ' left out' : ''}…`;
+    const p = posAt(c.approx ? pts[c.firstP] : (c.inT + c.outT) / 2), r = await dec.frameAt(p);
     if (!r.frame) continue;
-    const cv = document.createElement('canvas'); cv.width = 480; cv.height = 270;
+    const cv = document.createElement('canvas'); cv.width = 384; cv.height = 216;
     const g = cv.getContext('2d');
-    if (r.frame.kind === 'yuv') g.putImageData(frameToImage(r.frame, 480, 270), 0, 0); else { g.drawImage(r.frame, 0, 0, 480, 270); r.frame.close(); }
-    g.strokeStyle = '#f2d675'; g.lineWidth = 2; g.strokeRect(c.box.x * 480, c.box.y * 270, c.box.w * 480, c.box.h * 270);
+    if (r.frame.kind === 'yuv') g.putImageData(frameToImage(r.frame, 384, 216), 0, 0); else { g.drawImage(r.frame, 0, 0, 384, 216); r.frame.close(); }
+    g.strokeStyle = colour; g.lineWidth = 2; g.strokeRect(c.box.x * 384, c.box.y * 216, c.box.w * 384, c.box.h * 216);
     const fig = document.createElement('figure'); fig.appendChild(cv);
-    const cap = document.createElement('figcaption'); cap.textContent = `${i + 1} · ${tc(c.inT, m.fps)} – ${tc(c.outT, m.fps)}`; fig.appendChild(cap); th.appendChild(fig);
+    const capTxt = `${i + 1} · ${tc(c.inT, m.fps)} – ${tc(c.outT, m.fps)} · ${attrs(c)}${why(c)}`;
+    const cap = document.createElement('figcaption'); cap.textContent = capTxt; fig.appendChild(cap); box.appendChild(fig);
+    store.push({ cv, cap: capTxt });
   }
   dec.close();
   // one line per run at the top (readable in a small screenshot; Copy as text for the details)
   const how = det === 'model' ? `model ${W}×${H} on ${sessionEp === 'webgpu' ? 'graphics chip' : 'processor'}` : 'image checks';
   const offs = check ? check.rows.filter(r => r.c).flatMap(r => [Math.abs(r.c.inT - r.a), Math.abs(r.c.outT - r.b)].map(v => Math.round(v * m.fps))) : [];
-  const testTxt = check ? `${check.found}/${TRUTH.length} found, ${check.extra.length} extra, in/out off ≤ ${Math.max(...offs)} fr (median ${median(offs)})` : `${final.length} pieces of text`;
+  const testTxt = (check ? `${check.found}/${TRUTH.length} found, ${check.extra.length} extra, in/out off ≤ ${Math.max(...offs)} fr (median ${median(offs)})` : `${final.length} pieces of text`) + `, ${leftOut.length} left out`;
   $('#noRuns')?.remove(); $('#sumText').hidden = false; ['#pics', '#copy', '#savetxt'].forEach(b => $(b).disabled = false);
   $('#summary tbody').insertAdjacentHTML('beforeend', `<tr><td>${file.name}</td><td>${how}</td><td class="n">${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)}</td><td class="n">${fmtDur(totalMs / 1000)}</td><td class="n"><b>${win === 'all' ? fmtDur(est) : '–'}</b></td><td>${check ? (check.found === TRUTH.length && !check.extra.length ? '<span class="ok">' : '<span class="warn">') + testTxt + '</span>' : testTxt}</td></tr>`);
   $('#sumText').value += `${file.name} | ${m.kind} ${m.width}x${m.height} ${fmtDur(m.duration)} | ${how}, every ${step} s | per frame ${fmtMs((tm.frame + tm.image + tm.detect) / tm.n)} (get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find ${fmtMs(tm.detect / tm.n)}) | scan ${samples} fr ${fmtDur(scanMs / 1000)}, in/out ${refineN} fr ${fmtDur(refineMs / 1000)}, total ${fmtDur(totalMs / 1000)}${win === 'all' ? ', 45 min ≈ ' + fmtDur(est) : ''} | ${testTxt}\n`;
@@ -481,8 +569,12 @@ async function runFile(file, det) {
     perFrame: fmtMs((tm.frame + tm.image + tm.detect) / tm.n), total: fmtDur(totalMs / 1000), est: win === 'all' ? fmtDur(est) : '–', testTxt, good: check && check.found === TRUTH.length && !check.extra.length,
     timing: [...card.querySelectorAll('table')[0].querySelectorAll('tr')].slice(1).map(tr => [...tr.children].map(td => td.textContent.trim())),
     check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a, m.fps), tc(r.b, m.fps), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
-    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
-    thumbs: [...th.querySelectorAll('figure')].map(f => ({ cv: f.querySelector('canvas'), cap: f.querySelector('figcaption').textContent })) });
+    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
+    leftOut: leftOut.map((c, i) => [String(i + 1), c.why, (c.approx ? '~' : '') + tc(c.inT, m.fps), (c.approx ? '~' : '') + tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
+    leaveTxt: leave === 'none' ? 'nothing left out' : `left out: ${leave === 'both' ? 'small or moving' : leave} text (small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height, moving = drifts > 1%)`,
+    thumbs, thumbsOut });
+  const thisRun = RUNS[RUNS.length - 1];
+  card.querySelector('.runpics').onclick = () => savePictures([thisRun]);
   window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, 'missed']) } });
 }
 </script>
