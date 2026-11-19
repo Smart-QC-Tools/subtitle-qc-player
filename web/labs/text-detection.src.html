@@ -42,7 +42,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
     <label class="opt">Model size <select id="msize"><option value="640">640 × 352 (faster)</option><option value="960">960 × 544</option></select></label>
     <label class="opt">Model runs on <select id="ep"><option value="auto">graphics chip if possible</option><option value="wasm">processor</option></select></label>
     <label class="opt">One frame every <select id="step"><option>2</option><option>1</option><option>3</option><option>4</option></select> s</label>
-    <label class="opt">Leave out <select id="leave"><option value="both">small or moving text</option><option value="small">small text</option><option value="moving">moving text</option><option value="none">nothing</option></select></label>
+    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, centred (within 12% of the middle): main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label></span>
     <label class="opt" title="Height of the box around one line of text (about twice the height of its capital letters)">Small = line boxes under <select id="minH"><option value="0.02">2%</option><option value="0.03" selected>3%</option><option value="0.04">4%</option><option value="0.05">5%</option></select> of the picture height</label>
     <label class="opt">Look at <select id="win"><option value="all">the whole video</option><option value="1200">the first 20 minutes</option></select></label>
   </div>
@@ -231,7 +231,7 @@ function blocks(boxes) {
 
 // ------------------------------------------------------------ the Harbor Lights test episode: what is really there
 const TRUTH_DURATION = 412.04;
-const TRUTH = [[27.0, 30.0, "THREE WEEKS EARLIER"], [39.5, 44.5, "HARBOR LIGHTS"], [50.0, 53.5, "Starring / ELENA MARCH"], [57.0, 60.5, "Starring / TOMAS REY"], [64.0, 67.5, "Starring / JUNE ADEBAYO"], [71.0, 74.5, "With / PETER LANGLEY"], [78.0, 81.5, "And / MARGIT SOLHEIM"], [85.0, 88.5, "Casting by / RUTH ABELARD"], [92.0, 95.5, "Music by / IVO KARLSSON"], [99.0, 102.5, "Edited by / DANA WHITLOCK"], [113.0, 116.5, "Production Designer / SAM OYELARAN"], [120.0, 123.5, "Director of Photography / LENA HOLT"], [127.0, 130.5, "Produced by / MARK DELACROIX"], [134.0, 137.5, "Executive Producers / NORA FITCH   ALAN BRISCOE"], [141.0, 144.5, "Written by / CLARE DUNMORE"], [148.0, 151.5, "Directed by / OSCAR VALE"], [160.0, 163.0, "HARBOUR OFFICE — 6 40 AM"]];
+const TRUTH = [[27.0, 30.0, "THREE WEEKS EARLIER"], [39.5, 44.5, "HARBOR LIGHTS", "title"], [50.0, 53.5, "Starring / ELENA MARCH"], [57.0, 60.5, "Starring / TOMAS REY"], [64.0, 67.5, "Starring / JUNE ADEBAYO"], [71.0, 74.5, "With / PETER LANGLEY"], [78.0, 81.5, "And / MARGIT SOLHEIM"], [85.0, 88.5, "Casting by / RUTH ABELARD"], [92.0, 95.5, "Music by / IVO KARLSSON"], [99.0, 102.5, "Edited by / DANA WHITLOCK"], [113.0, 116.5, "Production Designer / SAM OYELARAN"], [120.0, 123.5, "Director of Photography / LENA HOLT"], [127.0, 130.5, "Produced by / MARK DELACROIX"], [134.0, 137.5, "Executive Producers / NORA FITCH   ALAN BRISCOE"], [141.0, 144.5, "Written by / CLARE DUNMORE"], [148.0, 151.5, "Directed by / OSCAR VALE"], [160.0, 163.0, "HARBOUR OFFICE — 6 40 AM"]];
 
 // ------------------------------------------------------------ page
 const files = [];
@@ -444,13 +444,16 @@ async function runFile(file, det) {
   cards.push(...active);
   const scanMs = now() - T0, scanN = tm.n;
   // drop logos / burnt-in timecode (on screen for more than 20 s)
-  const leave = $('#leave').value, minH = +$('#minH').value;
-  const leaveSmall = leave === 'both' || leave === 'small', leaveMoving = leave === 'both' || leave === 'moving';
+  const minH = +$('#minH').value, leaveSmall = $('#lvSmall').checked, leaveMoving = $('#lvMoving').checked, leaveTitle = $('#lvTitle').checked;
+  const leave = leaveSmall || leaveMoving || leaveTitle ? 'some' : 'none';
+  // large centred text: main titles and big logos (a subtitle can't avoid them, so they don't matter here)
+  const TITLE_H = 0.08, isTitle = c => c.lh >= TITLE_H && Math.abs(c.box.x + c.box.w / 2 - 0.5) < 0.12;
   const leftOut = [];
   const kept = cards.filter(c => {
     if (pts[c.lastP] - pts[c.firstP] > 20) return false;
     // small text (a map on a screen, a newspaper): left out before the in / out step, with times from the scan only
-    if (leaveSmall && c.lh < minH) { leftOut.push(Object.assign(c, { why: 'small', approx: true, inT: pts[c.firstP], outT: Math.min(m.duration, pts[c.lastP] + step) })); return false; }
+    const why = leaveSmall && c.lh < minH ? 'small' : leaveTitle && isTitle(c) ? 'title' : '';
+    if (why) { leftOut.push(Object.assign(c, { why, approx: true, inT: pts[c.firstP], outT: Math.min(m.duration, pts[c.lastP] + step) })); return false; }
     return true;
   });
   // pieces seen on exactly the same frames, touching: one card, so its in and out are found once
@@ -481,7 +484,7 @@ async function runFile(file, det) {
   // How far it moves while on screen: graphics stay put; text in the scene drifts with the camera. Measured on whichever
   // edge is steadiest (left, centre or right; top, middle or bottom), so text that grows as it's typed on still counts as still.
   const spread = (vals) => Math.max(...vals) - Math.min(...vals);
-  for (const c of groups) {
+  for (const c of [...groups, ...leftOut]) {
     const o = c.obs;
     c.move = o.length < 2 ? 0 : Math.max(
       Math.min(spread(o.map(b => b.x)), spread(o.map(b => b.x + b.w / 2)), spread(o.map(b => b.x + b.w))),
@@ -505,9 +508,13 @@ async function runFile(file, det) {
   // 3. compare with the test episode
   let check = null;
   if (Math.abs(m.duration - TRUTH_DURATION) < 1) {
-    const rows = TRUTH.map(([a, b, txt]) => { const ov = c => Math.min(b, c.outT) - Math.max(a, c.inT); const c = final.filter(c => ov(c) > 0).sort((x, y) => ov(y) - ov(x))[0]; return { a, b, txt, c }; });
+    const rows = TRUTH.map(([a, b, txt, kind]) => {
+      // the main title should be left out as a title (when that's on)
+      if (kind === 'title' && leaveTitle) { const t = leftOut.find(c => c.why === 'title' && c.inT < b && c.outT > a); return { a, b, txt, c: null, title: t, ok: !!t }; }
+      const ov = c => Math.min(b, c.outT) - Math.max(a, c.inT); const c = final.filter(c => ov(c) > 0).sort((x, y) => ov(y) - ov(x))[0]; return { a, b, txt, c, ok: !!c };
+    });
     const extra = final.filter(c => !TRUTH.some(([a, b]) => c.inT < b && c.outT > a));
-    check = { rows, extra, found: rows.filter(r => r.c).length };
+    check = { rows, extra, found: rows.filter(r => r.ok).length };
     log(`test episode: ${check.found} of ${TRUTH.length} found, ${extra.length} extra, ${leftOut.length} left out`);
   }
   // 4. show
@@ -527,7 +534,7 @@ async function runFile(file, det) {
     ${check ? `<h2>Against what's really on screen</h2>
     <div>${check.found === TRUTH.length ? '<span class="ok">All ' + TRUTH.length + ' found.</span>' : `<span class="warn">${check.found} of ${TRUTH.length} found.</span>`} ${check.extra.length ? `<span class="warn">${check.extra.length} extra (text where there is none).</span>` : '<span class="ok">Nothing extra.</span>'}</div>
     <table style="margin-top:6px"><tr><th>Really there</th><th>In</th><th>Out</th><th>Found</th><th class="n">In off by</th><th class="n">Out off by</th></tr>
-    ${check.rows.map(r => `<tr><td>${r.txt}</td><td>${tc(r.a, m.fps)}</td><td>${tc(r.b, m.fps)}</td><td>${r.c ? `${tc(r.c.inT)} – ${tc(r.c.outT)}` : '<span class="err">missed</span>'}</td><td class="n">${r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : ''}</td><td class="n">${r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : ''}</td></tr>`).join('')}
+    ${check.rows.map(r => `<tr><td>${r.txt}</td><td>${tc(r.a, m.fps)}</td><td>${tc(r.b, m.fps)}</td><td>${r.c ? `${tc(r.c.inT)} – ${tc(r.c.outT)}` : r.title ? '<span class="ok">left out as a title</span>' : '<span class="err">missed</span>'}</td><td class="n">${r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : ''}</td><td class="n">${r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : ''}</td></tr>`).join('')}
     </table><div class="dim" style="font-size:12px;margin-top:4px">Each card fades in and out over 0.4 s (about 10 frames), so a few frames either way is expected.</div>` : ''}
     <div class="row" style="justify-content:space-between"><h2>What was found (${final.length})</h2><button class="runpics">Save pictures of this run</button></div>
     <table><tr><th>#</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
@@ -535,7 +542,7 @@ async function runFile(file, det) {
     </table>
     <div class="thumbs keep"></div>
     <h2>Left out (${leftOut.length})</h2>
-    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters) (times only approximate: their in / out wasn't looked for). Moving = drifts more than 1% of the picture while on screen.`}</div>
+    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${TITLE_H * 100}% of the picture height and centred.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.'].filter(Boolean).join(' ')}</div>
     ${leftOut.length ? `<table style="margin-top:6px"><tr><th>#</th><th>Why</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
     ${leftOut.map((c, i) => `<tr><td>${i + 1}</td><td>${c.why}</td><td>${c.approx ? '~' : ''}${tc(c.inT, m.fps)}</td><td>${c.approx ? '~' : ''}${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
     </table>` : ''}
@@ -568,14 +575,14 @@ async function runFile(file, det) {
   RUNS.push({ file: file.name, sub: `${m.kind === 'prores' ? 'ProRes ' + m.fourcc : m.kind.toUpperCase()} · ${m.width}×${m.height} · ${fmtDur(m.duration)} · ${how} · a frame every ${step} s`, how,
     perFrame: fmtMs((tm.frame + tm.image + tm.detect) / tm.n), total: fmtDur(totalMs / 1000), est: win === 'all' ? fmtDur(est) : '–', testTxt, good: check && check.found === TRUTH.length && !check.extra.length,
     timing: [...card.querySelectorAll('table')[0].querySelectorAll('tr')].slice(1).map(tr => [...tr.children].map(td => td.textContent.trim())),
-    check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a, m.fps), tc(r.b, m.fps), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
+    check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a, m.fps), tc(r.b, m.fps), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : r.title ? 'left out as a title' : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
     found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
     leftOut: leftOut.map((c, i) => [String(i + 1), c.why, (c.approx ? '~' : '') + tc(c.inT, m.fps), (c.approx ? '~' : '') + tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
-    leaveTxt: leave === 'none' ? 'nothing left out' : `left out: ${leave === 'both' ? 'small or moving' : leave} text (small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height, moving = drifts > 1%)`,
+    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large centred titles (line box ≥ ${TITLE_H * 100}%, centred)`].filter(Boolean).join(', '),
     thumbs, thumbsOut });
   const thisRun = RUNS[RUNS.length - 1];
   card.querySelector('.runpics').onclick = () => savePictures([thisRun]);
-  window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, 'missed']) } });
+  window.__results = window.__results || []; window.__results.push({ file: file.name, det, W, H, ep: sessionEp, samples, scanMs, refineN, refineMs, totalMs, perFrame: (tm.frame + tm.image + tm.detect) / tm.n, getMs: tm.frame / tm.n, shrinkMs: tm.image / tm.n, detectMs: tm.detect / tm.n, found: final.length, check: check && { found: check.found, extra: check.extra.length, rows: check.rows.map(r => r.c ? [r.txt, Math.round((r.c.inT - r.a) * m.fps), Math.round((r.c.outT - r.b) * m.fps)] : [r.txt, r.title ? 'title' : 'missed']) } });
 }
 </script>
 </body>
