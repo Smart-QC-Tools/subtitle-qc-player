@@ -69,7 +69,13 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Filter bar: buttons only for checks with hits, no dots; selected = soft steel fill, same size as unselected;
   count as a badge; "All issues" (red + amber, not placement/top) first with a divider; zero-hit checks on a
   "✓ Clean: …" line. Mixed align is amber. No "Critical" filter.
-- Limits (Lines 2–4, CPS 3–40 default 20 amber, CPL 10–60): plain blue values, drag or click-to-type.
+- Limits (Lines 2–4, CPS 3–40 default 25 amber only, CPL 10–60): plain blue values, drag or click-to-type.
+  Saved limits carry `v: 2`; older saved ones keep CPL / lines but CPS restarts at 25.
+- Duration (seconds, same at any frame rate; `DUR` in cueinfo.js): amber under 0.65 s or over 7 s, red under 0.45 s or
+  over 10 s. No "very short with a long line" flag any more. Filter buttons count red + amber; Duration is red when
+  any hit is red.
+- Text column: subtitle lines don't wrap; a row whose longest line doesn't fit shrinks just enough (down to 80%);
+  longer still: normal size, wrapped (`evFitText` in events.js).
 - Speeds (J / L): 2× → 4× → 8× both ways.
 - Keys: ←/→ frame, Shift + ←/→ ±5 min (no ±5 s any more), Shift + ↑/↓ start / end of the video (⌥ + arrows: nothing),
   ↑/↓ previous / next event. "Past end" (red, its own filter): event still on screen after the video's last frame
@@ -82,7 +88,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Subtitle info under the player: off by default, toggled by a text button "Show subtitle info" (top right;
   grey, blue on hover / when on); hidden until an event is selected; space stays the same.
 - Conform page: Checks (errors/warnings or ✓ OK) + Notes column (info); File 520px, Type/Label/Detected 170/Checks
-  fixed px, Notes (last) takes the spare width. No ▶ / "Open in player" buttons (the Conform / QC tabs switch stages), no review-status dropdown; "No label" in amber; Detected shows % only when it
+  fixed px, Notes (last) takes the spare width. No ▶ / "Open in player" buttons (the Conform / QC tabs switch stages), no review-status dropdown; "No label" in amber (CC: a grey dash: CC usually has no label and is checked as English, amber
+  "Content looks X" only with enough text; .scc counts as CC); Detected shows % only when it
   matters; title shown large without a "Title" label; one language filter at a time (All default);
   section titles in the detail view all blue. No sticky headers. Type label "CC" (not CC/SDH).
 - Help button orange-tinted. Help modal has a left nav (Keyboard, Waveform & timing, Subtitle checks,

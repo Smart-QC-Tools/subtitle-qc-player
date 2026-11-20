@@ -5,15 +5,20 @@
 // grey = top (neutral).
 
   const QC_LIMITS_KEY = 'qc:limits';
-  let CPS_LIMIT = 20;
+  // CPS default 25 (amber only). Limits saved before that (no "v": 2) keep CPL and lines, but CPS starts again at 25.
+  let CPS_LIMIT = 25;
   (function loadLimits() {
     try {
       const v = JSON.parse(Store.get(QC_LIMITS_KEY) || 'null');
-      if (v && v.cps > 0) CPS_LIMIT = +v.cps;
+      if (v && v.v === 2 && v.cps > 0) CPS_LIMIT = +v.cps;
       if (v && v.cpl > 0) CHAR_LIMIT = +v.cpl;
       if (v && v.lines > 0) LINE_COUNT_THRESHOLD = +v.lines + 1;
     } catch (e) { /* defaults */ }
   })();
+
+  // Time on screen, in seconds (the same at any frame rate): amber = worth a look, red = too short / too long.
+  // At 24 fps: amber at 15 frames or less, red at 10 frames or less.
+  const DUR = { shortWarn: 0.65, shortBad: 0.45, longWarn: 7, longBad: 10 };
 
   // ---------------------------------------------------------------- placement
   const RTL_LANG = /^(ar|he|iw|fa|ur|yi|ps|sd|ug|dv|ckb)\b/i;
@@ -108,6 +113,12 @@
       if (c.chars == null) c.chars = Array.from(c.text.replace(/\n/g, '')).length;
       c.cps = c.duration > 0 ? c.chars / c.duration : null;
       c.cpsOver = c.cps != null && c.cps > CPS_LIMIT + 1e-9;
+      const dur = isFinite(c.end) && isFinite(c.begin) ? c.end - c.begin : null;
+      c.tooShort = dur != null && dur < DUR.shortBad - 1e-6;
+      c.tooLong = dur != null && dur > DUR.longBad + 1e-6;
+      c.shortWarn = dur != null && !c.tooShort && dur < DUR.shortWarn - 1e-6;
+      c.longWarn = dur != null && !c.tooLong && dur > DUR.longWarn + 1e-6;
+      c.tooShortCritical = false;   // (the old "very short with a long line" flag: red under 0.45 s covers it)
       c.charLimitExceeded = c.maxLineLength > CHAR_LIMIT;
       const nx = list[i + 1];
       c.gap = nx && isFinite(c.end) ? nx.begin - c.end : null;
@@ -146,9 +157,8 @@
     if (c.charLimitExceeded) add('chars', `CPL ${c.maxLineLength}`, `Longest line has ${c.maxLineLength} characters (limit ${CHAR_LIMIT})`);
     if (c.lineCount >= LINE_COUNT_THRESHOLD) add('lines', `${c.lineCount} lines`, `${c.lineCount} lines on screen`);
     if (c.overlap) add('overlap', 'Overlap', 'Overlaps another event');
-    if (c.tooShortCritical) add('durationCritical', `${secs(c.duration)}s, long line`, `On screen for only ${c.duration.toFixed(3)}s with a ${c.maxLineLength}-character line`);
-    else if (c.tooShort) add('duration', `Short ${secs(c.duration)}s`, `Under ${SHORT_DURATION_SECONDS}s on screen (${c.duration.toFixed(3)}s)`);
-    else if (c.tooLong) add('duration', `Long ${secs(c.duration)}s`, `Over ${MAX_DURATION_SECONDS}s on screen (${c.duration.toFixed(3)}s)`);
+    if (c.tooShort) add('duration', `Short ${secs(c.duration)}s`, `Under ${DUR.shortBad}s on screen (${c.duration.toFixed(3)}s)`);
+    else if (c.tooLong) add('duration', `Long ${secs(c.duration)}s`, `Over ${DUR.longBad}s on screen (${c.duration.toFixed(3)}s)`);
     if (c.hasSuspiciousChars) add('suspicious', 'Odd char', 'Contains an invisible / control / replacement character');
     if (c.pastEnd) add('pastEnd', 'Past end', `Still on screen after the video ends (the event ends ${formatVideoTC(c.end)}, the video at ${formatVideoTC(c.videoEnd)})`);
     return out;
@@ -157,6 +167,8 @@
   function cueWarns(c) {
     const out = [];
     if (c.mixedAlign) out.push({ key: 'mixed', text: 'Mixed align', title: 'Lines of this event are aligned differently', kind: 'warn' });
+    if (c.shortWarn) out.push({ key: 'duration', text: `Short ${secs(c.duration)}s`, title: `Under ${DUR.shortWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
+    if (c.longWarn) out.push({ key: 'duration', text: `Long ${secs(c.duration)}s`, title: `Over ${DUR.longWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
     if (c.cpsOver) out.push({ key: 'cps', text: `CPS ${c.cps.toFixed(1)}`, title: `Fast: ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`, kind: 'warn' });
     if (!c.gapWarn) return out;
     return [...out, { key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (${formatVideoTC(c.gapNext)}): the subtitle blinks off for a single frame`, kind: 'warn' }];
@@ -190,7 +202,10 @@
     { key: 'chars', get label() { return `CPL > ${CHAR_LIMIT}`; }, cls: 'f-issue', get title() { return `A line longer than ${CHAR_LIMIT} characters`; }, test: c => !!c.charLimitExceeded },
     { key: 'lines', get label() { return `Lines > ${LINE_COUNT_THRESHOLD - 1}`; }, cls: 'f-issue', get title() { return `More than ${LINE_COUNT_THRESHOLD - 1} lines`; }, test: c => c.lineCount >= LINE_COUNT_THRESHOLD },
     { key: 'overlap', label: 'Overlaps', cls: 'f-issue', test: c => !!c.overlap },
-    { key: 'duration', label: 'Duration', cls: 'f-issue', title: `Under ${SHORT_DURATION_SECONDS}s or over ${MAX_DURATION_SECONDS}s on screen`, test: c => !!(c.tooShort || c.tooLong) },
+    // red and amber together; the button is red when any of them is red
+    { key: 'duration', label: 'Duration', get cls() { return cueList.some(c => c.tooShort || c.tooLong) ? 'f-issue' : 'f-warn'; },
+      title: `Short: under ${DUR.shortWarn}s amber, under ${DUR.shortBad}s red · Long: over ${DUR.longWarn}s amber, over ${DUR.longBad}s red`,
+      test: c => !!(c.tooShort || c.tooLong || c.shortWarn || c.longWarn) },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
     { key: 'pastEnd', label: 'Past end', cls: 'f-issue', title: 'Still on screen after the video ends', test: c => !!c.pastEnd },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
@@ -207,7 +222,7 @@
     if (cps > 0) CPS_LIMIT = +cps;
     if (cpl > 0) CHAR_LIMIT = +cpl;
     if (lines > 0) LINE_COUNT_THRESHOLD = +lines + 1;
-    Store.set(QC_LIMITS_KEY, JSON.stringify({ cps: CPS_LIMIT, cpl: CHAR_LIMIT, lines: LINE_COUNT_THRESHOLD - 1 }));
+    Store.set(QC_LIMITS_KEY, JSON.stringify({ v: 2, cps: CPS_LIMIT, cpl: CHAR_LIMIT, lines: LINE_COUNT_THRESHOLD - 1 }));
     if (cueList.length) { finalizeQcFlags(cueList); renderSidebarList(); tlDirty = true; }
     document.dispatchEvent(new CustomEvent('qc-limits'));
   }
