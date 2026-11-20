@@ -1,15 +1,17 @@
 name: Build Mac app
 
+# One build per version: a push to release/x.y.z rebuilds that stable release in place, a push to video-analysis
+# rebuilds the preview. main itself builds nothing (its fixes reach the stable version through release/x.y.z).
 on:
   push:
-    branches: [main, video-analysis, 'release/**']
-    paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'mac/selftest/**', '.github/workflows/selftest.yml']
+    branches: [video-analysis, 'release/**']
+    paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'CLAUDE.md', 'mac/selftest/**', '.github/workflows/selftest.yml']
   workflow_dispatch:
     inputs:
       replace_release:
-        description: On a release/x.y.z branch, rebuild the existing vx.y.z release in place (same download links)
+        description: (no longer needed - a push to release/x.y.z always rebuilds vx.y.z in place)
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
@@ -46,30 +48,17 @@ jobs:
             build/Subtitle-QC-Player.zip
             web/dist/Subtitle_QC_Player.html
 
-      - name: Publish as the latest download (Releases)
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
-            --target "$GITHUB_SHA" \
-            --title "Subtitle QC Player $(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js) — build ${{ github.run_number }}" \
-            --notes "Latest build ($(date -u '+%Y-%m-%d %H:%M UTC'), commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
-
-      # A release/x.y.z branch keeps that version as its own permanent release (tag vx.y.z), which later
-      # builds never replace (only a manual run with replace_release rebuilds it in place). It is not marked
-      # as the latest, so the download page keeps following main.
-      - name: Publish a permanent release for a release branch
+      # A release/x.y.z branch is that version's permanent release (tag vx.y.z): each push rebuilds it in place, so
+      # the download links never change. (The old rolling "latest" release is removed.)
+      - name: Publish the stable release for a release branch
         if: startsWith(github.ref, 'refs/heads/release/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER="${GITHUB_REF_NAME#release/}"
           NOTES="Stable version $VER (commit ${GITHUB_SHA::7}). Mac app: Subtitle-QC-Player.zip. Web version for Chrome: Subtitle_QC_Player.html."
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
           if gh release view "v$VER" >/dev/null 2>&1; then
-            # Only a manual run with replace_release swaps the files of an existing release (links stay the same).
-            [ "${{ inputs.replace_release }}" = "true" ] || { echo "v$VER already exists: left as it is"; exit 0; }
             git tag -f "v$VER" "$GITHUB_SHA" && git push -f origin "refs/tags/v$VER"
             gh release upload "v$VER" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html --clobber
             gh release edit "v$VER" --notes "$NOTES"
