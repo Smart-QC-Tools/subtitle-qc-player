@@ -157,23 +157,38 @@
     if (drop && (nom === 30 || nom === 60)) { const d = nom === 30 ? 2 : 4, mins = h * 60 + m; n -= d * (mins - Math.floor(mins / 10)); }
     return n;
   }
-  // Typed entry: "01:00:12:00", "1:0:12:0", "01;00;12;00", "01001200". Short entries count from the
-  // right and missing digits are zeros: "1200" and "12:00" both mean 00:00:12:00.
-  function parseTypedTC(str, cur) {
+  // Typed timecodes (playhead box and offset field), the user's rule: 1-2 digits = seconds, 3-4 = minutes:seconds
+  // ("0130" = 1 min 30 s), 5-6 = minutes:seconds:frames, 7-8 = hh:mm:ss:ff. With colons (or ; .) the same by the
+  // number of parts: 1:30 = m:ss, 1:30:12 = m:ss:ff, 1:00:00:00 = the full timecode.
+  // Returns [h, m, s, f] and whether hours were typed, or null (not digits / too many).
+  function parseTypedTC(str) {
     str = (str || '').trim();
     let parts;
-    if (/^\d+$/.test(str)) { if (str.length > 8) return null; const p = str.padStart(Math.ceil(str.length / 2) * 2, '0'); parts = p.match(/\d\d/g); }
-    else if (/^\d{1,2}([:;.]\d{1,2}){0,3}$/.test(str)) parts = str.split(/[:;.]/);
-    else return null;
-    if (parts.length > 4) return null;
-    return ['0', '0', '0', '0'].slice(0, 4 - parts.length).concat(parts).map(Number);
+    if (/^\d+$/.test(str)) {
+      const n = str.length, two = (q, k) => +q.slice(k, k + 2);
+      if (n <= 2) parts = [0, 0, +str, 0];
+      else if (n <= 4) { const q = str.padStart(4, '0'); parts = [0, two(q, 0), two(q, 2), 0]; }
+      else if (n <= 6) { const q = str.padStart(6, '0'); parts = [0, two(q, 0), two(q, 2), two(q, 4)]; }
+      else if (n <= 8) { const q = str.padStart(8, '0'); return { parts: [two(q, 0), two(q, 2), two(q, 4), two(q, 6)], hours: true }; }
+      else return null;
+      return { parts, hours: false };
+    }
+    if (!/^\d{1,2}([:;.]\d{1,2}){0,3}$/.test(str)) return null;
+    const a = str.split(/[:;.]/).map(Number);
+    if (a.length === 4) return { parts: a, hours: true };
+    return { parts: a.length === 1 ? [0, 0, a[0], 0] : a.length === 2 ? [0, a[0], a[1], 0] : [0, a[0], a[1], a[2]], hours: false };
   }
+  const tcInRange = ([h, m, s, f], nom) => h <= 23 && m <= 59 && s <= 59 && f < nom;
   // Returns true (moved), false (no video) or 'bad' (not a valid timecode).
+  // Hours not typed: the hour the playhead is in now (a video's timecode usually starts at 01:00:00:00).
   function goToTypedTC() {
-    const v = parseTypedTC(tcDisplay.textContent);
+    const r = parseTypedTC(tcDisplay.textContent);
     const nom = vmeta.tcFps || Math.round(fps());
     if (!video || !video.currentSrc) return false;
-    if (!v || v[0] > 23 || v[1] > 59 || v[2] > 59 || v[3] >= nom) return 'bad';
+    if (!r) return 'bad';
+    const v = r.parts.slice();
+    if (!r.hours) v[0] = +(timecodeAt(currentFrame()).split(/[:;]/)[0]) || 0;
+    if (!tcInRange(v, nom)) return 'bad';
     const target = tcToFrames(v[0], v[1], v[2], v[3], nom, vmeta.dropFrame);
     const last = Math.floor(((tlDuration() || 0) - 0.001) * fps());
     const n = Math.max(0, Math.min(last, target));
@@ -914,30 +929,13 @@
     // The first click selects the value; typing replaces it with just what you type (digits, colons optional).
     // Enter, Tab or clicking away applies it (an invalid one flashes red and the previous value stays); Esc cancels.
     // Short entries count from the right, missing digits are zeros ("1200" -> 00:00:12:00).
-    // Short entries: 1-2 digits = seconds, 3-4 = minutes:seconds, 5-6 = minutes:seconds:frames, 7-8 = the full
-    // hh:mm:ss:ff ("0130" -> 00:01:30:00, "13012" -> 00:01:30:12). With colons the same: 1:30 = m:ss, 1:30:12 = m:ss:ff.
-    // Returns { tc } or { err } (what is wrong, in words).
+    // Short entries as in parseTypedTC (hours not typed = 00 here). Returns { tc } or { err }.
     const parseEntry = (str) => {
       str = (str || '').trim();
       const neg = /^-/.test(str); str = str.replace(/^[-+]/, '');
-      let parts;
-      if (/^\d+$/.test(str)) {
-        const n = str.length, two = (q, k) => +q.slice(k, k + 2);
-        if (n <= 2) parts = [0, 0, +str, 0];
-        else if (n <= 4) { const q = str.padStart(4, '0'); parts = [0, two(q, 0), two(q, 2), 0]; }
-        else if (n <= 6) { const q = str.padStart(6, '0'); parts = [0, two(q, 0), two(q, 2), two(q, 4)]; }
-        else if (n <= 8) { const q = str.padStart(8, '0'); parts = [two(q, 0), two(q, 2), two(q, 4), two(q, 6)]; }
-        else return { err: 'too many digits (8 at most: hh mm ss ff)' };
-      } else if (/^\d{1,2}([:;.]\d{1,2}){0,3}$/.test(str)) {
-        const a = str.split(/[:;.]/).map(Number);
-        parts = a.length === 1 ? [0, 0, a[0], 0] : a.length === 2 ? [0, a[0], a[1], 0] : a.length === 3 ? [0, a[0], a[1], a[2]] : a;
-      } else return { err: 'type digits, with or without colons' };
-      const [h, mi, se, fr] = parts;
-      if (h > 23) return { err: 'hours go up to 23' };
-      if (mi > 59) return { err: 'minutes go up to 59' };
-      if (se > 59) return { err: 'seconds go up to 59' };
-      if (fr >= nominal()) return { err: `frames go up to ${nominal() - 1} at ${nominal()} fps` };
-      return { tc: (neg ? '-' : '') + parts.map(x => String(x).padStart(2, '0')).join(':') };
+      const r = parseTypedTC(str);
+      if (!r || !tcInRange(r.parts, nominal())) return { err: 'invalid' };
+      return { tc: (neg ? '-' : '') + r.parts.map(x => String(x).padStart(2, '0')).join(':') };
     };
     // A bad entry: "Invalid value" just above the field (the status line isn't shown on the QC page).
     const offTip = fieldTip(el, false);
