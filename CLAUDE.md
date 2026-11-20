@@ -78,8 +78,10 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Text column: subtitle lines don't wrap; a row whose longest line doesn't fit shrinks just enough (down to 80%);
   longer still: normal size, wrapped (`evFitText` in events.js).
 - Speeds (J / L): 2× → 4× → 8× both ways.
-- Offset field: first click selects; typing replaces (digits, colons optional, short entries count from the right);
-  Enter, Tab or clicking away applies and remembers it for the video; Esc cancels; invalid flashes red and is dropped.
+- Offset field: first click selects; typing replaces (colons optional). Digits: 1-2 = ss, 3-4 = mm:ss (0130 = 1 min
+  30 s), 5-6 = mm:ss:ff, 7-8 = hh:mm:ss:ff (user's rule; the playhead go-to box still counts from the right).
+  Enter, Tab or clicking away applies and remembers it for the video; Esc cancels; a bad entry keeps the old value and
+  shows a red message under the field for 6 s ("seconds go up to 59").
 - Keys: ←/→ frame, Shift + ←/→ ±5 min (no ±5 s any more), Shift + ↑/↓ start / end of the video (⌥ + arrows: nothing),
   ↑/↓ previous / next event. "Past end" (red, its own filter): event still on screen after the video's last frame
   (QC page only; `requalify()` re-checks when the video's length or the offset changes).
