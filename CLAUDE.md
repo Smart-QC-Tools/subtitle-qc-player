@@ -157,14 +157,16 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   rejected (6× extra hits on real footage); PP-OCRv4 det model on WebGPU ≈ 33 ms/frame, a 45-min episode ≈ 2–5 min.
   User decisions: all text matters (lower thirds, burnt-in subs), except small text, text moving with the camera
   (screens, maps, signs) and large centred main titles (line box ≥ 8%, centred), which are left out (listed separately).
-  Status (2026-11-20, user testing at work): lab build 10. Rules: small = line box < 3%; moving = drifts > 1%
+  Status (2026-11-20, user testing at work): lab build 11. Rules: small = line box < 3%; moving = drifts > 1%
   (whole sightings only, extremes ignored); title = line box ≥ 8% in the middle both ways, or ≥ 14% anywhere.
   scene = part of the shot: the picture cuts (32×18 luma change outside the box ≥ 20) both at its in and its out, and it
   stays out of the bottom quarter (a full-screen news insert at the bottom is kept: the user wants it flagged).
   Scene exception needs the box ≥ 30% wide too (a POLICE badge on a vest is not kept). Build 9 adds: faint = contrast
-  < 140 or sharpness < 30% (LAO credits/captions: 233–255 / 45–51%; scene text lower); end credits = the run of text
-  reaching the last minute, walking back while pauses stay ≤ 8 s (≥ 3 pieces, last 5 min, videos ≥ 10 min; user: end
-  credits almost never matter, but a fixed "last 2 min" could swallow a real caption just before them). Contrast / sharpness and the thumbnail are
+  < 140 or sharpness < 30% (LAO credits/captions: 233–255 / 45–51%; scene text lower); end credits = walking back from the
+  end, credit-like pieces (2+ lines over black, outside-box luma < 30) join while pauses stay ≤ 8 s; the first piece
+  that isn't credit-like stops it ("To be continued…" just before the credits is common and may be subtitled: kept);
+  anything after the run's start goes too (end logos); ≥ 3 credit-like pieces, last 5 min, videos ≥ 10 min. When
+  unsure, nothing is left out (user: end credits staying in is acceptable). Contrast / sharpness and the thumbnail are
   taken on a frame where the text was seen (the middle of a merged piece can fall between two cards).
   On LAO-21-M2701 (Law & Order SVU) all 28 end-of-opening credits kept; animated title-sequence names left out as
   moving; back-to-back cards in one spot merge into one piece. Proposed next (not yet agreed): use this engine for a
