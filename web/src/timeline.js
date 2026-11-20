@@ -892,14 +892,46 @@
     // The first click selects the value; typing replaces it with just what you type (digits, colons optional).
     // Enter, Tab or clicking away applies it (an invalid one flashes red and the previous value stays); Esc cancels.
     // Short entries count from the right, missing digits are zeros ("1200" -> 00:00:12:00).
+    // Short entries: 1-2 digits = seconds, 3-4 = minutes:seconds, 5-6 = minutes:seconds:frames, 7-8 = the full
+    // hh:mm:ss:ff ("0130" -> 00:01:30:00, "13012" -> 00:01:30:12). With colons the same: 1:30 = m:ss, 1:30:12 = m:ss:ff.
+    // Returns { tc } or { err } (what is wrong, in words).
     const parseEntry = (str) => {
       str = (str || '').trim();
       const neg = /^-/.test(str); str = str.replace(/^[-+]/, '');
-      const v = parseTypedTC(str);
-      if (!v) return null;
-      const out = (neg ? '-' : '') + v.map(n => String(n).padStart(2, '0')).join(':');
-      return valid(out) ? out : null;
+      let parts;
+      if (/^\d+$/.test(str)) {
+        const n = str.length, two = (q, k) => +q.slice(k, k + 2);
+        if (n <= 2) parts = [0, 0, +str, 0];
+        else if (n <= 4) { const q = str.padStart(4, '0'); parts = [0, two(q, 0), two(q, 2), 0]; }
+        else if (n <= 6) { const q = str.padStart(6, '0'); parts = [0, two(q, 0), two(q, 2), two(q, 4)]; }
+        else if (n <= 8) { const q = str.padStart(8, '0'); parts = [two(q, 0), two(q, 2), two(q, 4), two(q, 6)]; }
+        else return { err: 'too many digits (8 at most: hh mm ss ff)' };
+      } else if (/^\d{1,2}([:;.]\d{1,2}){0,3}$/.test(str)) {
+        const a = str.split(/[:;.]/).map(Number);
+        parts = a.length === 1 ? [0, 0, a[0], 0] : a.length === 2 ? [0, a[0], a[1], 0] : a.length === 3 ? [0, a[0], a[1], a[2]] : a;
+      } else return { err: 'type digits, with or without colons' };
+      const [h, mi, se, fr] = parts;
+      if (h > 23) return { err: 'hours go up to 23' };
+      if (mi > 59) return { err: 'minutes go up to 59' };
+      if (se > 59) return { err: 'seconds go up to 59' };
+      if (fr >= nominal()) return { err: `frames go up to ${nominal() - 1} at ${nominal()} fps` };
+      return { tc: (neg ? '-' : '') + parts.map(x => String(x).padStart(2, '0')).join(':') };
     };
+    // A clear red message under the field for a bad entry (the previous value stays); gone after a few seconds.
+    const offSt = document.getElementById('offsetStatus');
+    let errTimer = 0, errPrev = null;
+    function badEntry(typed, why) {
+      flash();
+      if (!offSt) return;
+      if (errPrev == null) errPrev = { text: offSt.textContent, err: offSt.classList.contains('err') };
+      offSt.textContent = `“${typed}” isn't a valid offset: ${why}. Kept ${lastGood}.`;
+      offSt.classList.add('err');
+      clearTimeout(errTimer);
+      errTimer = setTimeout(() => {
+        if (errPrev) { offSt.textContent = errPrev.text; offSt.classList.toggle('err', errPrev.err); errPrev = null; }
+      }, 6000);
+    }
+    function clearBad() { if (errPrev) { clearTimeout(errTimer); offSt.textContent = errPrev.text; offSt.classList.toggle('err', errPrev.err); errPrev = null; } }
     let editing = false, cancelled = false;
     // The browser's own 'change' (fired on blur while typing) must not apply a half-typed value;
     // only Enter (commit) applies it.
@@ -911,18 +943,19 @@
     el.addEventListener('focus', () => { atFocus = raw.get(); editing = false; cancelled = false; });
     el.addEventListener('blur', () => {
       if (editing && !cancelled) {
-        const v = parseEntry(raw.get());
-        if (v) { raw.set(v); editing = false; commit(); return; }
-        flash();
+        const typed = raw.get().trim(), r = parseEntry(typed);
+        if (r.tc) { clearBad(); raw.set(r.tc); editing = false; commit(); return; }
+        if (typed) badEntry(typed, r.err);
       }
       raw.set(lastGood); editing = false; el.classList.remove('err');
     });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const v = editing ? parseEntry(raw.get()) : raw.get();
-        if (!v) { el.blur(); return; }   // invalid entry: keep the previous value
-        raw.set(v); editing = false; commit(); el.blur(); return;
+        if (!editing) { el.blur(); return; }
+        const typed = raw.get().trim(), r = parseEntry(typed);
+        if (!r.tc) { if (typed) badEntry(typed, r.err); editing = false; el.blur(); return; }   // bad: previous value stays
+        clearBad(); raw.set(r.tc); editing = false; commit(); el.blur(); return;
       }
       if (e.key === 'Escape') { e.preventDefault(); cancelled = true; el.blur(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;   // shortcuts, arrows, backspace
