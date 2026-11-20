@@ -17,11 +17,12 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 
 ## Branches, versions, releases
 - `main`: stable line (1.0.x). `APP_VERSION` in `web/src/config.js` (currently 1.0.0).
-- `release/1.0.0`: permanent stable 1.0.0 → release `v1.0.0` (never replaced by normal pushes;
-  manual workflow input `replace_release` rebuilds it in place).
+- `release/1.0.0`: permanent stable 1.0.0 → release `v1.0.0`; every push there rebuilds v1.0.0 in place (same links).
+  Stable fix flow: commit on main, push main (no build), merge main into video-analysis (preview build), cherry-pick
+  onto release/1.0.0 (drop CLAUDE.md, which that branch doesn't have) and push (v1.0.0 build). One build per version.
 - `video-analysis`: work in progress → pre-release `analysis-preview` ("Video analysis 1.1.0 — test build N"; preview.html shows "VERSION 1.1.0 · BUILD N").
   When done: merge to main, release as 1.1.0, point the main download page at it.
-- `latest` release = rolling build of main. Build: `.github/workflows/build.yml` (macos-15).
+- No "latest" release any more (the user wants only 1.0.0 and the 1.1.0 preview). Build: `.github/workflows/build.yml` (macos-15).
   `selftest.yml` (manual) runs the Mac app against generated ProRes/H.264/HEVC media.
 - Mac bundle ID: `com.smartqctools.subtitleqc`. App is ad-hoc signed, not sandboxed. Never touches the network:
   web requests blocked (content rules), no CDN fallback for imscJS (bundled), no URLSession; Web Inspector only
