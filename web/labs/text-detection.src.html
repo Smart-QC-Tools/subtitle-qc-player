@@ -42,7 +42,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
     <label class="opt">Model size <select id="msize"><option value="640">640 × 352 (faster)</option><option value="960">960 × 544</option></select></label>
     <label class="opt">Model runs on <select id="ep"><option value="auto">graphics chip if possible</option><option value="wasm">processor</option></select></label>
     <label class="opt">One frame every <select id="step"><option>2</option><option>1</option><option>3</option><option>4</option></select> s</label>
-    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, in the middle of the picture across (within 12%) and up / down (within 20%), or at least 14% anywhere: main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label></span>
+    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, in the middle of the picture across (within 12%) and up / down (within 20%), or at least 14% anywhere: main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label> <label class="opt" title="Text that is part of the shot (signs, screens, logos on a set): it appears on a cut and disappears on a cut"><input type="checkbox" id="lvScene" checked> in the picture (comes and goes on cuts)</label></span>
     <label class="opt" title="Height of the box around one line of text (about twice the height of its capital letters)">Small = line boxes under <select id="minH"><option value="0.02">2%</option><option value="0.03" selected>3%</option><option value="0.04">4%</option><option value="0.05">5%</option></select> of the picture height</label>
     <label class="opt">Look at <select id="win"><option value="all">the whole video</option><option value="1200">the first 20 minutes</option></select></label>
   </div>
@@ -207,6 +207,31 @@ function detectImage(img, thr = 70) {
   return boxes;
 }
 
+// ------------------------------------------------------------ how a piece of text looks (contrast, sharpness)
+function lookOf(frame, box) {
+  let L, w, h;
+  if (frame.kind === 'yuv') {
+    const p = frame, sh = p.bits - 8, x0 = Math.max(0, Math.floor(box.x * p.w)), y0 = Math.max(0, Math.floor(box.y * p.h));
+    w = Math.min(p.w - x0, Math.ceil(box.w * p.w)); h = Math.min(p.h - y0, Math.ceil(box.h * p.h));
+    L = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) L[y * w + x] = ((p.Y[(y0 + y) * p.ys + x0 + x] >> sh) - 16) * 255 / 219;
+  } else {
+    const FW = frame.displayWidth, FH = frame.displayHeight, x0 = Math.max(0, Math.floor(box.x * FW)), y0 = Math.max(0, Math.floor(box.y * FH));
+    w = Math.max(1, Math.min(FW - x0, Math.ceil(box.w * FW))); h = Math.max(1, Math.min(FH - y0, Math.ceil(box.h * FH)));
+    const c = new OffscreenCanvas(w, h), g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(frame, x0, y0, w, h, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data; L = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) L[i] = (d[4 * i] * 54 + d[4 * i + 1] * 183 + d[4 * i + 2] * 19) / 256;
+  }
+  if (w < 4 || h < 4) return null;
+  const sorted = Float32Array.from(L).sort(), contrast = sorted[Math.floor(sorted.length * 0.98)] - sorted[Math.floor(sorted.length * 0.02)];
+  const grads = [];
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x; grads.push(Math.max(Math.abs(L[i + 1] - L[i - 1]), Math.abs(L[i + w] - L[i - w])) / 2); }
+  grads.sort((a, b) => b - a);
+  const top = grads.slice(0, Math.max(1, Math.floor(grads.length * 0.05))), edge = top.reduce((a, b) => a + b, 0) / top.length;
+  return { contrast: Math.round(contrast), sharp: contrast > 1 ? Math.round(Math.min(100, edge / contrast * 100)) : 0 };
+}
+
 // ------------------------------------------------------------ from boxes to cards
 const overlap = (a, b) => { const ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y); if (ix <= 0 || iy <= 0) return 0; return ix * iy / Math.min(a.w * a.h, b.w * b.h); };
 const union = (a, b) => { const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }; };
@@ -367,10 +392,10 @@ function fullText() {
       out.push('', r.check.head, `${pad('Really there', 46)}${pad('In', 9)}${pad('Out', 9)}${pad('Found', 22)}${pad('In off', 8, 1)}${pad('Out off', 9, 1)}`);
       r.check.rows.forEach(c => out.push(`${pad(c[0].length > 44 ? c[0].slice(0, 43) + '…' : c[0], 46)}${pad(c[1], 9)}${pad(c[2], 9)}${pad(c[3], 22)}${pad(c[4], 8, 1)}${pad(c[5], 9, 1)}`));
     }
-    out.push('', `What was found (${r.found.length}):`, `   #  In        Out         Length  Height  Moves  Where (x, y, width, height)`);
-    r.found.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${f[1]} – ${f[2]}  ${pad(f[3], 7, 1)}  ${pad(f[4], 6, 1)}  ${pad(f[5], 5, 1)}  ${f[6]}`));
+    out.push('', `What was found (${r.found.length}):`, `   #  In        Out         Length  Height  Moves  Change in/out  Contrast/sharp  Where (x, y, width, height)`);
+    r.found.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${f[1]} – ${f[2]}  ${pad(f[3], 7, 1)}  ${pad(f[4], 6, 1)}  ${pad(f[5], 5, 1)}  ${pad(f[6], 13, 1)}  ${pad(f[7], 14, 1)}  ${f[8]}`));
     out.push('', `Left out (${r.leftOut.length}): ${r.leaveTxt}`);
-    r.leftOut.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${pad(f[1], 7)} ${f[2]} – ${f[3]}  ${pad(f[4], 7, 1)}  ${pad(f[5], 6, 1)}  ${pad(f[6], 5, 1)}  ${f[7]}`));
+    r.leftOut.forEach(f => out.push(`${pad(f[0], 4, 1)}  ${pad(f[1], 7)} ${f[2]} – ${f[3]}  ${pad(f[4], 7, 1)}  ${pad(f[5], 6, 1)}  ${pad(f[6], 5, 1)}  ${pad(f[7], 13, 1)}  ${pad(f[8], 14, 1)}  ${f[9]}`));
   });
   return out.join('\n') + '\n';
 }
@@ -414,7 +439,36 @@ async function runFile(file, det) {
     if (!r.frame) return null;
     t = now(); const img = frameToImage(r.frame, W, H); if (timed) tm.image += now() - t;
     if (r.frame.close) r.frame.close();
+    if (!lumaThumbs.has(p)) lumaThumbs.set(p, thumbOf(img));
     return img;
+  };
+  // A 32 × 18 brightness thumbnail of every frame looked at, to tell whether the picture cuts where text comes or goes.
+  const lumaThumbs = new Map();
+  const thumbOf = img => {
+    const t = new Float32Array(32 * 18), n = new Uint16Array(32 * 18), d = img.data;
+    for (let y = 0; y < img.height; y += 2) for (let x = 0; x < img.width; x += 2) {
+      const k = Math.floor(y * 18 / img.height) * 32 + Math.floor(x * 32 / img.width), o = 4 * (y * img.width + x);
+      t[k] += (d[o] * 54 + d[o + 1] * 183 + d[o + 2] * 19) >> 8; n[k]++;
+    }
+    for (let k = 0; k < t.length; k++) t[k] /= n[k] || 1;
+    return t;
+  };
+  // How much the picture changes between two frames, outside the text (mean brightness difference, 0–255).
+  // A cut changes everything (typically 30+); a fade, a dissolve or text popping on over a steady shot, very little.
+  const CUT = 20, SUB_ZONE = 0.75;
+  const changeBetween = async (pa, pb, box) => {
+    if (pa < 0 || pb >= pts.length) return 0;
+    if (!lumaThumbs.has(pa)) await grab(pa); if (!lumaThumbs.has(pb)) await grab(pb);
+    const a = lumaThumbs.get(pa), b = lumaThumbs.get(pb);
+    if (!a || !b) return 0;
+    const g = { x: box.x - 0.03, y: box.y - 0.03, w: box.w + 0.06, h: box.h + 0.06 };
+    let sum = 0, cnt = 0;
+    for (let y = 0; y < 18; y++) for (let x = 0; x < 32; x++) {
+      const cx = (x + 0.5) / 32, cy = (y + 0.5) / 18;
+      if (cx > g.x && cx < g.x + g.w && cy > g.y && cy < g.y + g.h) continue;
+      sum += Math.abs(a[y * 32 + x] - b[y * 32 + x]); cnt++;
+    }
+    return cnt ? sum / cnt : 0;
   };
   const find = async (img, thr, near) => {
     if (!img) return [];
@@ -444,8 +498,8 @@ async function runFile(file, det) {
   cards.push(...active);
   const scanMs = now() - T0, scanN = tm.n;
   // drop logos / burnt-in timecode (on screen for more than 20 s)
-  const minH = +$('#minH').value, leaveSmall = $('#lvSmall').checked, leaveMoving = $('#lvMoving').checked, leaveTitle = $('#lvTitle').checked;
-  const leave = leaveSmall || leaveMoving || leaveTitle ? 'some' : 'none';
+  const minH = +$('#minH').value, leaveSmall = $('#lvSmall').checked, leaveMoving = $('#lvMoving').checked, leaveTitle = $('#lvTitle').checked, leaveScene = $('#lvScene').checked;
+  const leave = leaveSmall || leaveMoving || leaveTitle || leaveScene ? 'some' : 'none';
   // large centred text: main titles and big logos (a subtitle can't avoid them, so they don't matter here)
   // a title sits in the middle of the picture both ways; big credits along the bottom are credits, not titles
   const TITLE_H = 0.08, HUGE_H = 0.14, isTitle = c => c.lh >= HUGE_H || (c.lh >= TITLE_H && Math.abs(c.box.x + c.box.w / 2 - 0.5) < 0.12 && Math.abs(c.box.y + c.box.h / 2 - 0.5) < 0.2);
@@ -477,8 +531,13 @@ async function runFile(file, det) {
     let lo = c.beforeP == null ? -1 : c.beforeP, hi = c.firstP;
     while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (await present(mid)) hi = mid; else lo = mid; }
     c.inP = hi;
+    c.cutIn = await changeBetween(lo, hi, c.box);           // the picture just before the text vs. its first frame
     lo = c.lastP; let hi2 = c.afterP == null ? pts.length : c.afterP;
     while (hi2 - lo > 1) { const mid = (lo + hi2) >> 1; if (await present(mid)) lo = mid; else hi2 = mid; }
+    c.cutOut = await changeBetween(lo, hi2, c.box);         // its last frame vs. the picture just after
+    // comes and goes on cuts: part of the shot. Kept all the same when it reaches into the bottom quarter, where
+    // subtitles go (a news insert filling the picture, a caption on a screen in close-up).
+    c.scene = c.cutIn >= CUT && c.cutOut >= CUT && c.box.y + c.box.h < SUB_ZONE;
     c.outT = hi2 < pts.length ? pts[hi2] : m.duration; c.inT = pts[c.inP];
   }
   const refineMs = now() - T1, refineN = tm.n - scanN;
@@ -502,12 +561,23 @@ async function runFile(file, det) {
   for (let i = 0; i < final.length; i++) for (let j = i + 1; j < final.length; j++) {
     const c = final[i], o = final[j], both = Math.min(o.outT, c.outT) - Math.max(o.inT, c.inT);
     if (both < Math.min(c.outT - c.inT, o.outT - o.inT) * 0.7 || !overlap(grown(c.box), o.box)) continue;
-    c.box = union(c.box, o.box); c.inT = Math.min(c.inT, o.inT); c.outT = Math.max(c.outT, o.outT); c.lh = Math.max(c.lh, o.lh); c.move = Math.min(c.move, o.move); final.splice(j, 1); j = i;
+    c.box = union(c.box, o.box); c.inT = Math.min(c.inT, o.inT); c.outT = Math.max(c.outT, o.outT); c.lh = Math.max(c.lh, o.lh); c.move = Math.min(c.move, o.move); c.scene = c.scene && o.scene; c.cutIn = Math.min(c.cutIn, o.cutIn); c.cutOut = Math.min(c.cutOut, o.cutOut); final.splice(j, 1); j = i;
   }
+  if (leaveScene) final = final.filter(c => !c.scene || !leftOut.push(Object.assign(c, { why: 'scene' })));
   if (leaveMoving) final = final.filter(c => c.move <= 0.01 || !leftOut.push(Object.assign(c, { why: 'moving' })));
   leftOut.sort((a, b) => a.inT - b.inT);
-  const attrs = c => `${(c.lh * 100).toFixed(1)}%`, moveTxt = c => c.moveN < 2 ? '–' : (c.move * 100).toFixed(1) + '%';
+  const attrs = c => `${(c.lh * 100).toFixed(1)}%`, moveTxt = c => c.moveN < 2 ? '–' : (c.move * 100).toFixed(1) + '%', cutTxt = c => c.cutIn == null ? '–' : `${Math.round(c.cutIn)} / ${Math.round(c.cutOut)}`, lookTxt = c => c.look ? `${c.look.contrast} / ${c.look.sharp}%` : '–';
   const totalMs = now() - T0;
+  // Contrast and sharpness inside each piece's box, on the full-size frame in the middle of it (not timed; only shown,
+  // to see whether they tell graphics from text in the scene). Contrast: brightest minus darkest (2nd–98th
+  // percentile, 0–255). Sharp: how steep the edges are compared with that contrast (higher = crisper; crisp graphics ≈ 45%).
+  for (const [i, c] of [...final, ...leftOut].entries()) {
+    if (i % 10 === 0) $('#status').textContent = `${file.name}: measuring contrast, ${i} of ${final.length + leftOut.length}…`;
+    const r = await dec.frameAt(posAt(c.approx ? pts[c.firstP] : (c.inT + c.outT) / 2));
+    if (!r.frame) continue;
+    c.look = lookOf(r.frame, c.box);
+    if (r.frame.close) r.frame.close();
+  }
   log(`scan: ${samples} frames in ${fmtDur(scanMs / 1000)} · refine: ${refineN} frames in ${fmtDur(refineMs / 1000)} · per frame: get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find text ${fmtMs(tm.detect / tm.n)} · ${final.length} pieces of text`);
 
   // 3. compare with the test episode
@@ -542,14 +612,14 @@ async function runFile(file, det) {
     ${check.rows.map(r => `<tr><td>${r.txt}</td><td>${tc(r.a, m.fps)}</td><td>${tc(r.b, m.fps)}</td><td>${r.c ? `${tc(r.c.inT)} – ${tc(r.c.outT)}` : r.title ? '<span class="ok">left out as a title</span>' : '<span class="err">missed</span>'}</td><td class="n">${r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : ''}</td><td class="n">${r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : ''}</td></tr>`).join('')}
     </table><div class="dim" style="font-size:12px;margin-top:4px">Each card fades in and out over 0.4 s (about 10 frames), so a few frames either way is expected.</div>` : ''}
     <div class="row" style="justify-content:space-between"><h2>What was found (${final.length})</h2><button class="runpics">Save pictures of this run</button></div>
-    <table><tr><th>#</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
-    ${final.map((c, i) => `<tr><td>${i + 1}</td><td>${tc(c.inT, m.fps)}</td><td>${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
+    <table><tr><th>#</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th class="n" title="How much the picture changes when the text comes / goes (a cut: ${CUT} or more)">Change in / out</th><th class="n" title="Contrast (0–255) / sharpness of the lettering (higher = crisper; crisp graphics ≈ 45%)">Contrast / sharp</th><th>Where (x, y, width, height)</th></tr>
+    ${final.map((c, i) => `<tr><td>${i + 1}</td><td>${tc(c.inT, m.fps)}</td><td>${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="n">${cutTxt(c)}</td><td class="n">${lookTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
     </table>
     <div class="thumbs keep"></div>
     <h2>Left out (${leftOut.length})</h2>
-    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${Math.round(TITLE_H * 100)}% of the picture height in the middle of the picture (across and up / down), or at least ${Math.round(HUGE_H * 100)}% anywhere.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.'].filter(Boolean).join(' ')}</div>
-    ${leftOut.length ? `<table style="margin-top:6px"><tr><th>#</th><th>Why</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th>Where (x, y, width, height)</th></tr>
-    ${leftOut.map((c, i) => `<tr><td>${i + 1}</td><td>${c.why}</td><td>${c.approx ? '~' : ''}${tc(c.inT, m.fps)}</td><td>${c.approx ? '~' : ''}${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
+    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${Math.round(TITLE_H * 100)}% of the picture height in the middle of the picture (across and up / down), or at least ${Math.round(HUGE_H * 100)}% anywhere.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.', leaveScene && `Scene = in the picture: the picture cuts both when it comes and when it goes (change ${CUT} or more both times), and it stays out of the bottom quarter, where subtitles go.`].filter(Boolean).join(' ')}</div>
+    ${leftOut.length ? `<table style="margin-top:6px"><tr><th>#</th><th>Why</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th class="n" title="How much the picture changes when the text comes / goes (a cut: ${CUT} or more)">Change in / out</th><th class="n" title="Contrast (0–255) / sharpness of the lettering (higher = crisper; crisp graphics ≈ 45%)">Contrast / sharp</th><th>Where (x, y, width, height)</th></tr>
+    ${leftOut.map((c, i) => `<tr><td>${i + 1}</td><td>${c.why}</td><td>${c.approx ? '~' : ''}${tc(c.inT, m.fps)}</td><td>${c.approx ? '~' : ''}${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="n">${cutTxt(c)}</td><td class="n">${lookTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
     </table>` : ''}
     <div class="thumbs out"></div>`;
   // pictures of what was found (not timed)
@@ -581,9 +651,9 @@ async function runFile(file, det) {
     perFrame: fmtMs((tm.frame + tm.image + tm.detect) / tm.n), total: fmtDur(totalMs / 1000), est: win === 'all' ? fmtDur(est) : '–', testTxt, good: check && check.found === TRUTH.length && !check.extra.length,
     timing: [...card.querySelectorAll('table')[0].querySelectorAll('tr')].slice(1).map(tr => [...tr.children].map(td => td.textContent.trim())),
     check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a, m.fps), tc(r.b, m.fps), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : r.title ? 'left out as a title' : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
-    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
-    leftOut: leftOut.map((c, i) => [String(i + 1), c.why, (c.approx ? '~' : '') + tc(c.inT, m.fps), (c.approx ? '~' : '') + tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
-    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large titles (line box ≥ ${Math.round(TITLE_H * 100)}% in the middle both ways, or ≥ ${Math.round(HUGE_H * 100)}% anywhere)`].filter(Boolean).join(', '),
+    found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), cutTxt(c), lookTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
+    leftOut: leftOut.map((c, i) => [String(i + 1), c.why, (c.approx ? '~' : '') + tc(c.inT, m.fps), (c.approx ? '~' : '') + tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), cutTxt(c), lookTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
+    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large titles (line box ≥ ${Math.round(TITLE_H * 100)}% in the middle both ways, or ≥ ${Math.round(HUGE_H * 100)}% anywhere)`, leaveScene && `in the picture (comes and goes on cuts: change ≥ ${CUT}; not in the bottom quarter)`].filter(Boolean).join(', '),
     thumbs, thumbsOut });
   const thisRun = RUNS[RUNS.length - 1];
   card.querySelector('.runpics').onclick = () => savePictures([thisRun]);
