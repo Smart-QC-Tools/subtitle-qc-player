@@ -79,7 +79,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   longer still: normal size, wrapped (`evFitText` in events.js).
 - Speeds (J / L): 2× → 4× → 8× both ways.
 - Offset field: first click selects; typing replaces (colons optional). Digits: 1-2 = ss, 3-4 = mm:ss (0130 = 1 min
-  30 s), 5-6 = mm:ss:ff, 7-8 = hh:mm:ss:ff (user's rule; the playhead go-to box still counts from the right).
+  30 s), 5-6 = mm:ss:ff, 7-8 = hh:mm:ss:ff (user's rule, `parseTypedTC`; the playhead go-to box
+  too: there, hours not typed = the hour the playhead is in).
   Enter, Tab or clicking away applies and remembers it for the video; Esc cancels. Bad entry + Enter: stays in the field in red,
   selected (type over it), with "Invalid value" just above it (`fieldTip`, `.field-tip`); Tab / clicking away with a bad
   entry: the old value comes back at once, no note. The playhead timecode (go-to box) behaves the same way.
