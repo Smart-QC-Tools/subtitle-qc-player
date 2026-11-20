@@ -42,7 +42,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
     <label class="opt">Model size <select id="msize"><option value="640">640 × 352 (faster)</option><option value="960">960 × 544</option></select></label>
     <label class="opt">Model runs on <select id="ep"><option value="auto">graphics chip if possible</option><option value="wasm">processor</option></select></label>
     <label class="opt">One frame every <select id="step"><option>2</option><option>1</option><option>3</option><option>4</option></select> s</label>
-    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, in the middle of the picture across (within 12%) and up / down (within 20%), or at least 14% anywhere: main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label> <label class="opt" title="Text that is part of the shot (signs, screens, logos on a set): it appears on a cut and disappears on a cut"><input type="checkbox" id="lvScene" checked> in the picture (comes and goes on cuts)</label></span>
+    <span class="opt">Leave out <label class="opt"><input type="checkbox" id="lvSmall" checked> small</label> <label class="opt"><input type="checkbox" id="lvMoving" checked> moving</label> <label class="opt" title="Line box at least 8% of the picture height, in the middle of the picture across (within 12%) and up / down (within 20%), or at least 14% anywhere: main titles, big logos"><input type="checkbox" id="lvTitle" checked> large centred titles</label> <label class="opt" title="Text that is part of the shot (signs, screens, logos on a set): it appears on a cut and disappears on a cut"><input type="checkbox" id="lvScene" checked> in the picture (comes and goes on cuts)</label> <label class="opt" title="Contrast under 140 or sharpness under 30%: credits and captions are made to be read; signs, screens and background text usually aren't"><input type="checkbox" id="lvFaint" checked> faint</label> <label class="opt" title="Anything starting in the last 2 minutes (videos of 10 minutes or more)"><input type="checkbox" id="lvEnd" checked> end credits</label></span>
     <label class="opt" title="Height of the box around one line of text (about twice the height of its capital letters)">Small = line boxes under <select id="minH"><option value="0.02">2%</option><option value="0.03" selected>3%</option><option value="0.04">4%</option><option value="0.05">5%</option></select> of the picture height</label>
     <label class="opt">Look at <select id="win"><option value="all">the whole video</option><option value="1200">the first 20 minutes</option></select></label>
   </div>
@@ -498,8 +498,9 @@ async function runFile(file, det) {
   cards.push(...active);
   const scanMs = now() - T0, scanN = tm.n;
   // drop logos / burnt-in timecode (on screen for more than 20 s)
-  const minH = +$('#minH').value, leaveSmall = $('#lvSmall').checked, leaveMoving = $('#lvMoving').checked, leaveTitle = $('#lvTitle').checked, leaveScene = $('#lvScene').checked;
-  const leave = leaveSmall || leaveMoving || leaveTitle || leaveScene ? 'some' : 'none';
+  const minH = +$('#minH').value, leaveSmall = $('#lvSmall').checked, leaveMoving = $('#lvMoving').checked, leaveTitle = $('#lvTitle').checked, leaveScene = $('#lvScene').checked, leaveFaint = $('#lvFaint').checked, leaveEnd = $('#lvEnd').checked;
+  const leave = leaveSmall || leaveMoving || leaveTitle || leaveScene || leaveFaint || leaveEnd ? 'some' : 'none';
+  const END_S = 120, FAINT = { contrast: 140, sharp: 30 };
   // large centred text: main titles and big logos (a subtitle can't avoid them, so they don't matter here)
   // a title sits in the middle of the picture both ways; big credits along the bottom are credits, not titles
   const TITLE_H = 0.08, HUGE_H = 0.14, isTitle = c => c.lh >= HUGE_H || (c.lh >= TITLE_H && Math.abs(c.box.x + c.box.w / 2 - 0.5) < 0.12 && Math.abs(c.box.y + c.box.h / 2 - 0.5) < 0.2);
@@ -507,7 +508,8 @@ async function runFile(file, det) {
   const kept = cards.filter(c => {
     if (pts[c.lastP] - pts[c.firstP] > 20) return false;
     // small text (a map on a screen, a newspaper): left out before the in / out step, with times from the scan only
-    const why = leaveSmall && c.lh < minH ? 'small' : leaveTitle && isTitle(c) ? 'title' : '';
+    // end credits (anything starting in the last 2 minutes): hardly ever subtitled over, so not followed up
+    const why = leaveEnd && m.duration >= 600 && pts[c.firstP] >= m.duration - END_S ? 'end credits' : leaveSmall && c.lh < minH ? 'small' : leaveTitle && isTitle(c) ? 'title' : '';
     if (why) { leftOut.push(Object.assign(c, { why, approx: true, inT: pts[c.firstP], outT: Math.min(m.duration, pts[c.lastP] + step) })); return false; }
     return true;
   });
@@ -536,8 +538,8 @@ async function runFile(file, det) {
     while (hi2 - lo > 1) { const mid = (lo + hi2) >> 1; if (await present(mid)) lo = mid; else hi2 = mid; }
     c.cutOut = await changeBetween(lo, hi2, c.box);         // its last frame vs. the picture just after
     // comes and goes on cuts: part of the shot. Kept all the same when it reaches into the bottom quarter, where
-    // subtitles go (a news insert filling the picture, a caption on a screen in close-up).
-    c.scene = c.cutIn >= CUT && c.cutOut >= CUT && c.box.y + c.box.h < SUB_ZONE;
+    // subtitles go, and is at least 30% of the picture wide (a news insert filling the picture; not a badge on a vest).
+    c.scene = c.cutIn >= CUT && c.cutOut >= CUT && !(c.box.y + c.box.h > SUB_ZONE && c.box.w >= 0.3);
     c.outT = hi2 < pts.length ? pts[hi2] : m.duration; c.inT = pts[c.inP];
   }
   const refineMs = now() - T1, refineN = tm.n - scanN;
@@ -573,11 +575,13 @@ async function runFile(file, det) {
   // percentile, 0–255). Sharp: how steep the edges are compared with that contrast (higher = crisper; crisp graphics ≈ 45%).
   for (const [i, c] of [...final, ...leftOut].entries()) {
     if (i % 10 === 0) $('#status').textContent = `${file.name}: measuring contrast, ${i} of ${final.length + leftOut.length}…`;
-    const r = await dec.frameAt(posAt(c.approx ? pts[c.firstP] : (c.inT + c.outT) / 2));
+    const r = await dec.frameAt(c.firstP);   // a frame where it was seen (the middle of a merged piece can fall between cards)
     if (!r.frame) continue;
     c.look = lookOf(r.frame, c.box);
     if (r.frame.close) r.frame.close();
   }
+  // faint: low contrast or soft lettering (made to be read it isn't: a sign, a screen, a poster in the background)
+  if (leaveFaint) { final = final.filter(c => !(c.look && (c.look.contrast < FAINT.contrast || c.look.sharp < FAINT.sharp)) || !leftOut.push(Object.assign(c, { why: 'faint' }))); leftOut.sort((a, b) => a.inT - b.inT); }
   log(`scan: ${samples} frames in ${fmtDur(scanMs / 1000)} · refine: ${refineN} frames in ${fmtDur(refineMs / 1000)} · per frame: get ${fmtMs(tm.frame / tm.n)}, shrink ${fmtMs(tm.image / tm.n)}, find text ${fmtMs(tm.detect / tm.n)} · ${final.length} pieces of text`);
 
   // 3. compare with the test episode
@@ -617,7 +621,7 @@ async function runFile(file, det) {
     </table>
     <div class="thumbs keep"></div>
     <h2>Left out (${leftOut.length})</h2>
-    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${Math.round(TITLE_H * 100)}% of the picture height in the middle of the picture (across and up / down), or at least ${Math.round(HUGE_H * 100)}% anywhere.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.', leaveScene && `Scene = in the picture: the picture cuts both when it comes and when it goes (change ${CUT} or more both times), and it stays out of the bottom quarter, where subtitles go.`].filter(Boolean).join(' ')}</div>
+    <div class="dim" style="font-size:12.5px">${leave === 'none' ? 'Nothing is left out (setting).' : [leaveSmall && `Small = line boxes under ${(minH * 100).toFixed(1)}% of the picture height (a line's box is about twice its capital letters).`, leaveTitle && `Title = line box at least ${Math.round(TITLE_H * 100)}% of the picture height in the middle of the picture (across and up / down), or at least ${Math.round(HUGE_H * 100)}% anywhere.`, (leaveSmall || leaveTitle) && 'Small text and titles have approximate times (~): their in / out wasn\'t looked for.', leaveMoving && 'Moving = drifts more than 1% of the picture while on screen.', leaveScene && `Scene = in the picture: the picture cuts both when it comes and when it goes (change ${CUT} or more both times), unless it reaches into the bottom quarter, where subtitles go, and is at least 30% of the picture wide.`, leaveFaint && `Faint = contrast under ${FAINT.contrast} or sharpness under ${FAINT.sharp}%.`, leaveEnd && `End credits = anything starting in the last ${END_S / 60} minutes of a video of 10 minutes or more (times approximate).`].filter(Boolean).join(' ')}</div>
     ${leftOut.length ? `<table style="margin-top:6px"><tr><th>#</th><th>Why</th><th>In</th><th>Out</th><th>Length</th><th class="n">Text height</th><th class="n">Moves</th><th class="n" title="How much the picture changes when the text comes / goes (a cut: ${CUT} or more)">Change in / out</th><th class="n" title="Contrast (0–255) / sharpness of the lettering (higher = crisper; crisp graphics ≈ 45%)">Contrast / sharp</th><th>Where (x, y, width, height)</th></tr>
     ${leftOut.map((c, i) => `<tr><td>${i + 1}</td><td>${c.why}</td><td>${c.approx ? '~' : ''}${tc(c.inT, m.fps)}</td><td>${c.approx ? '~' : ''}${tc(c.outT, m.fps)}</td><td>${(c.outT - c.inT).toFixed(1)} s</td><td class="n">${attrs(c)}</td><td class="n">${moveTxt(c)}</td><td class="n">${cutTxt(c)}</td><td class="n">${lookTxt(c)}</td><td class="dim">${[c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')}</td></tr>`).join('')}
     </table>` : ''}
@@ -628,7 +632,7 @@ async function runFile(file, det) {
   const lists = [[final.slice(0, 300), th, thumbs, '#f2d675', c => ''], [leftOut.slice(0, 150), thOut, thumbsOut, '#ff9a5c', c => ' · ' + c.why]];
   for (const [list, box, store, colour, why] of lists) for (const [i, c] of list.entries()) {
     if (i % 10 === 0) $('#status').textContent = `${file.name}: pictures of what was found, ${i} of ${list.length}${box === thOut ? ' left out' : ''}…`;
-    const p = posAt(c.approx ? pts[c.firstP] : (c.inT + c.outT) / 2), r = await dec.frameAt(p);
+    const r = await dec.frameAt(c.firstP);
     if (!r.frame) continue;
     const cv = document.createElement('canvas'); cv.width = 384; cv.height = 216;
     const g = cv.getContext('2d');
@@ -653,7 +657,7 @@ async function runFile(file, det) {
     check: check && { head: card.querySelector('h2 + div').textContent.trim(), rows: check.rows.map(r => [r.txt, tc(r.a, m.fps), tc(r.b, m.fps), r.c ? `${tc(r.c.inT, m.fps)} – ${tc(r.c.outT, m.fps)}` : r.title ? 'left out as a title' : 'missed', r.c ? Math.round((r.c.inT - r.a) * m.fps) + ' fr' : '', r.c ? Math.round((r.c.outT - r.b) * m.fps) + ' fr' : '']) },
     found: final.map((c, i) => [String(i + 1), tc(c.inT, m.fps), tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), cutTxt(c), lookTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
     leftOut: leftOut.map((c, i) => [String(i + 1), c.why, (c.approx ? '~' : '') + tc(c.inT, m.fps), (c.approx ? '~' : '') + tc(c.outT, m.fps), (c.outT - c.inT).toFixed(1) + ' s', attrs(c), moveTxt(c), cutTxt(c), lookTxt(c), [c.box.x, c.box.y, c.box.w, c.box.h].map(v => (v * 100).toFixed(0) + '%').join(', ')]),
-    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large titles (line box ≥ ${Math.round(TITLE_H * 100)}% in the middle both ways, or ≥ ${Math.round(HUGE_H * 100)}% anywhere)`, leaveScene && `in the picture (comes and goes on cuts: change ≥ ${CUT}; not in the bottom quarter)`].filter(Boolean).join(', '),
+    leaveTxt: leave === 'none' ? 'nothing left out' : 'left out: ' + [leaveSmall && `small (line boxes under ${(minH * 100).toFixed(1)}% of the picture height)`, leaveMoving && 'moving (drifts > 1%)', leaveTitle && `large titles (line box ≥ ${Math.round(TITLE_H * 100)}% in the middle both ways, or ≥ ${Math.round(HUGE_H * 100)}% anywhere)`, leaveScene && `in the picture (comes and goes on cuts: change ≥ ${CUT}; unless in the bottom quarter and ≥ 30% wide)`, leaveFaint && `faint (contrast < ${FAINT.contrast} or sharp < ${FAINT.sharp}%)`, leaveEnd && `end credits (last ${END_S / 60} minutes)`].filter(Boolean).join(', '),
     thumbs, thumbsOut });
   const thisRun = RUNS[RUNS.length - 1];
   card.querySelector('.runpics').onclick = () => savePictures([thisRun]);
