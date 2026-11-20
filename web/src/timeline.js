@@ -225,7 +225,6 @@
   }
   function cueColor(c) {
     if (c.overlap) return [255, 90, 90];
-    if (c.tooShortCritical) return [255, 61, 184];
     if (c.tooShort || c.tooLong) return [79, 209, 197];
     if (c.charLimitExceeded) return [199, 146, 234];
     if (c.lineCount >= LINE_COUNT_THRESHOLD) return [255, 159, 67];

@@ -744,14 +744,14 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
         <section data-h="checks" hidden>
           <h4>Colours</h4>
           <ul>
-            <li><span class="qtag q-issue">Red</span> breaks a rule: over the line-length (CPL) limit, more lines than allowed, overlap, too short or too long on screen, odd (invisible / control) characters.</li>
-            <li><span class="qtag q-warn">Amber</span> worth a look: reading speed over the CPS limit, lines of one event aligned differently, unusual placement (raised, or left / right-aligned), a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine).</li>
+            <li><span class="qtag q-issue">Red</span> breaks a rule: over the line-length (CPL) limit, more lines than allowed, overlap, on screen under 0.45 s or over 10 s, odd (invisible / control) characters.</li>
+            <li><span class="qtag q-warn">Amber</span> worth a look: on screen under 0.65 s or over 7 s, reading speed over the CPS limit, lines of one event aligned differently, unusual placement (raised, or left / right-aligned), a 1-frame gap to the next event (the subtitle blinks off for a frame; back-to-back events with no gap are fine).</li>
             <li><span class="qtag q-neutral">Grey</span> placed at the top.</li>
           </ul>
           <h4>Event table</h4>
           <ul>
             <li>In / Out turn red where events overlap; Out turns amber before a 1-frame gap. Duration is seconds:frames (2:13s), or minutes:seconds:frames from a minute up (1:05:12m).</li>
-            <li>Pos (placement) is blank for the usual bottom-centre. L / R: left / right-aligned · Mix: lines aligned differently (amber) · Raised · Top. A very short event with a long line has its duration in a stronger red.</li>
+            <li>Pos (placement) is blank for the usual bottom-centre. L / R: left / right-aligned · Mix: lines aligned differently (amber) · Raised · Top.</li>
             <li>Click a row to jump there; click a column heading to sort (again to reverse). Hover a row for the characters on each line and every flag in words.</li>
             <li>Under the player: the selected event (or the one playing) in detail, with the characters on each line.</li>
           </ul>

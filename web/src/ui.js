@@ -415,11 +415,11 @@ function renderLangFilter(list) {
 function cueChecksHtml(c) {
   if (!c) return '<span class="muted">—</span>';
   const items = [['cps', 'S', `Over ${CueCheck.CPS_LIMIT} characters per second`], ['chars', 'C', `Over ${CueCheck.CHAR_LIMIT} characters on a line`], ['lines', 'L', `${CueCheck.LINE_COUNT_THRESHOLD}+ lines`],
-    ['overlap', 'O', 'Overlapping cues'], ['duration', 'D', `Shorter than ${CueCheck.SHORT_DURATION_SECONDS}s or longer than ${CueCheck.MAX_DURATION_SECONDS}s`], ['critical', '!', 'Very short with a long line'],
+    ['overlap', 'O', 'Overlapping cues'], ['duration', 'D', `Under ${CueCheck.DUR.shortWarn}s or over ${CueCheck.DUR.longWarn}s on screen (red under ${CueCheck.DUR.shortBad}s / over ${CueCheck.DUR.longBad}s)`],
     ['odd', '#', 'Invisible / odd characters'], ['mixed', 'M', 'Lines aligned differently within an event'],
     ['gaps', 'G', '1-frame gaps (the subtitle blinks off for a frame)'],
     ['raised', '↑', 'Raised'], ['side', '↔', 'Left / right-aligned']]
-    .filter(([k]) => c[k]).map(([k, t, title]) => `<span class="ft ${k === 'raised' || k === 'side' ? 'ft-place' : k === 'gaps' || k === 'cps' || k === 'mixed' ? 'ft-warn' : 'ft-issue'}" title="${esc(title)}: ${c[k]}">${t}<b>${c[k]}</b></span>`);
+    .filter(([k]) => c[k]).map(([k, t, title]) => `<span class="ft ${k === 'raised' || k === 'side' ? 'ft-place' : k === 'gaps' || k === 'cps' || k === 'mixed' || (k === 'duration' && !c.durationRed) ? 'ft-warn' : 'ft-issue'}" title="${esc(title)}: ${c[k]}">${t}<b>${c[k]}</b></span>`);
   return items.length ? items.join('') : '<span class="ok small">clean</span>';
 }
 
@@ -454,7 +454,7 @@ function rowHtml(r) {
     <td class="dot"><span class="sd sd-${r.severity}" title="${r.severity}"></span></td>
     <td class="fname"><div class="dn fn" title="${esc(r.name)}">${esc(r.name)}</div>${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}</td>
     <td><span class="ty ${typeCls}">${esc(r.type)}</span></td>
-    <td class="lbl ${r.rawLabel ? expCls : ''}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}">${r.rawLabel ? `<code>${esc(r.rawLabel)}</code>` : '<span class="no-label">No label</span>'}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
+    <td class="lbl ${r.rawLabel ? expCls : ''}" title="${esc(r.expected ? r.expected.names.map(prettyName).join(' / ') + (r.match && r.match.ref ? ` (list code ${r.match.ref.code})` : '') : '')}">${r.rawLabel ? `<code>${esc(r.rawLabel)}</code>` : r.type === 'CC' ? '<span class="muted" title="No label: normal for closed captions (checked as English)">—</span>' : '<span class="no-label">No label</span>'}${r.match && r.match.ref && r.match.status !== 'exact' ? `<div class="muted small">list: ${esc(r.match.ref.code)}</div>` : ''}</td>
     <td class="${detErr ? 'hl-error' : detWarn ? 'hl-warn' : ''}">${det}</td>
     <td class="flags">${flags || '<span class="ok">✓ OK</span>'}</td>
     <td class="notes">${notes}</td></tr>`;
@@ -542,7 +542,7 @@ function renderLibrary() {
   const cur = Player.currentSubtitle();
   sl.innerHTML = [...subs].sort((a, b) => langSortKey(a).localeCompare(langSortKey(b))).map(r => `
     <div class="li${cur === r.name ? ' sel' : ''}" data-f="${esc(r.name)}" title="${esc(r.name)}">
-      <div class="li-t">${esc(langLabel(r) || 'No label')}
+      <div class="li-t">${esc(langLabel(r) || (r.type === 'CC' ? 'Captions' : 'No label'))}
         <code>${esc(r.rawLabel || '—')}</code> <span class="ty ${r.type === 'Forced' ? 'ty-forced' : r.type === 'CC' ? 'ty-cc' : 'ty-full'}">${esc(r.type)}</span></div>
       <div class="li-s">${esc(state.selectedVideo && r.video === state.selectedVideo ? r.name : displayName(r))}</div>
       ${(r.nameIssues || []).map(i => `<div class="name-issue sev-${i.sev}">⚠ ${esc(i.text)}</div>`).join('')}

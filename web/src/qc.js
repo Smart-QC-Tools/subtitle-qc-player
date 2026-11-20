@@ -251,6 +251,7 @@ async function analyzeFile(file) {
   r.fileLang = languageFromFilename(file.name);
   r.nameInfo = Match.parse(file.name);
   r.type = r.nameInfo.type || 'Full';
+  if (r.sidecar === 'SCC' && r.type !== 'Forced') r.type = 'CC';   // SCC is a closed-caption format
   r.forced = r.type === 'Forced';
   if (parsed.error) { r.format = '—'; flag('error', 'Could not read file', parsed.error); return finish(r); }
   Object.assign(r, { format: parsed.format, rawLabel: parsed.rootLang, cueCount: parsed.cues.length });
@@ -260,20 +261,24 @@ async function analyzeFile(file) {
   // ---- label vs reference list
   // WebVTT, SRT and SCC have no language label of their own (WebVTT may have a "Language:" header):
   // use the file name's.
-  const lab = parsed.rootLang || (r.sidecar && r.fileLang ? r.fileLang.code : null);
+  // CC (closed captions) usually has no label and is almost always English: no label is expected there. A label,
+  // when there is one, is checked like any other.
+  const isCC = r.type === 'CC';
+  const lab = parsed.rootLang || ((r.sidecar || isCC) && r.fileLang ? r.fileLang.code : null);
   if (r.sidecar && !parsed.rootLang) {
     if (r.fileLang) flag('info', `${r.sidecar} has no language label`, `Checked against the language in the file name (${r.fileLang.code}).`);
-    else flag('error', 'No language label', `${r.sidecar} files carry no language label, and the file name has none either.`);
+    else if (!isCC) flag('error', 'No language label', `${r.sidecar} files carry no language label, and the file name has none either.`);
   }
+  r.ccNoLabel = isCC && !lab;
   const m = matchReference(lab);
   r.match = m;
-  if (m.status === 'missing') { if (!r.sidecar) flag('error', 'No xml:lang on <tt>', 'The root <tt> element has no xml:lang attribute (or it is empty).'); }
+  if (m.status === 'missing') { if (!r.sidecar && !isCC) flag('error', 'No xml:lang on <tt>', 'The root <tt> element has no xml:lang attribute (or it is empty).'); }
   else if (m.status === 'unknown') flag('error', `Label “${lab}” is not in the reference list`, 'No matching code or base language in the DETE list.');
   else if (m.status === 'equivalent') flag('warn', `Non-standard code “${lab}”`, `Equivalent to list code “${m.ref.code}” (${m.ref.names.map(prettyName).join(' / ')}).`);
   else if (m.status === 'base') flag('warn', `“${lab}” is not an exact list code`, m.options ? `List has: ${m.options.map(o => o.code).join(', ')}.` : `Closest list code: “${m.ref.code}” (${m.ref.names.map(prettyName).join(' / ')}).`);
 
   const labelTag = m.tag ? canonical(m.tag) : null;
-  const expBase = labelTag ? labelTag.lang : null;
+  const expBase = labelTag ? labelTag.lang : r.ccNoLabel ? 'en' : null;   // unlabelled CC: expected to be English
   const expScript = expectedScript(labelTag) || (m.ref ? expectedScript(parseTag(m.ref.code)) : null);
   r.expected = m.ref ? { code: m.ref.code, names: m.ref.names } : null;
 
@@ -328,6 +333,8 @@ async function analyzeFile(file) {
     if (chinese(d) && chinese(expBase)) {
       if (expBase === 'zh' && d === 'yue') flag('warn', 'Written Cantonese in a Mandarin-labelled file', `${merged.han.cantonese} Cantonese-specific characters (係, 嘅, 唔, 咗 …).`);
       if (expBase === 'yue' && d === 'zh') flag('info', 'Cantonese not verifiable', 'Text is standard written Chinese (common for Cantonese subtitles).');
+    } else if (!Detector.sameCluster(d, expBase) && r.ccNoLabel) {
+      if (!littleText && merged.letters >= 200) flag('warn', `Content looks ${langName(d)}`, `No language label: closed captions are usually English. Detected ${langName(d)} (${prim.conf} confidence).`);
     } else if (!Detector.sameCluster(d, expBase)) {
       if (littleText) { if (prim.conf === 'high' && merged.hits >= 3 && !(merged.scores[expBase] > 0)) flag('warn', `Possibly ${langName(d)}, labelled ${langName(expBase)}`, `Based on very little text (${merged.letters} letters), so this may be wrong.`); }
       else if (merged.letters < 200) flag('warn', `Possibly ${langName(d)}, labelled ${langName(expBase)}`, `Based on little text (${merged.letters} letters); short lines, all-caps signs and close languages are easy to confuse.`);
@@ -345,7 +352,7 @@ async function analyzeFile(file) {
       if (expBase === 'sr' && expScript && (expScript === 'Latn' || expScript === 'Cyrl') && prim.script !== expScript)
         flag('error', `Serbian script is ${Detector.SCRIPT_NAMES[prim.script]}, label expects ${Detector.SCRIPT_NAMES[expScript]}`);
       // regional checks
-      const region = labelTag.region || (m.ref && parseTag(m.ref.code).region);
+      const region = labelTag ? labelTag.region || (m.ref && parseTag(m.ref.code).region) : null;   // (unlabelled CC: no region to check)
       const grp = REGION_GROUP[expBase];
       if (grp && region && !littleText) {
         const own = grp(region);
@@ -406,8 +413,8 @@ function countChecks(r) {
     chars: n(x => x.charLimitExceeded),
     lines: n(x => x.lineCount >= CueCheck.LINE_COUNT_THRESHOLD),
     overlap: n(x => x.overlap),
-    duration: n(x => (x.tooShort || x.tooLong) && !x.tooShortCritical),
-    critical: n(x => x.tooShortCritical),
+    duration: n(x => x.tooShort || x.tooLong || x.shortWarn || x.longWarn),
+    durationRed: n(x => x.tooShort || x.tooLong),
     odd: n(x => x.hasSuspiciousChars),
     mixed: n(x => x.mixedAlign),
     gaps: n(x => x.gapWarn),
