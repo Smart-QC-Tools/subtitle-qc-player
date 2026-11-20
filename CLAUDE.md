@@ -81,9 +81,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Offset field: first click selects; typing replaces (colons optional). Digits: 1-2 = ss, 3-4 = mm:ss (0130 = 1 min
   30 s), 5-6 = mm:ss:ff, 7-8 = hh:mm:ss:ff (user's rule; the playhead go-to box still counts from the right).
   Enter, Tab or clicking away applies and remembers it for the video; Esc cancels. Bad entry + Enter: stays in the field in red,
-  selected (type over it), with a red note just above the field ("seconds go up to 59"); Tab / clicking away with a
-  bad entry: the old value comes back and the note says "Not applied … Kept …" for 3 s. (The status line is hidden on
-  the QC page, so messages go in `.offset-tip`.)
+  selected (type over it), with "Invalid value" just above it (`fieldTip`, `.field-tip`); Tab / clicking away with a bad
+  entry: the old value comes back at once, no note. The playhead timecode (go-to box) behaves the same way.
 - Keys: ←/→ frame, Shift + ←/→ ±5 min (no ±5 s any more), Shift + ↑/↓ start / end of the video (⌥ + arrows: nothing),
   ↑/↓ previous / next event. "Past end" (red, its own filter): event still on screen after the video's last frame
   (QC page only; `requalify()` re-checks when the video's length or the offset changes).

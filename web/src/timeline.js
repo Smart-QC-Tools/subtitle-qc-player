@@ -127,6 +127,21 @@
   }
   // Displayed timecode always counts from 00:00:00:00 at the first frame of the video (the real
   // start timecode is still used for syncing via the offset).
+  // A small red note above a field for a bad entry (playhead timecode, offset). It stays until the field is typed in
+  // again or left.
+  function fieldTip(field, centred) {
+    const tip = document.createElement('div');
+    tip.className = 'field-tip'; tip.hidden = true; tip.textContent = 'Invalid value';
+    field.parentElement.appendChild(tip);
+    return {
+      show() {
+        tip.style.left = (centred ? field.offsetLeft + field.offsetWidth / 2 : field.offsetLeft) + 'px';
+        tip.style.transform = centred ? 'translateX(-50%)' : '';
+        tip.hidden = false;
+      },
+      hide() { tip.hidden = true; },
+    };
+  }
   function timecodeAt(frame) {
     const nom = vmeta.tcFps || Math.round(fps());
     return TimecodeTrack.framesToTC(frame, nom, vmeta.dropFrame);
@@ -153,12 +168,12 @@
     if (parts.length > 4) return null;
     return ['0', '0', '0', '0'].slice(0, 4 - parts.length).concat(parts).map(Number);
   }
+  // Returns true (moved), false (no video) or 'bad' (not a valid timecode).
   function goToTypedTC() {
     const v = parseTypedTC(tcDisplay.textContent);
     const nom = vmeta.tcFps || Math.round(fps());
-    const bad = () => {};   // invalid entry: nothing changes, the field just closes
-    if (!video || !video.currentSrc) { bad(); return false; }
-    if (!v || v[1] > 59 || v[2] > 59 || v[3] >= nom) { bad(); return false; }
+    if (!video || !video.currentSrc) return false;
+    if (!v || v[0] > 23 || v[1] > 59 || v[2] > 59 || v[3] >= nom) return 'bad';
     const target = tcToFrames(v[0], v[1], v[2], v[3], nom, vmeta.dropFrame);
     const last = Math.floor(((tlDuration() || 0) - 0.001) * fps());
     const n = Math.max(0, Math.min(last, target));
@@ -175,15 +190,22 @@
     const pad = Math.max(0, (tcW - tcDisplay.getBoundingClientRect().width) / 2 / uiZoom());
     tcDisplay.style.setProperty('padding-left', pad + 'px', 'important'); tcDisplay.style.setProperty('padding-right', pad + 'px', 'important');
   };
+  const tcTip = fieldTip(tcDisplay, true);
+  const tcBad = on => { tcDisplay.classList.toggle('err', on); if (on) tcTip.show(); else tcTip.hide(); };
   tcDisplay.addEventListener('focus', () => { tcW = tcDisplay.getBoundingClientRect().width; });
-  tcDisplay.addEventListener('input', holdWidth);
+  tcDisplay.addEventListener('input', () => { holdWidth(); if (tcDisplay.classList.contains('err')) tcBad(false); });
   const selectAllTC = () => { const r = document.createRange(); r.selectNodeContents(tcDisplay); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
   tcDisplay.addEventListener('mouseup', e => { if (tcDisplay.dataset.sel !== '1') { e.preventDefault(); selectAllTC(); tcDisplay.dataset.sel = '1'; } });
   tcDisplay.addEventListener('paste', e => { e.preventDefault(); const t = (e.clipboardData.getData('text') || '').trim().slice(0, 16); document.execCommand('insertText', false, t); });
-  tcDisplay.addEventListener('blur', () => { tcDisplay.dataset.sel = ''; tcW = 0; tcDisplay.style.removeProperty('padding-left'); tcDisplay.style.removeProperty('padding-right'); getSelection().removeAllRanges(); updateTC(); });
+  tcDisplay.addEventListener('blur', () => { tcBad(false); tcDisplay.dataset.sel = ''; tcW = 0; tcDisplay.style.removeProperty('padding-left'); tcDisplay.style.removeProperty('padding-right'); getSelection().removeAllRanges(); updateTC(); });
   tcDisplay.addEventListener('keydown', e => {
     e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); evRevealPending = true; goToTypedTC(); tcDisplay.blur(); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      evRevealPending = true;
+      if (goToTypedTC() === 'bad') { evRevealPending = false; tcBad(true); selectAllTC(); return; }   // stays, in red
+      tcDisplay.blur();
+    }
     else if (e.key === 'Escape') { e.preventDefault(); tcDisplay.blur(); }
   });
 
@@ -917,17 +939,8 @@
       if (fr >= nominal()) return { err: `frames go up to ${nominal() - 1} at ${nominal()} fps` };
       return { tc: (neg ? '-' : '') + parts.map(x => String(x).padStart(2, '0')).join(':') };
     };
-    // A bad entry: a small red note just above the field (the status line isn't shown on the QC page).
-    const tip = document.createElement('div');
-    tip.className = 'offset-tip'; tip.hidden = true;
-    el.parentElement.appendChild(tip);
-    let tipTimer = 0;
-    function showTip(text, ms) {
-      clearTimeout(tipTimer);
-      tip.textContent = text; tip.style.left = el.offsetLeft + 'px'; tip.hidden = false;
-      if (ms) tipTimer = setTimeout(hideTip, ms);
-    }
-    function hideTip() { clearTimeout(tipTimer); tip.hidden = true; }
+    // A bad entry: "Invalid value" just above the field (the status line isn't shown on the QC page).
+    const offTip = fieldTip(el, false);
     let editing = false, cancelled = false;
     // The browser's own 'change' (fired on blur while typing) must not apply a half-typed value;
     // only Enter (commit) applies it.
@@ -940,10 +953,9 @@
     el.addEventListener('blur', () => {
       if (editing && !cancelled) {
         const typed = raw.get().trim(), r = parseEntry(typed);
-        if (r.tc) { hideTip(); raw.set(r.tc); editing = false; commit(); return; }
-        // leaving with a bad entry: the previous value comes back, and the note says so for a moment
-        if (typed) { flash(); showTip(`Not applied: ${r.err}. Kept ${lastGood}.`, 3000); }
-      } else if (cancelled) hideTip();
+        if (r.tc) { offTip.hide(); raw.set(r.tc); editing = false; commit(); return; }
+      }
+      offTip.hide();   // leaving with a bad entry: the previous value comes back
       raw.set(lastGood); editing = false; el.classList.remove('err');
     });
     el.addEventListener('keydown', (e) => {
@@ -955,16 +967,16 @@
           if (!typed) { el.blur(); return; }
           // Enter on a bad entry: it stays in the field in red with a note; selected, so typing replaces it (Esc: back
           // to the previous value)
-          el.classList.add('err'); showTip(`“${typed}”: ${r.err}`); el.select();
+          el.classList.add('err'); offTip.show(); el.select();
           return;
         }
-        hideTip(); raw.set(r.tc); editing = false; commit(); el.blur(); return;
+        offTip.hide(); raw.set(r.tc); editing = false; commit(); el.blur(); return;
       }
       if (e.key === 'Escape') { e.preventDefault(); cancelled = true; el.blur(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;   // shortcuts, arrows, backspace
       if (!/[\d:;.\-+]/.test(e.key)) { e.preventDefault(); return; }
       if (!editing) { editing = true; raw.set(''); }   // the first key starts a fresh entry
-      el.classList.remove('err'); if (!tip.hidden) hideTip();
+      el.classList.remove('err'); offTip.hide();
     });
     el.addEventListener('input', () => {
       if (!editing) { editing = true; }
