@@ -31,7 +31,7 @@ label.opt{display:inline-flex;gap:6px;align-items:center}
 </head>
 <body>
 <main>
-<h1>Finding on-screen text without reading it: lab</h1>
+<h1>Finding on-screen text without reading it: lab <span class="dim" style="font-size:13px;font-weight:500;margin-left:8px">__LAB_BUILD__</span></h1>
 <p class="dim">Looks at one frame every few seconds, finds every piece of text on the picture (credits, captions, titles: anything), follows each one from frame to frame, then finds where it appears and disappears to the frame. Nothing is read and nothing is uploaded. Two ways of finding text are compared: <b>image checks</b> (sharp, aligned strokes; no download) and a <b>text-detection model</b> (PaddleOCR's PP-OCRv4 detector, 4.6 MB, run on the graphics chip when Chrome allows). On the Harbor Lights test episode (T1103 / T1104) the results are checked against what is really there.</p>
 <div class="card">
   <div class="row"><button class="primary" id="pick">Choose a folder…</button><span class="dim">or</span><label class="dim">pick files <input type="file" id="fileInput" multiple accept=".mp4,.mov,.m4v,video/*"></label></div>

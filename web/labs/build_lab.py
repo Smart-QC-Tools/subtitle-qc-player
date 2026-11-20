@@ -12,6 +12,8 @@ def build(name, extra=None):
     src = open(os.path.join(here, name + '.src.html'), encoding='utf-8').read()
     src = src.replace('/*@include lab-video.js*/', open(os.path.join(here, 'lab-video.js'), encoding='utf-8').read())
     src = src.replace('__PRORES_WASM_B64__', b64('prores/prores.wasm'))
+    # labs.yml sets the build number; a local build says so
+    src = src.replace('__LAB_BUILD__', 'BUILD ' + os.environ['LAB_BUILD'] if os.environ.get('LAB_BUILD') else 'local build')
     for k, v in (extra or {}).items():
         src = src.replace(k, v)
     os.makedirs(os.path.join(here, 'dist'), exist_ok=True)

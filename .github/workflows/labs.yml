@@ -21,6 +21,8 @@ jobs:
       - name: Fetch ONNX Runtime Web and the text detector (checksums pinned)
         run: bash web/labs/fetch_assets.sh
       - name: Build the pages
+        env:
+          LAB_BUILD: ${{ github.run_number }}
         run: |
           python3 web/labs/build_lab.py
           mkdir out

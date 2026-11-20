@@ -31,7 +31,7 @@ pre#log{background:#0b0c0f;border:1px solid var(--border);border-radius:8px;padd
 </head>
 <body>
 <main>
-<h1>Video analysis in Chrome: feasibility test</h1>
+<h1>Video analysis in Chrome: feasibility test <span class="dim" style="font-size:13px;font-weight:500;margin-left:8px">__LAB_BUILD__</span></h1>
 <p class="dim">Reads a video straight from a folder you pick (nothing is uploaded), decodes single frames and times every step, then estimates how long the planned analysis of a 45-minute episode would take in Chrome. H.264 / HEVC: Chrome's own decoder (WebCodecs). ProRes: a small ProRes-only decoder built from FFmpeg (<span id="wasmSize"></span>). For a network drive, pick a folder on it.</p>
 <div class="card">
   <div class="row"><button class="primary" id="pick">Choose a folder…</button><span class="dim">or</span><label class="dim">pick files <input type="file" id="fileInput" multiple accept=".mp4,.mov,.m4v,video/*"></label></div>
