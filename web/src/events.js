@@ -101,7 +101,7 @@
       io.appendChild(span(c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '', isFinite(c.end) ? formatVideoTC(c.end) : '…'));
       tr.appendChild(io);
       const dur = cell('ev-num');
-      dur.appendChild(span(c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '', durText(c.duration)));
+      dur.appendChild(span((c.tooShort || c.tooLong) ? 'bad' : (c.shortWarn || c.longWarn) ? 'warn' : '', durText(c.duration)));
       tr.appendChild(dur);
       const t = cell('ev-text');
       const tx = document.createElement('span');
@@ -124,11 +124,39 @@
       frag.appendChild(tr);
     });
     evBody.appendChild(frag);
+    evFitText(true);
     sortEvents();
     evApplyFilter();
     evSyncSel();
     evSyncActive();
     updateSortHeads();
+  }
+
+  // Text column: each subtitle line stays on one line, as in the file. A row whose longest line wouldn't fit gets
+  // smaller text, just enough (down to 80%); a line longer still keeps the normal size and wraps (its CPL is red anyway). Measured with the table's own font.
+  const EV_FONT_PX = 12.5, EV_FIT_MIN = 0.8;
+  let evMeasure = null, evFitW = 0;
+  function evLineWidth(c) {
+    if (c._tw != null) return c._tw;
+    if (!evMeasure) { evMeasure = document.createElement('canvas').getContext('2d'); evMeasure.font = `${EV_FONT_PX}px ${getComputedStyle(evTable).fontFamily}`; }
+    return (c._tw = Math.max(0, ...String(c.text || '').split('\n').map(l => evMeasure.measureText(l).width)));
+  }
+  function evFitText(force) {
+    const th = evTable && evTable.querySelector('th.ev-textcol');
+    if (!th) return;
+    const w = th.getBoundingClientRect().width / uiZoom() - 16 - 2;   // less the cell's padding, and a little spare
+    if (w <= 0 || (!force && Math.abs(w - evFitW) < 0.5)) return;
+    evFitW = w;
+    evRows.forEach((tr, i) => {
+      const tx = tr && tr.cells[2] && tr.cells[2].firstChild, need = evLineWidth(cueList[i]);
+      if (!tx) return;
+      const k = need > w && w / need >= EV_FIT_MIN ? w / need : 1;   // too long even at 80%: normal size, wrapped
+      tx.style.fontSize = k < 1 ? (EV_FONT_PX * k).toFixed(2) + 'px' : '';
+    });
+  }
+  if (evTable && window.ResizeObserver) {
+    const th = evTable.querySelector('th.ev-textcol');
+    if (th) new ResizeObserver(() => requestAnimationFrame(() => evFitText())).observe(th);
   }
 
   function sortEvents() {
@@ -296,7 +324,7 @@
     const times = row('evd-times');
     item(times, 'In', formatVideoTC(c.begin), c.overlapsPrev ? 'bad' : '');
     item(times, 'Out', isFinite(c.end) ? formatVideoTC(c.end) : '…', c.overlapsNext ? 'bad' : c.gapWarn ? 'warn' : '');
-    item(times, 'Duration', durText(c.duration), c.tooShortCritical ? 'crit' : (c.tooShort || c.tooLong) ? 'bad' : '');
+    item(times, 'Duration', durText(c.duration), (c.tooShort || c.tooLong) ? 'bad' : (c.shortWarn || c.longWarn) ? 'warn' : '');
     top.appendChild(times);
     const lines = document.createElement('div');
     const ls = c.text.split('\n');

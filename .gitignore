@@ -3,3 +3,5 @@ web/dist/
 web/src/player.js
 .DS_Store
 __pycache__/
+web/labs/dist/
+web/labs/vendor/

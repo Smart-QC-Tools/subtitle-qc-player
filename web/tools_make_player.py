@@ -93,7 +93,7 @@ js=js[:-5]+"""
   window.CueCheck = {
     parse: parseRawCueList, finalizeDurationFlags, finalizeCharFlags, finalizeQcFlags, setLimits,
     get CHAR_LIMIT() { return CHAR_LIMIT; }, get CPS_LIMIT() { return CPS_LIMIT; },
-    get LINE_COUNT_THRESHOLD() { return LINE_COUNT_THRESHOLD; }, SHORT_DURATION_SECONDS, SHORT_DURATION_CRITICAL_CHARS, MAX_DURATION_SECONDS
+    get LINE_COUNT_THRESHOLD() { return LINE_COUNT_THRESHOLD; }, DUR
   };
 })();
 """
