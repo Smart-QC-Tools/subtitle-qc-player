@@ -889,8 +889,8 @@
       if (v !== atFocus) { atFocus = v; const ev = new Event('change'); ev.userEdit = true; el.dispatchEvent(ev); }
     }
     raw.set(norm(raw.get()));
-    // Editing works like the playhead timecode: the first click selects the value; typing replaces it
-    // with just what you type (digits, colons optional); Enter applies, Esc or clicking away cancels.
+    // The first click selects the value; typing replaces it with just what you type (digits, colons optional).
+    // Enter, Tab or clicking away applies it (an invalid one flashes red and the previous value stays); Esc cancels.
     // Short entries count from the right, missing digits are zeros ("1200" -> 00:00:12:00).
     const parseEntry = (str) => {
       str = (str || '').trim();
@@ -900,7 +900,7 @@
       const out = (neg ? '-' : '') + v.map(n => String(n).padStart(2, '0')).join(':');
       return valid(out) ? out : null;
     };
-    let editing = false;
+    let editing = false, cancelled = false;
     // The browser's own 'change' (fired on blur while typing) must not apply a half-typed value;
     // only Enter (commit) applies it.
     el.addEventListener('change', (e) => { if (e.isTrusted) e.stopImmediatePropagation(); }, true);
@@ -908,8 +908,15 @@
       if (document.activeElement === el) return;
       e.preventDefault(); el.focus(); el.select();
     });
-    el.addEventListener('focus', () => { atFocus = raw.get(); editing = false; });
-    el.addEventListener('blur', () => { raw.set(lastGood); editing = false; el.classList.remove('err'); });
+    el.addEventListener('focus', () => { atFocus = raw.get(); editing = false; cancelled = false; });
+    el.addEventListener('blur', () => {
+      if (editing && !cancelled) {
+        const v = parseEntry(raw.get());
+        if (v) { raw.set(v); editing = false; commit(); return; }
+        flash();
+      }
+      raw.set(lastGood); editing = false; el.classList.remove('err');
+    });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -917,7 +924,7 @@
         if (!v) { el.blur(); return; }   // invalid entry: keep the previous value
         raw.set(v); editing = false; commit(); el.blur(); return;
       }
-      if (e.key === 'Escape') { e.preventDefault(); el.blur(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); cancelled = true; el.blur(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;   // shortcuts, arrows, backspace
       if (!/[\d:;.\-+]/.test(e.key)) { e.preventDefault(); return; }
       if (!editing) { editing = true; raw.set(''); }   // the first key starts a fresh entry
