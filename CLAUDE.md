@@ -149,4 +149,10 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   rejected (6× extra hits on real footage); PP-OCRv4 det model on WebGPU ≈ 33 ms/frame, a 45-min episode ≈ 2–5 min.
   User decisions: all text matters (lower thirds, burnt-in subs), except small text, text moving with the camera
   (screens, maps, signs) and large centred main titles (line box ≥ 8%, centred), which are left out (listed separately).
+  Status (paused 2026-11-20, user still testing at work): lab build 7. Rules: small = line box < 3%; moving = drifts > 1%
+  (whole sightings only, extremes ignored); title = line box ≥ 8% in the middle both ways, or ≥ 14% anywhere.
+  On LAO-21-M2701 (Law & Order SVU) all 28 end-of-opening credits kept; animated title-sequence names left out as
+  moving; back-to-back cards in one spot merge into one piece. Proposed next (not yet agreed): use this engine for a
+  real "on-screen text" analysis in the web preview's analysis panel (results file → QC page checks). Mac app: later
+  (user can't install new versions right away); idea: same model via Core ML instead of Vision text reading.
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).
