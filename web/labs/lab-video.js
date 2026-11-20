@@ -260,3 +260,34 @@ function yuvToCanvas(p, cv) {
   g.putImageData(img, 0, 0);
 }
 
+
+// ------------------------------------------------------------ remembering where you last picked from
+// A page opened from a file gets no "last location" from Chrome, so the last folder (or file) picked is kept as a
+// handle in this browser's storage and handed back to the picker as its starting place.
+const LabPlaces = {
+  db: null,
+  async open() {
+    if (!this.db) this.db = await new Promise((res, rej) => { const r = indexedDB.open('subtitle-qc-labs', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    return this.db;
+  },
+  async get(k) { try { const db = await this.open(); return await new Promise(res => { const q = db.transaction('h').objectStore('h').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch (e) { return null; } },
+  async set(k, v) { try { const db = await this.open(); await new Promise(res => { const t = db.transaction('h', 'readwrite'); t.objectStore('h').put(v, k); t.oncomplete = res; t.onerror = res; }); } catch (e) {} },
+};
+// opts: the picker's own options; fallbackStart: where to start the first time (e.g. 'downloads').
+async function pickFolderRemembered(key, opts = {}, fallbackStart) {
+  const last = await LabPlaces.get(key), start = last || fallbackStart;
+  let dir = null;
+  try { dir = await showDirectoryPicker({ ...opts, id: key, ...(start ? { startIn: start } : {}) }); }
+  catch (e) { if (e && e.name === 'AbortError') return null; try { dir = await showDirectoryPicker({ ...opts, id: key }); } catch (e2) { return null; } }
+  await LabPlaces.set(key, dir);
+  return dir;
+}
+async function pickFilesRemembered(key) {
+  const last = await LabPlaces.get(key);
+  const opts = { id: key, multiple: true, types: [{ description: 'Video', accept: { 'video/*': ['.mp4', '.mov', '.m4v'] } }] };
+  let hs = null;
+  try { hs = await showOpenFilePicker({ ...opts, ...(last ? { startIn: last } : {}) }); }
+  catch (e) { if (e && e.name === 'AbortError') return null; try { hs = await showOpenFilePicker(opts); } catch (e2) { return null; } }
+  if (hs && hs[0]) await LabPlaces.set(key, hs[0]);
+  return hs ? Promise.all(hs.map(h => h.getFile())) : null;
+}

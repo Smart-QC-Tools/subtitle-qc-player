@@ -269,11 +269,19 @@ function showFiles(list, where) {
 }
 $('#pick').onclick = async () => {
   if (!window.showDirectoryPicker) { alert('This Chrome has no folder picker: use "pick files" instead.'); return; }
-  let dir; try { dir = await showDirectoryPicker({ id: 'textlab' }); } catch (e) { return; }
+  const dir = await pickFolderRemembered('textlab');
+  if (!dir) return;
   const list = []; for await (const [name, h] of dir.entries()) if (h.kind === 'file' && VIDEO.test(name) && !name.startsWith('._')) list.push(await h.getFile());
   showFiles(list, 'Folder: ' + dir.name);
 };
 $('#fileInput').onchange = e => showFiles([...e.target.files], 'Files picked');
+// Pick files: with Chrome's own file picker (it starts where you last picked from); the plain file box otherwise.
+$('#fileInput').addEventListener('click', async e => {
+  if (!window.showOpenFilePicker) return;
+  e.preventDefault();
+  const list = await pickFilesRemembered('textlab-files');
+  if (list && list.length) showFiles(list, 'Files picked');
+});
 $('#env').innerHTML = [`${navigator.hardwareConcurrency} CPU threads`, `graphics chip for the model (WebGPU): ${navigator.gpu ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`].join(' · ');
 // ------------------------------------------------------------ pictures to send (wide, so a chat doesn't shrink them unreadable)
 const RUNS = [];
@@ -369,7 +377,8 @@ function allPictures(runs, withSummary) {
 async function savePictures(runs, withSummary = false) {
   const pics = allPictures(runs, withSummary);
   if (window.showDirectoryPicker) {
-    let dir; try { dir = await showDirectoryPicker({ id: 'textlabpics', mode: 'readwrite', startIn: 'downloads' }); } catch (e) { return; }
+    const dir = await pickFolderRemembered('textlabpics', { mode: 'readwrite' }, 'downloads');
+    if (!dir) return;
     for (const [i, [c, name]] of pics.entries()) {
       $('#status').textContent = `Saving pictures: ${i + 1} of ${pics.length}…`;
       const w = await (await dir.getFileHandle(name, { create: true })).createWritable(); await w.write(await pngBlob(c)); await w.close();

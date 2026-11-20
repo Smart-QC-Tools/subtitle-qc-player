@@ -68,12 +68,20 @@ function showFiles(list, where) {
 }
 $('#pick').onclick = async () => {
   if (!window.showDirectoryPicker) { alert('This Chrome has no folder picker: use "pick files" instead.'); return; }
-  let dir; try { dir = await showDirectoryPicker({ id: 'feasibility' }); } catch (e) { return; }
+  const dir = await pickFolderRemembered('feasibility');
+  if (!dir) return;
   const list = [];
   for await (const [name, h] of dir.entries()) if (h.kind === 'file' && VIDEO.test(name) && !name.startsWith('._')) list.push(await h.getFile());
   showFiles(list, 'Folder: ' + dir.name);
 };
 $('#fileInput').onchange = e => showFiles([...e.target.files], 'Files picked');
+// Pick files: with Chrome's own file picker (it starts where you last picked from); the plain file box otherwise.
+$('#fileInput').addEventListener('click', async e => {
+  if (!window.showOpenFilePicker) return;
+  e.preventDefault();
+  const list = await pickFilesRemembered('feasibility-files');
+  if (list && list.length) showFiles(list, 'Files picked');
+});
 $('#wasmSize').textContent = Math.round(PRORES_WASM_B64.length * 3 / 4 / 1024) + ' KB, ProRes decoder only';
 (async () => {
   const env = [`Chrome ${(navigator.userAgentData && navigator.userAgentData.brands.map(b => b.brand + ' ' + b.version).join(', ')) || navigator.userAgent}`, `${navigator.hardwareConcurrency} CPU threads`];

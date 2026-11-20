@@ -277,7 +277,13 @@ const Analysis = (() => {
       return;
     }
     if (!window.showDirectoryPicker) return;
-    let dir; try { dir = await window.showDirectoryPicker({ mode: 'read', id: 'analysis' }); } catch (e) { return; }
+    // starts where it was last picked from (kept like the QC page's folders: a page opened from a file gets no
+    // "last location" from Chrome)
+    const last = HandleStore.cache.analysis || await HandleStore.load('analysis');
+    let dir = null;
+    try { dir = await window.showDirectoryPicker(last ? { mode: 'read', id: 'analysis', startIn: last } : { mode: 'read', id: 'analysis' }); }
+    catch (e) { if (e && e.name === 'AbortError') return; try { dir = await window.showDirectoryPicker({ mode: 'read', id: 'analysis' }); } catch (e2) { return; } }
+    HandleStore.set('analysis', dir);
     ownFolder = true; sourceHandle = dir; sourceLabel = dir.name;
     await loadRows((await listDir(dir, VIDEO_EXT)));
   }
