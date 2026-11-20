@@ -948,21 +948,17 @@
       if (fr >= nominal()) return { err: `frames go up to ${nominal() - 1} at ${nominal()} fps` };
       return { tc: (neg ? '-' : '') + parts.map(x => String(x).padStart(2, '0')).join(':') };
     };
-    // A clear red message under the field for a bad entry (the previous value stays); gone after a few seconds.
-    const offSt = document.getElementById('offsetStatus');
-    let errTimer = 0, errPrev = null;
-    function badEntry(typed, why) {
-      flash();
-      if (!offSt) return;
-      if (errPrev == null) errPrev = { text: offSt.textContent, err: offSt.classList.contains('err') };
-      offSt.textContent = `“${typed}” isn't a valid offset: ${why}. Kept ${lastGood}.`;
-      offSt.classList.add('err');
-      clearTimeout(errTimer);
-      errTimer = setTimeout(() => {
-        if (errPrev) { offSt.textContent = errPrev.text; offSt.classList.toggle('err', errPrev.err); errPrev = null; }
-      }, 6000);
+    // A bad entry: a small red note just above the field (the status line isn't shown on the QC page).
+    const tip = document.createElement('div');
+    tip.className = 'offset-tip'; tip.hidden = true;
+    el.parentElement.appendChild(tip);
+    let tipTimer = 0;
+    function showTip(text, ms) {
+      clearTimeout(tipTimer);
+      tip.textContent = text; tip.style.left = el.offsetLeft + 'px'; tip.hidden = false;
+      if (ms) tipTimer = setTimeout(hideTip, ms);
     }
-    function clearBad() { if (errPrev) { clearTimeout(errTimer); offSt.textContent = errPrev.text; offSt.classList.toggle('err', errPrev.err); errPrev = null; } }
+    function hideTip() { clearTimeout(tipTimer); tip.hidden = true; }
     let editing = false, cancelled = false;
     // The browser's own 'change' (fired on blur while typing) must not apply a half-typed value;
     // only Enter (commit) applies it.
@@ -975,9 +971,10 @@
     el.addEventListener('blur', () => {
       if (editing && !cancelled) {
         const typed = raw.get().trim(), r = parseEntry(typed);
-        if (r.tc) { clearBad(); raw.set(r.tc); editing = false; commit(); return; }
-        if (typed) badEntry(typed, r.err);
-      }
+        if (r.tc) { hideTip(); raw.set(r.tc); editing = false; commit(); return; }
+        // leaving with a bad entry: the previous value comes back, and the note says so for a moment
+        if (typed) { flash(); showTip(`Not applied: ${r.err}. Kept ${lastGood}.`, 3000); }
+      } else if (cancelled) hideTip();
       raw.set(lastGood); editing = false; el.classList.remove('err');
     });
     el.addEventListener('keydown', (e) => {
@@ -985,14 +982,20 @@
         e.preventDefault();
         if (!editing) { el.blur(); return; }
         const typed = raw.get().trim(), r = parseEntry(typed);
-        if (!r.tc) { if (typed) badEntry(typed, r.err); editing = false; el.blur(); return; }   // bad: previous value stays
-        clearBad(); raw.set(r.tc); editing = false; commit(); el.blur(); return;
+        if (!r.tc) {
+          if (!typed) { el.blur(); return; }
+          // Enter on a bad entry: it stays in the field in red with a note; selected, so typing replaces it (Esc: back
+          // to the previous value)
+          el.classList.add('err'); showTip(`“${typed}”: ${r.err}`); el.select();
+          return;
+        }
+        hideTip(); raw.set(r.tc); editing = false; commit(); el.blur(); return;
       }
       if (e.key === 'Escape') { e.preventDefault(); cancelled = true; el.blur(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;   // shortcuts, arrows, backspace
       if (!/[\d:;.\-+]/.test(e.key)) { e.preventDefault(); return; }
       if (!editing) { editing = true; raw.set(''); }   // the first key starts a fresh entry
-      el.classList.remove('err');
+      el.classList.remove('err'); if (!tip.hidden) hideTip();
     });
     el.addEventListener('input', () => {
       if (!editing) { editing = true; }
