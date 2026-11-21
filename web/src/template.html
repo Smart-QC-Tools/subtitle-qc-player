@@ -388,13 +388,41 @@ select:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:1px}
 .ana-dt tr.k-other td,.ana-dt tr.k-start td,.ana-dt tr.k-end td,.ana-dt tr.k-text td{color:var(--dim)}
 .ana-dt+.ana-dh,.ana-dim+.ana-dh{margin-top:14px}
 html.native #anaBtn{display:none}
+/* start screen */
+#home{position:fixed;inset:0;z-index:95;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+#home[hidden]{display:none}
+.home-in{width:min(860px,100%)}
+.home-title{font-size:22px;font-weight:650;margin:0 0 22px;color:var(--text)}
+.home-ver{font-size:12px;font-weight:500;color:var(--dim);margin-left:8px;letter-spacing:.3px}
+.home-cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.home-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:26px 26px 22px;color:var(--text);cursor:pointer;min-height:210px;font:inherit}
+.home-card:hover{border-color:#4f86e8;background:#1a1f27}
+.home-card:focus-visible{outline:2px solid rgba(111,168,255,.6);outline-offset:2px}
+.home-card .hc-ic{color:var(--val);margin-bottom:6px}
+.home-card b{font-size:19px;font-weight:650}
+.hc-d{font-size:13.5px;line-height:1.45;color:#b4bac4}
+.hc-last{margin-top:auto;padding-top:10px;font-size:12px;color:var(--dim);min-height:1em}
+@media (max-width:640px){.home-cards{grid-template-columns:1fr}}
+.home-btn{display:inline-flex;align-items:center;gap:6px;color:#aab0ba;margin-right:12px}
+.home-btn:hover{color:#a9caff}
+#homeBtn{padding:4px 6px}
+#anaBtn{color:var(--val)}
+/* Video Analysis as a page of its own (web) */
+html.ana-page #anaModal{padding:0;background:var(--bg);z-index:94;align-items:stretch}
+html.ana-page .modal.ana{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;box-shadow:none}
+html.ana-page .ana-tablewrap{max-height:none;flex:1}
+.ana-dest{color:#b4bac4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.ana-note-box{font-size:12.5px;line-height:1.45;color:#f5bd5c;background:rgba(240,168,48,.08);border:1px solid rgba(240,168,48,.35);border-radius:8px;padding:8px 12px}
+.ana-note-box[hidden]{display:none}
+.ana-sub{font-size:11px;color:var(--dim);margin-bottom:1px}
+.vi-ana .ana-act{margin-left:10px;font-size:12px}
 /* … and in that window the panel is the whole page. */
 html.ana-window body>*:not(#anaModal){display:none!important}
 html.ana-window #anaModal{position:fixed;inset:0;padding:0;background:var(--panel);display:block}
 html.ana-window .modal.ana{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;box-shadow:none}
 html.ana-window .ana-tablewrap{max-height:none;flex:1}
 html.ana-window .ana-folder{font-weight:500}
-html.ana-window .modal.ana>.modal-h{display:none}   /* the window's own title bar says it */
+html.ana-window .modal.ana>.modal-h>b{display:none}   /* the window's own title bar says it */
 html.ana-window .ana-body{padding-top:16px}
 .ana-sim{margin-left:12px;font-size:11.5px;color:#f5bd5c;border:1px solid rgba(245,189,92,.4);border-radius:999px;padding:2px 9px;cursor:help}
 .ana-body{padding:14px 18px 6px;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
@@ -594,8 +622,27 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
 </style>
 </head>
 <body>
+<div id="home" hidden>
+  <div class="home-in">
+    <div class="home-title">Subtitle QC Player <span class="home-ver">1.1.0</span></div>
+    <div class="home-cards">
+      <button class="home-card" id="homeQc">
+        <svg class="hc-ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17h-9l-4.5 3.5V17H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"/><path d="M7 9.5h10M7 13h6"/></svg>
+        <b>QC / Conform</b>
+        <span class="hc-d">Check subtitle files against the videos: languages and labels, timing, reading speed, placement.</span>
+        <span class="hc-last" id="homeQcLast"></span>
+      </button>
+      <button class="home-card" id="homeAna">
+        <svg class="hc-ic" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="13" rx="1.5"/><path d="M7 14.5h10M9 11.5h6"/><path d="M8 21h8"/></svg>
+        <b>Video Analysis</b>
+        <span class="hc-d">Find on-screen text (and, in the Mac app, commercial blacks and credits) in a folder of videos. Results go in a VideoMarkers folder, for QC.</span>
+        <span class="hc-last" id="homeAnaLast"></span>
+      </button>
+    </div>
+  </div>
+</div>
 <header class="top">
-  <div class="hdr-left"><nav class="tabs"><button class="tab active" data-tab="qc">Conform</button><button class="tab" data-tab="player">QC</button></nav></div>
+  <div class="hdr-left"><button class="textbtn home-btn" id="homeBtn" title="Start screen: QC / Conform or Video Analysis"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9h11v-9"/></svg></button><nav class="tabs"><button class="tab active" data-tab="qc">Conform</button><button class="tab" data-tab="player">QC</button></nav></div>
   <span class="fl-lab"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor" stroke="none"/></svg>Videos</span>
   <div class="folder empty" data-kind="videos" role="button" tabindex="0"><svg class="fl-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span class="fl-n unset" id="vidFolderName">Select folder…</span><button class="btn sm" id="pickVids" hidden>Choose…</button><button type="button" class="fl-other" id="vidReopen" hidden title="Select a different folder"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><path d="M12 11v5M9.5 13.5h5"/></svg></button></div>
   <span class="fl-lab sub"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17h-9l-4.5 3.5V17H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"/><path d="M7 9.5h10M7 13h6"/></svg>Subtitles</span>
@@ -603,7 +650,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
   <label class="sw-wrap" for="matchToggle"><span>Matched only</span><button class="sw" id="matchToggle" role="switch" aria-checked="true"><span class="knob"></span></button></label>
   <button class="btn sm" id="rescan" hidden title="Re-read both folders">↻ Rescan</button>
   <span class="spacer"></span>
-  <button class="textbtn" id="anaBtn" title="Find commercial blacks and opening credits in a folder of videos (a batch job, separate from QC)">Analyse videos</button>
+  <button class="textbtn" id="anaBtn" hidden title="Video Analysis is running: click to see it"></button>
   <button class="textbtn" id="helpBtn" title="Keyboard shortcuts and how the tool works">Help</button>
   <input type="file" id="subDirInput" webkitdirectory directory multiple hidden>
   <input type="file" id="vidDirInput" webkitdirectory directory multiple hidden>
@@ -734,7 +781,8 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
           <ul>
             <li>Press or drag on the bar to move the playhead. Click a subtitle block to select that event in the table.</li>
             <li>The index underneath shows the whole video: where the subtitles are, and a box for the part shown in the bar above. Click anywhere on it to jump there (drag to scrub); drag the box to look around without moving the playhead.</li>
-            <li>After a video analysis (Mac app: Window ▸ Video Analysis), the opening credits are marked with a thin <span style="color:#f2d675">yellow line</span> (along the top of the waveform bar, along the bottom of the index), and commercial blacks in <span style="color:#ff5c5c">red</span> on both. On the index, point at them to see what they are.</li>
+            <li>After a video analysis (start screen ▸ Video Analysis), on-screen text (or, from the Mac app, the opening credits) is marked with a thin <span style="color:#f2d675">yellow line</span> (along the top of the waveform bar, along the bottom of the index), and commercial blacks in <span style="color:#ff5c5c">red</span> on both. On the index, point at them to see what they are. Subtitles over the text are flagged <b>On text</b>, close to it <b>Near text</b>.</li>
+            <li>The analysis results are kept in a <b>VideoMarkers</b> folder: beside the delivery folder (Encodes, QC_PASS, QC_FAIL) when the videos are in one, otherwise inside the videos' folder. They count for the episode: a proxy's markers serve its encode as long as the length agrees. If they aren't found, use <b>Link markers folder…</b> under the video list.</li>
             <li>The bar shows between 10 seconds and 1½ minutes (1 minute to start with): ⌘ / Ctrl + scroll (or pinch) anywhere over the picture, the bar or the controls under it to zoom.</li>
             <li>The channel menu picks which audio channels are drawn. It doesn't change what you hear.</li>
           </ul>

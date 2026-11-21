@@ -630,7 +630,7 @@
     const m = marksNow(), d = tlDuration(); if (!m || !d) return '';
     const px = t => t / d * w;
     for (const [a, b] of m.blacks) if (x >= px(a) - 3 && x <= Math.max(px(b), px(a) + 2) + 3) return 'Commercial black';
-    for (const [a, b] of m.credits) if (x >= px(a) - 1 && x <= Math.max(px(b), px(a) + 2) + 1) return `Credits ${ovLabel(a)} – ${ovLabel(b)}`;
+    for (const [a, b] of m.credits) if (x >= px(a) - 1 && x <= Math.max(px(b), px(a) + 2) + 1) return `${m.label || 'Credits'} ${ovLabel(a)} – ${ovLabel(b)}`;
     return '';
   }
   const ovTime = (px, w) => Math.max(0, Math.min(tlDuration(), px / w * tlDuration()));

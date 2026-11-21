@@ -157,10 +157,26 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   Blacks engine v3: silence = RMS ≤ −50 dBFS (a low noise floor counts); blacks with sound are dropped.
 - Results folder stays visible ("Subtitle QC Data" next to the videos): sharing results is crucial to the user
   (not hidden, not in Application Support).
-- Agreed next design (2026-11-21, IDEAS.md "Video analysis as its own workflow"): 1.1.0 gets a start screen (QC / Conform
-  or Video Analysis, Home button back; web and Mac), 1.0.0 stays clean QC. Results move to a `VideoMarkers` folder:
-  beside the `Encodes` / `_Encodes` folder when the video is in or below one, else inside the video's folder; markers
-  match by episode (proxies count for encodes, same length ±1 s); Link markers folder… as a fallback.
+- **Built 2026-11-21 (1.1.0 / video-analysis):**
+  - Start screen (`#home`, `Home` in analysis.js): QC / Conform or Video Analysis; Home button in the QC header
+    (`#homeBtn`) and the analysis page (`#anaHome`). Web: Video Analysis is a full page (`html.ana-page`), keeps running
+    while you QC (`#anaBtn` in the QC header = "Analysing 2 of 5…"). Mac: the button opens the analysis window; its Home
+    posts `showHome` (main window to front, start screen). Self-test skips it (`window.__selftest`, `Home.hide()`).
+  - Markers: `VideoMarkers/<video name>.markers.json`, format `video-markers` v1 (old Subtitle QC Data dropped: nothing
+    to keep). Place: beside the topmost delivery folder (Encodes/_Encodes/QC_PASS/QC_FAIL, `DELIVERY`), else in the
+    video's folder (`markersPlace` web handles / `markersPathFor` Mac paths). Web analysis takes any folder and lists
+    videos 3 levels down (pick Digital or the season); a delivery folder chosen itself → notice "choose the folder above".
+    QC page: by name, else by `Match.episodeKey` with length ±1 s ("from <proxy>"); web looks in the videos folder's
+    VideoMarkers, the analysed folders remembered in IndexedDB (`markerRoots`, `resolve()`), links (`markerLinks`);
+    Mac: Swift `markersRead {dirs, around}` (own + parent / grandparent and their subfolders), `markersWrite {dir}`,
+    `Access.isMarkersAllowed` (VideoMarkers up to 3 levels above a chosen folder). Link markers folder… / Allow buttons.
+  - Web engine: on-screen text only (`textdetect.js` wraps `web/labs/lab-video.js` + `web/labs/text-engine.js`, the
+    lab's `findText` and `TEXT_RULES`: lab and app share the rules); blacks / credits are Mac-only (no simulation any
+    more). Built with `TEXT_MODEL=1 python3 build.py` (needs `web/labs/fetch_assets.sh`; ~37 MB page); the Mac app's page
+    is built without it (~0.7 MB). build.yml builds the web download with the model after the app.
+  - QC checks with text markers: `m.allText` → filters "On text" / "Near text", any text counts for "Raised, no credit".
+  - Headless testing: OPFS folders (http://localhost) + `Analysis._useFolder`; headless Chromium crashes storing OPFS
+    handles in IndexedDB, so tests stub HandleStore (real Chrome is fine with picked folders).
 - Version: this branch is 1.1.0 (`APP_VERSION`); main / release stay 1.0.0 until it's merged.
 - Web text detection lab (`web/labs/text-detection.src.html`, download page `docs/labs.html`): find all on-screen text
   without reading it over the whole episode (a frame every 2 s, in/out by bisection). Findings: image checks (edges)

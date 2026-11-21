@@ -198,7 +198,8 @@
       if (c.onText) c.nearText = null;
       // Raised (or at the top) with nothing to make room for: no credit within 20 s, no on-screen text at the time.
       if (c.placement && (c.placement.v === 'raised' || c.placement.v === 'top') && m.scannedTo && vb < m.scannedTo && m.cards) {
-        const nearCredit = m.cards.some(k => (k.kind === 'credit' || k.kind === 'title') && vb < k.out + RAISED_WINDOW && ve > k.in - RAISED_WINDOW);
+        // (markers from text detection don't tell credits from other text: any of it counts)
+        const nearCredit = m.cards.some(k => (m.allText || k.kind === 'credit' || k.kind === 'title') && vb < k.out + RAISED_WINDOW && ve > k.in - RAISED_WINDOW);
         const withText = m.cards.some(k => vb < k.out + TIME_MARGIN && ve > k.in - TIME_MARGIN);
         if (!nearCredit && !withText) c.raisedNoText = true;
       }
@@ -215,7 +216,7 @@
     if (c.tooShort) add('duration', `Short ${secs(c.duration)}s`, `Under ${DUR.shortBad}s on screen (${c.duration.toFixed(3)}s)`);
     else if (c.tooLong) add('duration', `Long ${secs(c.duration)}s`, `Over ${DUR.longBad}s on screen (${c.duration.toFixed(3)}s)`);
     if (c.hasSuspiciousChars) add('suspicious', 'Odd char', 'Contains an invisible / control / replacement character');
-    if (c.onText) add('onText', `On ${c.onText.kind === 'on-screen text' ? 'text' : c.onText.kind}`, `Covers the ${c.onText.kind} “${c.onText.text}” (${formatVideoTC(c.onText.in)} – ${formatVideoTC(c.onText.out)})`);
+    if (c.onText) add('onText', `On ${c.onText.kind === 'on-screen text' ? 'text' : c.onText.kind}`, `Covers ${c.onText.text ? `the ${c.onText.kind} “${c.onText.text}”` : `on-screen text`} (${formatVideoTC(c.onText.in)} – ${formatVideoTC(c.onText.out)})`);
     if (c.overBlack) add('overBlack', 'Over black', `Runs across the commercial black at ${formatVideoTC(c.overBlack.in)}`);
     if (c.pastEnd) add('pastEnd', 'Past end', `Still on screen after the video ends (the event ends ${formatVideoTC(c.end)}, the video at ${formatVideoTC(c.videoEnd)})`);
     return out;
@@ -226,7 +227,7 @@
     if (c.mixedAlign) out.push({ key: 'mixed', text: 'Mixed align', title: 'Lines of this event are aligned differently', kind: 'warn' });
     if (c.shortWarn) out.push({ key: 'duration', text: `Short ${secs(c.duration)}s`, title: `Under ${DUR.shortWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
     if (c.longWarn) out.push({ key: 'duration', text: `Long ${secs(c.duration)}s`, title: `Over ${DUR.longWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
-    if (c.nearText) out.push({ key: 'nearText', text: `Near ${c.nearText.kind === 'on-screen text' ? 'text' : c.nearText.kind}`, title: `Close to the ${c.nearText.kind} “${c.nearText.text}” (${formatVideoTC(c.nearText.in)} – ${formatVideoTC(c.nearText.out)}): about ${Math.round(c.nearText.gap)}% of the picture height apart`, kind: 'warn' });
+    if (c.nearText) out.push({ key: 'nearText', text: `Near ${c.nearText.kind === 'on-screen text' ? 'text' : c.nearText.kind}`, title: `Close to ${c.nearText.text ? `the ${c.nearText.kind} “${c.nearText.text}”` : 'on-screen text'} (${formatVideoTC(c.nearText.in)} – ${formatVideoTC(c.nearText.out)}): about ${Math.round(c.nearText.gap)}% of the picture height apart`, kind: 'warn' });
     if (c.raisedNoText) out.push({ key: 'raisedNoText', text: 'Raised, no credit', title: `Raised or at the top, but there is no credit within ${RAISED_WINDOW} s and no other on-screen text at the time (from the video analysis)`, kind: 'warn' });
     if (c.cpsOver) out.push({ key: 'cps', text: `CPS ${c.cps.toFixed(1)}`, title: `Fast: ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`, kind: 'warn' });
     if (!c.gapWarn) return out;
@@ -266,12 +267,12 @@
       title: `Short: under ${DUR.shortWarn}s amber, under ${DUR.shortBad}s red · Long: over ${DUR.longWarn}s amber, over ${DUR.longBad}s red`,
       test: c => !!(c.tooShort || c.tooLong || c.shortWarn || c.longWarn) },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
-    { key: 'onText', label: 'On credits', cls: 'f-issue', title: 'Covers a credit or other on-screen text (from the video analysis)', test: c => !!c.onText },
+    { key: 'onText', get label() { const m = typeof marksNow === 'function' && marksNow(); return m && m.allText ? 'On text' : 'On credits'; }, cls: 'f-issue', title: 'Covers a credit or other on-screen text (from the video markers)', test: c => !!c.onText },
     { key: 'overBlack', label: 'Over black', cls: 'f-issue', title: 'Runs across a commercial black (from the video analysis)', test: c => !!c.overBlack },
     { key: 'pastEnd', label: 'Past end', cls: 'f-issue', title: 'Still on screen after the video ends', test: c => !!c.pastEnd },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'mixed', label: 'Mixed align', cls: 'f-warn', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
-    { key: 'nearText', label: 'Near credits', cls: 'f-warn', title: `Within ${NEAR_PCT}% of the picture height of a credit or other on-screen text`, test: c => !!c.nearText },
+    { key: 'nearText', get label() { const m = typeof marksNow === 'function' && marksNow(); return m && m.allText ? 'Near text' : 'Near credits'; }, cls: 'f-warn', title: `Within ${NEAR_PCT}% of the picture height of a credit or other on-screen text`, test: c => !!c.nearText },
     { key: 'raisedNoText', label: 'Raised, no credit', cls: 'f-warn', title: `Raised or at the top, with no credit within ${RAISED_WINDOW} s and no on-screen text at the time`, test: c => !!c.raisedNoText },
     { key: 'gaps', label: 'Gaps', cls: 'f-warn', title: '1-frame gaps (the subtitle blinks off for a frame)', test: c => !!c.gapWarn },
     { key: 'placement', label: 'Placement', cls: 'f-place', title: 'Raised, or left / right-aligned', test: c => !!(c.placement && (c.placement.v === 'raised' || c.placement.h === 'left' || c.placement.h === 'right')) },

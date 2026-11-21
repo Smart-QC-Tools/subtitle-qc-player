@@ -10,7 +10,7 @@ for f in "$MEDIA"/Videos/*; do echo "== $(basename "$f") $(stat -f%z "$f") bytes
 export SQC_SELFTEST="$(pwd)/mac/selftest/selftest.js" SQC_VIDEOS="$MEDIA/Videos" SQC_SUBS="$MEDIA/Subtitles" SQC_RESULT="$OUT/result.json"
 # Video analysis test folder (the results files the app writes there are collected too). SQC_ONLY=analysis skips the playback tests.
 export SQC_ANALYSIS="$MEDIA/Analysis" SQC_ONLY="${SQC_ONLY:-}"
-rm -rf "$MEDIA/Analysis/Subtitle QC Data"
+rm -rf "$MEDIA/Analysis/VideoMarkers"
 EVERY=20; [ -n "$SQC_ONLY" ] && EVERY=4
 "$BIN" > "$OUT/stdout.txt" 2>&1 &
 PID=$!
@@ -32,7 +32,7 @@ wait $PID 2>/dev/null; echo "exit $?" >> "$OUT/ps.txt"
 { echo "== nettop (processes with any network traffic):"; nettop -P -L 1 -x -n 2>/dev/null | grep -iE "SubtitleQC|WebKit" || echo "(none of ours)"; } >> "$OUT/network.txt"
 [ "$(grep -c '^== [0-9]' "$OUT/network.txt")" = "0" ] && grep -q "(none of ours)" "$OUT/network.txt" && echo "NETWORK: no connections" >> "$OUT/network.txt" || echo "NETWORK: SEE ABOVE" >> "$OUT/network.txt"
 cp "$HOME/Library/Logs/Subtitle QC Player/app.log" "$OUT/" 2>/dev/null || true
-cp -R "$MEDIA/Analysis/Subtitle QC Data" "$OUT/analysis-results" 2>/dev/null || true
+cp -R "$MEDIA/Analysis/VideoMarkers" "$OUT/analysis-results" 2>/dev/null || true
 cp "$MEDIA/Analysis/expected.json" "$OUT/analysis-expected.json" 2>/dev/null || true
 # crash reports, if any
 cp "$HOME"/Library/Logs/DiagnosticReports/SubtitleQC* "$OUT/" 2>/dev/null || true

@@ -10,7 +10,8 @@ b64 = lambda p: base64.b64encode(open(os.path.join(here, p), 'rb').read()).decod
 
 def build(name, extra=None):
     src = open(os.path.join(here, name + '.src.html'), encoding='utf-8').read()
-    src = src.replace('/*@include lab-video.js*/', open(os.path.join(here, 'lab-video.js'), encoding='utf-8').read())
+    for inc in ('lab-video.js', 'text-engine.js'):
+        src = src.replace('/*@include %s*/' % inc, open(os.path.join(here, inc), encoding='utf-8').read())
     src = src.replace('__PRORES_WASM_B64__', b64('prores/prores.wasm'))
     # labs.yml sets the build number; a local build says so
     src = src.replace('__LAB_BUILD__', 'BUILD ' + os.environ['LAB_BUILD'] if os.environ.get('LAB_BUILD') else 'local build')

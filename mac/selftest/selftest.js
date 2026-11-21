@@ -2,6 +2,7 @@
 // person would (folders, episode list, keys, clicks) and records timings and anything odd.
 (async () => {
   const CFG = window.__selftest || {};
+  if (window.Home) Home.hide();   // 1.1.0: straight past the start screen
   const R = { started: new Date().toISOString(), ua: navigator.userAgent, steps: [], problems: [], errors: [] };
   const T0 = performance.now();
   const now = () => performance.now();
@@ -124,7 +125,7 @@
       // the window's own run: wait for its results files
       const t = now(); let texts = [];
       const complete = x => { try { const r = JSON.parse(x); return r.blacks && (r.credits || (expected && expected.text === false)); } catch (e) { return false; } };
-      while (now() - t < 600000) { texts = await Native.call('analysisReadAll', { folder: CFG.analysis }).catch(() => []); if (texts.filter(complete).length >= vids.length) break; await sleep(1000); }
+      while (now() - t < 600000) { texts = (await Native.call('markersRead', { dirs: [CFG.analysis.replace(/\/+$/, '') + '/VideoMarkers'] }).catch(() => [])).map(x => x.json); if (texts.filter(complete).length >= vids.length) break; await sleep(1000); }
       const written = texts.map(x => { try { const r = JSON.parse(x); return { name: r.video && r.video.name, format: r.format, version: r.version, app: r.app, simulated: r.simulated, fingerprint: r.video && r.video.fingerprint, duration: r.video && r.video.duration, blacks: r.blacks && { settings: r.blacks.settings, n: (r.blacks.items || []).length, commercial: (r.blacks.items || []).filter(b => b.kind === 'commercial').length }, credits: r.credits && { confirmed: r.credits.confirmed, cards: (r.credits.cards || []).length, credits: (r.credits.cards || []).filter(c => c.kind === 'credit').length, runs: r.credits.runs, seconds: r.credits.seconds } }; } catch (e) { return { bad: String(e) }; } });
       step('analysis: results files written by the window', { waitedMs: round(now() - t, 0), files: written });
       if (written.length < vids.length) problem('analysis window wrote fewer results files than videos', { written: written.length, videos: vids.length });

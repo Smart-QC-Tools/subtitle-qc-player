@@ -122,24 +122,27 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "analysisCancel":
             analysisJobs[Int(num("id"))]?.cancel()
             replyHandler(true, nil)
-        case "analysisReadAll":
-            let folder = str("folder")
-            guard Access.isAllowed(folder) else { replyHandler([String](), nil); return }
+        case "markersRead":
+            let dirs = body["dirs"] as? [String] ?? [], around = str("around")
             DispatchQueue.global(qos: .userInitiated).async {
-                let list = AnalysisFiles.readAll(folder: folder)
+                let list = MarkersFiles.read(dirs: dirs, around: Access.isAllowed(around) ? around : "")
                 DispatchQueue.main.async { replyHandler(list, nil) }
             }
-        case "analysisWrite":
-            let folder = str("folder"), name = str("name"), json = str("json")
-            guard Access.isAllowed(folder) else { replyHandler(nil, "Not allowed: choose this folder first."); return }
+        case "markersWrite":
+            let dir = str("dir"), name = str("name"), json = str("json")
             DispatchQueue.global(qos: .userInitiated).async {
-                let problem = AnalysisFiles.write(folder: folder, videoName: name, json: json)
+                let problem = MarkersFiles.write(dir: dir, fileName: name, json: json)
                 DispatchQueue.main.async { [weak self] in
                     if let p = problem { replyHandler(nil, p); return }
-                    self?.tellOthers("analysisFile", ["folder": Access.canonical(folder), "name": name, "json": json])
+                    self?.tellOthers("analysisFile", ["dir": Access.canonical(dir), "name": name])
                     replyHandler(true, nil)
                 }
             }
+        case "showHome":
+            // from the analysis window's Home button: the main window, at its start screen
+            (NSApp.delegate as? AppDelegate)?.window?.makeKeyAndOrderFront(nil)
+            tellOthers("showHome", [:])
+            replyHandler(true, nil)
         case "analysisBusy":
             AnalysisWindow.shared.setBusy(running: body["running"] as? Bool ?? false, keepAwake: body["awake"] as? Bool ?? false, title: str("title"))
             replyHandler(true, nil)

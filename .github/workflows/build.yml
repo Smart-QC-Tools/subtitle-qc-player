@@ -5,7 +5,7 @@ name: Build Mac app
 on:
   push:
     branches: [video-analysis, 'release/**']
-    paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'CLAUDE.md', 'mac/selftest/**', '.github/workflows/selftest.yml', 'web/labs/**', '.github/workflows/labs.yml']
+    paths-ignore: ['docs/**', 'README.md', 'IDEAS.md', 'CLAUDE.md', 'mac/selftest/**', '.github/workflows/selftest.yml', 'web/labs/*.src.html', 'web/labs/build_lab.py', 'web/labs/README.md', 'web/labs/fetch_assets.sh', '.github/workflows/labs.yml']   # (text-engine.js, lab-video.js and prores/ are in the app's web page too)
   workflow_dispatch:
     inputs:
       replace_release:
@@ -30,6 +30,14 @@ jobs:
 
       - name: Build Subtitle QC Player.app
         run: BUILD_NUMBER=${{ github.run_number }} bash mac/build.sh
+
+      # The web version's Video Analysis finds on-screen text with the lab's engine and a text-detection model
+      # (about 35 MB, packed into the page). The Mac app's page doesn't carry it (its analysis is native), so the web
+      # page is built again, with the model, after the app.
+      - name: Web version with the text detector
+        run: |
+          bash web/labs/fetch_assets.sh
+          cd web && TEXT_MODEL=1 python3 build.py
 
       # A signed record that these exact files were built by this workflow, in this repository, from this commit.
       # Anyone can check a download:  gh attestation verify Subtitle-QC-Player.zip --repo Smart-QC-Tools/subtitle-qc-player

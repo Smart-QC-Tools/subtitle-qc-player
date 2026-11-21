@@ -13,4 +13,6 @@ Experiments, not part of the app. Nothing here is built into the web version or 
   episode (T1103 / T1104). Needs `web/labs/fetch_assets.sh` once (downloads onnxruntime-web 1.20.1 and the model
   into `web/labs/vendor/`, not committed); the built page is ~35 MB because everything is inside it.
 - `lab-video.js`: shared by both pages (MP4 / MOV parsing, frame decoding), inlined at build time.
+- `text-engine.js`: the text detector and the rules (`findText`, `TEXT_RULES`). The lab page and the app's Video Analysis
+  (web/src/textdetect.js) both use it: a rule changed here changes the app too (rebuilds the preview).
 - `prores/`: the ProRes decoder (`prores.wasm`, 346 KB, ~130 KB compressed) and how to rebuild it (`build.sh`).
