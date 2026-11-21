@@ -112,7 +112,7 @@ footer { color: var(--dim); font-size: 13px; border-top: 1px solid var(--line); 
 
   <section class="get web" aria-labelledby="web-h">
     <h2 id="web-h" style="margin:0">Web version · preview</h2>
-    <p class="note" style="margin:0">The same tool as a single page that runs in Google Chrome on Mac or Windows, with no install. Download it, then open the file in Chrome. Chrome can't play ProRes, so for ProRes video use the Mac app. This preview includes the new video analysis window, with simulated results (the real analysis runs in the Mac app).</p>
+    <p class="note" style="margin:0">The same tool as a single page that runs in Google Chrome on Mac or Windows, with no install. Download it, then open the file in Chrome. Chrome can't play ProRes, so for ProRes video use the Mac app. This preview starts with a choice of <b>QC / Conform</b> or <b>Video Analysis</b>, which finds on-screen text in a folder of videos right in Chrome (ProRes included). The text-detection model is inside the file, so the download is about 35 MB.</p>
     <div class="get-row">
       <a class="dl secondary" id="webBtn" href="https://github.com/Smart-QC-Tools/subtitle-qc-player/releases/download/analysis-preview/Subtitle_QC_Player.html">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10.5 12 15.5 17 10.5"/><path d="M5 19.5h14"/></svg>
@@ -141,7 +141,7 @@ footer { color: var(--dim); font-size: 13px; border-top: 1px solid var(--line); 
       <li>Checks a subtitles folder (TTML, IMSC, iTT, DFXP, WebVTT, SRT, SCC) against the language code list: labelled, expected and detected language, Full / Forced / SDH, cue checks.</li>
       <li>Matches each subtitle file to its episode video by file name.</li>
       <li>QC player with a waveform bar, subtitle events, and timecode from the video's own timecode track.</li>
-      <li><b>New in this preview:</b> video analysis, a batch window that finds commercial blacks and opening credits in a folder of videos (in progress; the web version simulates the results).</li>
+      <li><b>New in this preview:</b> a start screen with <b>QC / Conform</b> and <b>Video Analysis</b>. Video Analysis works through a folder of videos and keeps what it finds in a <b>VideoMarkers</b> folder for the QC page: on-screen text (web version), commercial blacks and opening credits (Mac app). Subtitles over on-screen text are flagged.</li>
       <li>J / K / L shuttle, frame stepping with <kbd>←</kbd> <kbd>→</kbd>, and <kbd>↑</kbd> <kbd>↓</kbd> to jump between subtitle events.</li>
     </ul>
     <div class="wave" aria-hidden="true" id="wave"></div>
