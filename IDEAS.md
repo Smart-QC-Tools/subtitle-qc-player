@@ -1,5 +1,34 @@
 # Ideas (discussed, not built)
 
+## Video analysis as its own workflow + the VideoMarkers folder (agreed 2026-11-21, not built yet)
+
+**Versions.** 1.0.0 stays the clean QC / Conform version (no start screen, no analysis). 1.1.0 = the advanced version.
+
+**Start screen (1.1.0, web and Mac alike).** Two big buttons: **QC / Conform** (check subtitles against video) and
+**Video Analysis** (find blacks, credits, on-screen text in a folder of videos), recent folders under each. A Home
+button in both workflows' headers goes back. Analysis keeps running while you QC (switching doesn't stop it).
+Web 1.1.0 carries the text-detection model (~35 MB file).
+
+**Markers folder: `VideoMarkers`** (generic name, not tied to this app; visible; files `<video file name>.markers.json`,
+old `Subtitle QC Data/*.analysis.json` still read). Where:
+- Video in an `Encodes` / `_Encodes` folder or below one (Encodes/QC_PASS, Encodes/QC_FAIL): `VideoMarkers` beside that
+  Encodes folder (same level). Never inside delivery folders.
+- Otherwise: `VideoMarkers` inside the video's own folder (e.g. Client 2 `_Proxies/_Episodic/<Series>/<Season>/`,
+  Client 1 `…/Digital/Proxies/`).
+- Packages, Deliverables and other folders at the Encodes level don't matter (no videos there).
+- Write access on the shared drive: believed fine, to be tested with the first build.
+
+**Proxies count for the episode.** Often proxies are all there is (lots of the work is dubs and subs). Markers match
+by episode (series / season / episode from the file name, as Conform does) and are used only when the length agrees
+within 1 s (else "different cut", not used). Lookup: own VideoMarkers, then other VideoMarkers folders in the same
+season (finds `Proxies/VideoMarkers` from `Encodes`), then a manual **Link markers folder…** (remembered per season;
+for clients whose proxies live in a separate tree, e.g. Client 2). The QC page says where markers came from
+("Markers from ep101_proxy.mp4").
+
+Client folder examples (from the user): Client 1 `_TVDeliveries/<Series>/<Season>/Digital/{Proxies, Encodes,
+Encodes/QC_PASS}`; Client 2 `_Proxies/_Episodic/<Series>/<Season>` and `<Series>/<Season>/Encodes/{QC_PASS, QC_FAIL}`.
+Still deferred from earlier: hand-made markers files, pass / fail + moving to QC_PASS / QC_FAIL.
+
 ## Commercial black detection (discussed 2026-11-05)
 - Optional "Analyze blacks" button; runs in the background with progress.
 - Black frame = ~98% of pixels below ~10% luma (ffmpeg blackdetect defaults), on a downscaled frame.

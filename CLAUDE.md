@@ -157,6 +157,10 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   Blacks engine v3: silence = RMS ≤ −50 dBFS (a low noise floor counts); blacks with sound are dropped.
 - Results folder stays visible ("Subtitle QC Data" next to the videos): sharing results is crucial to the user
   (not hidden, not in Application Support).
+- Agreed next design (2026-11-21, IDEAS.md "Video analysis as its own workflow"): 1.1.0 gets a start screen (QC / Conform
+  or Video Analysis, Home button back; web and Mac), 1.0.0 stays clean QC. Results move to a `VideoMarkers` folder:
+  beside the `Encodes` / `_Encodes` folder when the video is in or below one, else inside the video's folder; markers
+  match by episode (proxies count for encodes, same length ±1 s); Link markers folder… as a fallback.
 - Version: this branch is 1.1.0 (`APP_VERSION`); main / release stay 1.0.0 until it's merged.
 - Web text detection lab (`web/labs/text-detection.src.html`, download page `docs/labs.html`): find all on-screen text
   without reading it over the whole episode (a frame every 2 s, in/out by bisection). Findings: image checks (edges)
