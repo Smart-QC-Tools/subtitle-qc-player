@@ -175,6 +175,14 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
     lab's `findText` and `TEXT_RULES`: lab and app share the rules); blacks / credits are Mac-only (no simulation any
     more). Built with `TEXT_MODEL=1 python3 build.py` (needs `web/labs/fetch_assets.sh`; ~37 MB page); the Mac app's page
     is built without it (~0.7 MB). build.yml builds the web download with the model after the app.
+  - Analysis listing (2026-11-24): videos grouped by sub-folder (3 levels; only folders with videos), folder icon, ▾/▸
+    collapse (remembered, `ana:collapsed`), a folder checkbox ticks its videos; audio-only / dubcard / < 1 min files
+    (`classifyVideo`, as on the QC page) in a collapsed "Ignored" group, unticked; ↻ Rescan. Mac: `listFolder` takes
+    `folders: true` (returns `isDir` entries; `NDir.entries(true)`), so the window lists sub-folders too.
+    Web, videos folder = a delivery folder: Videos row shows the folder, Results row "Not chosen yet" + "Choose the folder
+    above…" (must hold the videos folder, checked with `resolve()`, and not be a delivery folder itself); then Videos shows
+    "Digital / Encodes / QC_PASS" and Results "Digital / VideoMarkers · beside Encodes, the delivery folder". Remembered
+    per videos folder (`anaResults` in IndexedDB; "Allow" on a new visit). Last videos folder: "Open “X” again" button.
   - QC checks with text markers: `m.allText` → filters "On text" / "Near text", any text counts for "Raised, no credit".
   - Headless testing: OPFS folders (http://localhost) + `Analysis._useFolder`; headless Chromium crashes storing OPFS
     handles in IndexedDB, so tests stub HandleStore (real Chrome is fine with picked folders).

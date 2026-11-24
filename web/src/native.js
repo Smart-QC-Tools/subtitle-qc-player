@@ -51,9 +51,10 @@ const Native = (() => {
   }
   class NDir {
     constructor(path) { this.path = path; this.name = path.split('/').filter(Boolean).pop() || path; this.kind = 'directory'; }
-    async *entries() {
-      const list = await call('listFolder', { path: this.path });
-      for (const f of list) yield [f.name, { kind: 'file', getFile: async () => new NFile(f) }];
+    // folders: true also lists the folders inside (Video Analysis looks a few levels down)
+    async *entries(folders) {
+      const list = await call('listFolder', { path: this.path, folders: !!folders });
+      for (const f of list) yield f.isDir ? [f.name, new NDir(f.path)] : [f.name, { kind: 'file', getFile: async () => new NFile(f) }];
     }
     async queryPermission() { return 'granted'; }
     async requestPermission() { return 'granted'; }

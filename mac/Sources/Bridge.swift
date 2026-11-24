@@ -47,14 +47,15 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             if let win = webView?.window { panel.beginSheetModal(for: win, completionHandler: finish) } else { finish(panel.runModal()) }
 
         case "listFolder":
-            let path = str("path")
+            let path = str("path"), withFolders = (body["folders"] as? Bool) == true
             guard Access.isAllowed(path) else { replyHandler(nil, "Not allowed: choose this folder first."); return }
             DispatchQueue.global(qos: .userInitiated).async {
                 let url = URL(fileURLWithPath: path, isDirectory: true)
-                let items = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey], options: [.skipsHiddenFiles])
+                let items = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey, .fileSizeKey, .contentModificationDateKey], options: [.skipsHiddenFiles])
                 DispatchQueue.main.async {
                     guard let items = items else { replyHandler(nil, "Can't read the folder “\(path)”."); return }
-                    let files = items.compactMap { FileInfo.describe($0) }.filter { ($0["isFile"] as? Bool) == true }
+                    // files; with folders: true, the folders inside too (isDir), packages such as .app excluded
+                    let files = items.compactMap { FileInfo.describe($0) }.filter { ($0["isFile"] as? Bool) == true || (withFolders && ($0["isDir"] as? Bool) == true) }
                     replyHandler(files, nil)
                 }
             }

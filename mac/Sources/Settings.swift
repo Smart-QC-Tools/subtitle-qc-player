@@ -16,13 +16,14 @@ enum Settings {
 
 enum FileInfo {
     static func describe(_ url: URL) -> [String: Any]? {
-        guard let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]) else { return nil }
+        guard let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .isPackageKey, .fileSizeKey, .contentModificationDateKey]) else { return nil }
         return [
             "name": url.lastPathComponent,
             "path": url.path,
             "size": v.fileSize ?? 0,
             "mtime": ((v.contentModificationDate ?? Date()).timeIntervalSince1970 * 1000).rounded(),
             "isFile": v.isRegularFile ?? false,
+            "isDir": (v.isDirectory ?? false) && !(v.isPackage ?? false),
         ]
     }
 }

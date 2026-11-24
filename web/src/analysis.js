@@ -52,7 +52,7 @@ const Analysis = (() => {
     const upTo = i > 0 ? i - 1 : segs.length;    // walk this many folders down from the chosen one
     let h = root;
     try { for (let k = 0; k < upTo; k++) h = await h.getDirectoryHandle(segs[k]); } catch (e) { return { needParent: false, parent: null }; }
-    return { parent: h, label: [...names.slice(0, upTo + 1), MARKERS_DIR].join('/') };
+    return { parent: h, label: [...names.slice(0, upTo + 1), MARKERS_DIR].join(' / ') };
   }
   async function markersDir(place, create) {
     if (!place || !place.parent) return null;
@@ -141,6 +141,12 @@ const Analysis = (() => {
   // ------------------------------------------------------------ the analysis page / window
   let rows = [], running = false, stopReq = false, built = false, sourceHandle = null, sourceLabel = '', ownFolder = false;
   let queueInfo = null, folderProblem = '', needParent = false;
+  // Web, videos in a delivery folder: the folder chosen for the results (it holds the videos folder; VideoMarkers is
+  // made beside the topmost delivery folder in it), the path from it down to the videos folder, and what went wrong.
+  let resultsRoot = null, resultsRel = null, resultsNote = '', resultsAsk = null;
+  const collapsed = new Set((() => { try { return JSON.parse(Store.get('ana:collapsed') || '[]'); } catch (e) { return []; } })());
+  let ignOpen = false;
+  const probeCache = new Map();   // file key → { probe, reason } (a rescan doesn't read every file again)
   const store = new Map();   // video name → its markers (the videos on this page)
   const typeOn = {}; for (const t of TYPES) typeOn[t.key] = t.can && Store.get('ana:t:' + t.key) !== '0';
   let skipDone = Store.get('ana:skip') !== '0';
@@ -164,8 +170,8 @@ const Analysis = (() => {
       <div class="modal ana" role="dialog" aria-label="Video analysis">
         <div class="modal-h"><button class="textbtn home-btn" id="anaHome" title="Back to the start screen (the analysis keeps running)">${HOME_ICON} Home</button><b>Video Analysis</b><span class="spacer"></span><button class="textbtn" id="anaHelp" title="Where results are kept">Where results go</button></div>
         <div class="ana-body">
-          <div class="ana-row"><span class="ana-k">Folder</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
-          <div class="ana-row"><span class="ana-k">Results</span><span class="ana-dest" id="anaDest"></span></div>
+          <div class="ana-row"><span class="ana-k">Videos</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaRescan" hidden title="Read the folder again">↻ Rescan</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
+          <div class="ana-row"><span class="ana-k">Results</span><span class="ana-dest" id="anaDest"></span><button class="btn sm" id="anaPickRes" hidden>Choose…</button></div>
           <div class="ana-note-box" id="anaParent" hidden></div>
           <div class="ana-row"><span class="ana-k">Find</span>${TYPES.map(t => `<label class="ana-chk${t.can ? '' : ' later'}"${t.can ? '' : ` title="${esc(t.why)}"`}><input type="checkbox" data-type="${t.key}"${!t.can ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.can ? '' : ` <i>(${NATIVE ? 'later' : 'Mac app'})</i>`}</label>`).join('')}${TYPES.some(t => t.key === 'text' && t.can) ? `<label class="ana-chk ana-dense" title="On-screen text: a look at every second instead of every 2 seconds, so captions and name cards shorter than 2 s are found too. Takes about 1.5 times as long."><input type="checkbox" id="anaDense"${dense ? ' checked' : ''}> Dense (a look every second, slower)</label>` : ''}</div>
           <div class="ana-tablewrap"><table class="ana-table"><colgroup><col class="c-c"><col class="c-f"><col class="c-l">${TYPES.map(() => '<col class="c-t">').join('')}</colgroup>
@@ -185,15 +191,30 @@ const Analysis = (() => {
     m.querySelectorAll('input[data-type]').forEach(cb => cb.onchange = () => { typeOn[cb.dataset.type] = cb.checked; Store.set('ana:t:' + cb.dataset.type, cb.checked ? '1' : '0'); render(); });
     if ($('#anaDense')) $('#anaDense').onchange = e => { dense = e.target.checked; Store.set('ana:dense', dense ? '1' : '0'); render(); };
     $('#anaSkip').onchange = e => { skipDone = e.target.checked; Store.set('ana:skip', skipDone ? '1' : '0'); render(); };
-    $('#anaAll').onchange = e => { if (running) return; rows.forEach(r => r.checked = e.target.checked && !r.blocked); render(); };
-    $('#anaBody').addEventListener('change', e => { const cb = e.target.closest('input[data-i]'); if (cb && !running) { rows[+cb.dataset.i].checked = cb.checked; render(); } });
-    // a click on an analysed row shows what was found
+    $('#anaAll').onchange = e => { if (running) return; rows.forEach(r => r.checked = e.target.checked && !r.blocked && !r.ignored); render(); };
+    $('#anaBody').addEventListener('change', e => {
+      if (running) return;
+      const cb = e.target.closest('input[data-i]'); if (cb) { rows[+cb.dataset.i].checked = cb.checked; render(); return; }
+      const g = e.target.closest('input[data-g]'); if (g) { groupRows(g.dataset.g).forEach(r => { if (!r.blocked) r.checked = g.checked; }); render(); }
+    });
     $('#anaBody').addEventListener('click', e => {
+      if (e.target.closest('#anaReopen')) { reopenLast(); return; }
       if (e.target.closest('input') || e.target.closest('tr.ana-detail')) return;
+      // a folder: open / close it
+      const gt = e.target.closest('tr[data-g]');
+      if (gt) {
+        const k = gt.dataset.g;
+        if (k === IGN) ignOpen = !ignOpen;
+        else { if (collapsed.has(k)) collapsed.delete(k); else collapsed.add(k); Store.set('ana:collapsed', JSON.stringify([...collapsed].slice(-200))); }
+        $('#anaBody').innerHTML = bodyHtml(); return;
+      }
+      // a click on an analysed row shows what was found
       const tr = e.target.closest('tr[data-i]'); if (!tr) return;
       const r = rows[+tr.dataset.i]; if (!r || !hasResults(store.get(r.name))) return;
-      r.open = !r.open; $('#anaBody').innerHTML = rows.map(rowHtml).join('');
+      r.open = !r.open; $('#anaBody').innerHTML = bodyHtml();
     });
+    $('#anaRescan').onclick = rescan;
+    $('#anaPickRes').onclick = pickResults;
     $('#anaStart').onclick = start;
     $('#anaStop').onclick = stop;
     $('#anaChange').onclick = changeFolder;
@@ -235,7 +256,59 @@ const Analysis = (() => {
     HandleStore.set('analysis', dir);
     ownFolder = true; sourceHandle = dir; sourceLabel = dir.name;
     await rememberRoot(dir);
+    await recallResults();
     await loadRows(await listDeep(dir));
+  }
+  // The last folder, opened again with one click (Chrome asks once per visit).
+  async function reopenLast() {
+    const last = sourceHandle || HandleStore.cache.analysis || await HandleStore.load('analysis');
+    if (!last) return changeFolder();
+    try { if (await last.requestPermission({ mode: 'readwrite' }) !== 'granted') return; } catch (e) { return changeFolder(); }
+    folderProblem = '';
+    await useOwnFolder(last);
+  }
+  async function rescan() {
+    if (running) return;
+    if (WINDOW || !ownFolder) { await refresh(true); return; }
+    if (sourceHandle) await loadRows(await listDeep(sourceHandle));
+  }
+  // ---- web: where results go when the videos folder is a delivery folder (or inside one). The page can't reach above
+  // the folder it was given, so the folder that holds the delivery folder is chosen once; it's remembered per videos folder.
+  async function recallResults() {
+    resultsRoot = null; resultsRel = null; resultsNote = ''; resultsAsk = null;
+    if (NATIVE || !sourceHandle || !sourceHandle.isSameEntry) return;
+    for (const x of ((await HandleStore.load('anaResults')) || [])) {
+      let same = false; try { same = x && x.videos && await x.videos.isSameEntry(sourceHandle); } catch (e) { /* gone */ }
+      if (!same) continue;
+      let perm = 'prompt'; try { perm = await x.results.queryPermission({ mode: 'readwrite' }); } catch (e) { /* */ }
+      if (perm === 'granted') await setResults(x.results, false); else resultsAsk = x.results;
+      return;
+    }
+  }
+  async function setResults(root, save) {
+    let rel = null; try { rel = await root.resolve(sourceHandle); } catch (e) { rel = null; }
+    if (!rel) { resultsNote = `“${root.name}” doesn't hold ${sourceLabel}. Choose the folder ${sourceLabel} is in, or one above it.`; return false; }
+    const pl = await markersPlace(root, rel);
+    if (pl.needParent) { resultsNote = `“${root.name}” is a delivery folder too: results can't go inside it. Choose the folder that holds it.`; return false; }
+    resultsRoot = root; resultsRel = rel; resultsNote = ''; resultsAsk = null;
+    await rememberRoot(root);
+    if (save) {
+      const list = ((await HandleStore.load('anaResults')) || []).filter(x => x && x.videos);
+      const keep = []; for (const x of list) { let same = false; try { same = await x.videos.isSameEntry(sourceHandle); } catch (e) { /* */ } if (!same) keep.push(x); }
+      HandleStore.set('anaResults', [{ videos: sourceHandle, results: root }, ...keep].slice(0, 30));
+    }
+    return true;
+  }
+  async function pickResults() {
+    if (running || NATIVE || !window.showDirectoryPicker) return;
+    if (resultsAsk && !resultsRoot) {   // chosen before: just allow it again
+      try { if (await resultsAsk.requestPermission({ mode: 'readwrite' }) === 'granted') { await setResults(resultsAsk, false); await loadRows(rows.map(r => ({ file: r.file, segs: r.segs }))); return; } } catch (e) { /* choose */ }
+    }
+    let dir = null;
+    try { dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'anaResults', startIn: resultsRoot || sourceHandle }); }
+    catch (e) { if (e && e.name === 'AbortError') return; try { dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'anaResults' }); } catch (e2) { return; } }
+    await setResults(dir, true);
+    await loadRows(rows.map(r => ({ file: r.file, segs: r.segs })));
   }
   async function changeFolder() {
     if (running) return;
@@ -255,7 +328,7 @@ const Analysis = (() => {
   // Web: the videos in a folder and in the folders inside it (3 levels; not inside VideoMarkers), so a season or
   // Digital folder takes in Encodes, QC_PASS and Proxies at once. Each: { file, segs (folders below the chosen one) }.
   async function listDeep(dir, segs = [], depth = 0, out = []) {
-    for await (const [name, h] of dir.entries()) {
+    for await (const [name, h] of dir.entries(true)) {   // (the Mac app's folders list sub-folders only when asked)
       if (name.startsWith('.') || name.startsWith('._')) continue;
       if (h.kind === 'file' && VIDEO_EXT.test(name)) out.push({ file: await h.getFile(), segs });
       else if (h.kind === 'directory' && depth < 3 && name !== MARKERS_DIR) await listDeep(h, [...segs, name], depth + 1, out);
@@ -269,20 +342,24 @@ const Analysis = (() => {
     HandleStore.set('markerRoots', [dir, ...list].slice(0, 30));
   }
   // The page's folder: its own, or the QC page's videos folder.
-  async function refresh() {
+  async function refresh(force) {
     if (WINDOW) {
       if (running) { render(); return; }
       sourceLabel = sourceHandle ? sourceHandle.path : '';
       let files = [], problem = '';
-      if (sourceHandle) { try { files = (await listDir(sourceHandle, VIDEO_EXT)).map(f => ({ file: f, segs: [] })); } catch (e) { problem = 'This folder can\'t be read: choose it again with Change…'; } }
+      if (sourceHandle) { try { files = await listDeep(sourceHandle); } catch (e) { problem = 'This folder can\'t be read: choose it again with Change…'; } }
       folderProblem = problem;
       await loadRows(files);
       return;
     }
-    if (running || ownFolder) { render(); return; }
+    if (running || (ownFolder && !force)) { render(); return; }
+    const same = sourceHandle && state.vidHandle && sourceHandle === state.vidHandle;
     sourceHandle = state.vidHandle; sourceLabel = state.vidFolder || '';
-    const files = [...state.videos.map(v => v.file), ...state.ignoredVideos.map(v => v.file)].filter(Boolean).map(f => ({ file: f, segs: [] }));
+    let files;
+    if (sourceHandle && sourceHandle.getDirectoryHandle) { try { files = await listDeep(sourceHandle); } catch (e) { files = null; } }
+    if (!files) files = [...state.videos.map(v => v.file), ...state.ignoredVideos.map(v => v.file)].filter(Boolean).map(f => ({ file: f, segs: [] }));
     if (sourceHandle && sourceHandle.getDirectoryHandle) await rememberRoot(sourceHandle);
+    if (!same) await recallResults();
     await loadRows(files);
   }
   async function loadRows(items) {
@@ -290,21 +367,32 @@ const Analysis = (() => {
     const old = new Map(rows.map(r => [r.key, r]));
     store.clear();
     needParent = false;
-    rows = [];
+    // which files are episodes: audio-only files, dubcards and clips under a minute are set aside (as on the QC page)
+    for (const [i, it] of items.entries()) {
+      const f = it.file, ck = [...it.segs, f.name, f.size, f.lastModified].join('|');
+      if (!probeCache.has(ck)) {
+        if (built && !running && items.length > 3) $('#anaSum').textContent = `Reading the videos: ${i + 1} of ${items.length}…`;
+        const probes = {}; let reason = null;
+        try { reason = await classifyVideo(f, probes); } catch (e) { reason = null; }
+        probeCache.set(ck, { probe: probes[f.name] || null, reason });
+      }
+      it.info = probeCache.get(ck);
+    }
+    const fresh = [];
     for (const it of items) {
-      const f = it.file, key = [...it.segs, f.name].join('/');
-      const qv = state.videos.find(v => v.name === f.name), ig = state.ignoredVideos.find(v => v.name === f.name);
+      const f = it.file, key = [...it.segs, f.name].join('/'), p = it.info.probe, ignored = it.info.reason || '';
       const prev = old.get(key);
-      const r = { key, file: f, name: f.name, segs: it.segs, size: f.size, duration: qv && qv.probe ? qv.probe.duration : null, fps: qv && qv.probe ? qv.probe.fps : null,
-        short: ig ? ig.reason : '', checked: prev ? prev.checked : !ig, open: prev ? prev.open : false, fp: null, live: {} };
+      const r = { key, file: f, name: f.name, segs: it.segs, size: f.size, duration: p ? p.duration : null, fps: p ? p.fps : null,
+        ignored, checked: prev && !prev.blocked ? prev.checked : !ignored, open: prev ? prev.open : false, fp: null, live: {} };
       if (NATIVE) { r.markersPath = markersPathFor(dirname(f.path)); r.dest = r.markersPath; }
       else if (sourceHandle && sourceHandle.getDirectoryHandle) {
-        r.place = await markersPlace(sourceHandle, it.segs);
+        r.place = resultsRoot ? await markersPlace(resultsRoot, [...resultsRel, ...it.segs]) : await markersPlace(sourceHandle, it.segs);
         if (r.place.needParent) { needParent = true; r.blocked = true; r.checked = false; }
         r.dest = r.place.label;
       } else { r.blocked = true; r.checked = false; }
-      rows.push(r);
+      fresh.push(r);
     }
+    rows = [...fresh.filter(r => !r.ignored), ...fresh.filter(r => r.ignored)];
     // the markers already there
     if (NATIVE) { for (const res of await readNative([...new Set(rows.map(r => r.markersPath))])) if (!store.has(res.video.name)) store.set(res.video.name, res); }
     else {
@@ -319,7 +407,6 @@ const Analysis = (() => {
     render();
     for (const r of rows) {           // lengths and fingerprints, filled in as they come
       if (r.duration == null) { try { const p = await TimecodeTrack.probe(r.file); r.duration = p && p.duration; r.fps = p && p.fps; } catch (e) { /* unreadable */ } }
-      if (!old.has(r.key) && r.duration != null && r.duration < 60 && !r.short) { r.short = `short (${Math.round(r.duration)}s), probably a dubcard`; r.checked = false; }
       try { r.fp = await fingerprint(r.file); } catch (e) { r.fp = null; r.err = 'The file can\'t be read'; }
       renderRow(r);
     }
@@ -393,15 +480,39 @@ const Analysis = (() => {
     return `<tr class="ana-detail"><td></td><td colspan="${2 + TYPES.length}">${textHtml(res, r)}${blacksHtml(res, r)}${creditsHtml(res, r)}</td></tr>`;
   }
   const rowHtml = (r, i) => rowMain(r, i) + (r.open ? detailHtml(r) : '');
+  const FOLDER_ICON = '<svg class="ana-fi" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>';
+  const IGN = '\u0000ignored';
+  const groupKey = r => r.ignored ? IGN : r.segs.join('/');
+  const groupRows = k => rows.filter(r => groupKey(r) === k);
+  const hasSub = () => rows.some(x => groupKey(x) !== '' && groupKey(x) !== IGN);   // videos in folders inside the chosen one
+  function groupHtml(k, list) {
+    const open = k === IGN ? ignOpen : !collapsed.has(k);
+    const live = list.filter(r => !r.blocked), on = live.filter(r => r.checked).length;
+    const cb = `<input type="checkbox" data-g="${esc(k)}"${on && on === live.length ? ' checked' : ''}${running || !live.length ? ' disabled' : ''} title="Tick or untick every video in this folder">`;
+    const label = k === IGN ? `Ignored (${list.length}): audio files, dubcards, short clips` : `${FOLDER_ICON}<span class="ana-gname">${esc(k === '' ? sourceLabel : k.split('/').join(' / '))}</span><span class="ana-gn">${list.length} video${list.length === 1 ? '' : 's'}</span>`;
+    return `<tr class="ana-grp${k === IGN ? ' ign' : ''}${open ? ' open' : ''}" data-g="${esc(k)}"><td>${cb.replace('<input', on && on < live.length ? '<input data-mixed="1"' : '<input')}</td><td colspan="${2 + TYPES.length}"><span class="ana-chev">${open ? '▾' : '▸'}</span>${label}</td></tr>`;
+  }
+  function bodyHtml() {
+    if (!rows.length) return '';
+    let html = '', cur = null;
+    rows.forEach((r, i) => {
+      const k = groupKey(r);
+      if (k !== cur) { cur = k; if (k !== '' || hasSub()) html += groupHtml(k, groupRows(k)); }
+      const open = k === IGN ? ignOpen : !collapsed.has(k);
+      if (open) html += rowHtml(r, i);
+    });
+    return html;
+  }
   function rowMain(r, i) {
-    const sub = r.segs.length ? `<div class="ana-sub">${esc(r.segs.join(' / '))}</div>` : '';
-    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${hasResults(store.get(r.name)) ? ' has-res' : ''}${r.open ? ' open' : ''}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running || r.blocked ? ' disabled' : ''}></td>
-      <td class="ana-file">${sub}<div>${esc(r.name)}</div>${r.short ? `<div class="ana-note">${esc(r.short)}</div>` : ''}${r.err ? `<div class="ana-note bad">${esc(r.err)}</div>` : ''}${r.place && r.place.needParent ? '<div class="ana-note">In a delivery folder: choose the folder above it (Change…)</div>' : ''}</td>
+    const sub = r.ignored && r.segs.length ? `<div class="ana-sub">${esc(r.segs.join(' / '))}</div>` : '';
+    const inGroup = groupKey(r) !== '' || hasSub();
+    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${hasResults(store.get(r.name)) ? ' has-res' : ''}${r.open ? ' open' : ''}${inGroup ? ' in-grp' : ''}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running || r.blocked ? ' disabled' : ''}></td>
+      <td class="ana-file">${sub}<div>${esc(r.name)}</div>${r.ignored ? `<div class="ana-note">${esc(r.ignored)}</div>` : ''}${r.err ? `<div class="ana-note bad">${esc(r.err)}</div>` : ''}</td>
       <td class="ana-len">${fmtLen(r.duration)}</td>${TYPES.map(t => `<td class="${t.can ? '' : 'later'}">${cellHtml(r, t)}</td>`).join('')}</tr>`;
   }
   function renderRow(r) {
     if (!built) return;
-    if (rows.some(x => x.open)) { $('#anaBody').innerHTML = rows.map(rowHtml).join(''); return; }
+    if (rows.some(x => x.open)) { $('#anaBody').innerHTML = bodyHtml(); return; }
     const i = rows.indexOf(r), tr = document.querySelector(`#anaBody tr[data-i="${i}"]`);
     if (tr) tr.outerHTML = rowHtml(r, i);
   }
@@ -418,16 +529,31 @@ const Analysis = (() => {
     if (!built) return;
     $('#anaFolder').textContent = sourceLabel || (rows.length ? '' : WINDOW ? 'No folder yet: choose one with Change…, or drop it on this window' : 'No folder yet: choose one with Change…, or drop it here');
     $('#anaFolder').title = sourceLabel;
+    // the videos folder: with a results folder chosen above it, the whole path, the results folder's part dimmed
+    if (resultsRoot && resultsRel) $('#anaFolder').innerHTML = `<span class="ana-dim">${esc([resultsRoot.name, ...resultsRel.slice(0, -1)].join(' / '))} / </span>${esc(sourceLabel)}`;
     const dests = [...new Set(rows.filter(r => r.dest && !(r.place && r.place.needParent)).map(r => r.dest))];
-    $('#anaDest').textContent = !rows.length ? '' : dests.length === 1 ? dests[0] : dests.length ? `${dests.length} VideoMarkers folders (beside each delivery folder, or inside the videos' folder)` : '';
-    $('#anaDest').title = dests.join('\n');
+    const dest = $('#anaDest'), pr = $('#anaPickRes');
+    if (needParent && !resultsRoot) {
+      dest.innerHTML = resultsAsk ? `<span class="ana-warn">${esc(resultsAsk.name)} / VideoMarkers</span> <span class="ana-dim">(chosen before: Chrome asks once per visit)</span>` : '<span class="ana-warn">Not chosen yet</span>';
+      pr.hidden = running; pr.textContent = resultsAsk ? 'Allow' : 'Choose the folder above…';
+    } else {
+      dest.textContent = !rows.length ? '' : dests.length === 1 ? dests[0] : dests.length ? `${dests.length} VideoMarkers folders (beside each delivery folder, or inside the videos' folder)` : '';
+      const dv = resultsRoot && resultsRel ? resultsRel.find(n => DELIVERY.test(n)) : null;
+      if (dv && dests.length === 1) dest.insertAdjacentHTML('beforeend', ` <span class="ana-dim">· beside ${esc(dv)}, the delivery folder</span>`);
+      pr.hidden = !resultsRoot || running; pr.textContent = 'Change…';
+    }
+    dest.title = dests.join('\n');
     const pb = $('#anaParent');
-    pb.hidden = !needParent;
-    if (needParent) pb.innerHTML = `<b>${esc(sourceLabel)}</b> is a delivery folder, and results are kept beside it, never inside. Choose the folder that holds it (Digital, or the season's folder) with <b>Change…</b>: its videos are found in the folders inside.`;
+    pb.hidden = !(needParent && !resultsRoot) && !resultsNote;
+    pb.classList.toggle('bad', !!resultsNote);
+    if (!pb.hidden) pb.innerHTML = (resultsNote ? esc(resultsNote) + '<br>' : '') + (needParent && !resultsRoot ? `<b>${esc(sourceLabel)}</b> is a delivery folder: results are kept beside it, never inside. ${resultsAsk ? 'Click <b>Allow</b> to use the results folder chosen before, or' : 'Click <b>Choose the folder above…</b> and pick'} the folder that holds it (Digital, or the season's folder). The videos are still listed from <b>${esc(sourceLabel)}</b>.` : '');
     $('#anaUseQc').hidden = !ownFolder || running;
     $('#anaChange').disabled = running;
-    $('#anaBody').innerHTML = rows.length ? rows.map(rowHtml).join('') : `<tr><td colspan="${3 + TYPES.length}" class="ana-empty">${folderProblem || (sourceLabel ? 'No video files in this folder.' : '')}</td></tr>`;
-    const all = $('#anaAll'); all.checked = rows.length > 0 && rows.every(r => r.checked || r.blocked); all.indeterminate = rows.some(r => r.checked) && !all.checked; all.disabled = running;
+    $('#anaRescan').hidden = !sourceHandle || running;
+    $('#anaBody').innerHTML = rows.length ? bodyHtml() : `<tr><td colspan="${3 + TYPES.length}" class="ana-empty">${folderProblem || (sourceLabel ? 'No video files in this folder or the folders inside it.' : '')}</td></tr>`;
+    document.querySelectorAll('#anaBody input[data-mixed]').forEach(i => i.indeterminate = true);
+    const main = rows.filter(r => !r.blocked && !r.ignored);
+    const all = $('#anaAll'); all.checked = main.length > 0 && main.every(r => r.checked); all.indeterminate = rows.some(r => r.checked) && !all.checked; all.disabled = running;
     const jobs = plan();
     $('#anaStart').disabled = running || !jobs.length;
     $('#anaStop').disabled = !running;
@@ -448,7 +574,8 @@ const Analysis = (() => {
     if (running || !jobs.length) return;
     // web: writing needs permission on the folder (asked once, on this click)
     if (!NATIVE && sourceHandle && sourceHandle.requestPermission) {
-      try { if (await sourceHandle.queryPermission({ mode: 'readwrite' }) !== 'granted' && await sourceHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') { $('#anaSum').textContent = 'Results can\'t be saved without permission to write in this folder'; return; } } catch (e) { /* ask on write */ }
+      const target = resultsRoot || sourceHandle;
+      try { if (await target.queryPermission({ mode: 'readwrite' }) !== 'granted' && await target.requestPermission({ mode: 'readwrite' }) !== 'granted') { $('#anaSum').textContent = 'Results can\'t be saved without permission to write in this folder'; return; } } catch (e) { /* ask on write */ }
     }
     running = true; stopReq = false;
     for (const j of jobs) for (const k of j.keys) j.row.live[k] = { state: 'queued' };
@@ -505,7 +632,7 @@ const Analysis = (() => {
     document.documentElement.classList.add('ana-page');
     if (!WINDOW && !ownFolder && !sourceHandle) {
       const last = HandleStore.cache.analysis || await HandleStore.load('analysis');
-      if (last) { sourceHandle = last; sourceLabel = last.name; ownFolder = true; try { if (await last.queryPermission({ mode: 'read' }) === 'granted') { await loadRows(await listDeep(last)); return; } } catch (e) { /* ask */ } rows = []; folderProblem = `Click Change… to open “${last.name}” again (Chrome asks for permission once per visit).`; render(); return; }
+      if (last) { sourceHandle = last; sourceLabel = last.name; ownFolder = true; try { if (await last.queryPermission({ mode: 'read' }) === 'granted') { await recallResults(); await loadRows(await listDeep(last)); return; } } catch (e) { /* ask */ } rows = []; folderProblem = `<button class="btn sm" id="anaReopen">Open “${esc(last.name)}” again</button><div class="ana-note" style="margin-top:6px">The folder used last time (Chrome asks for permission once per visit).</div>`; render(); return; }
     }
     refresh();
   }
@@ -641,7 +768,8 @@ const Analysis = (() => {
     return spans.length || blacks.length || r.credits || text ? { video: null, credits: spans, label: text ? 'On-screen text' : 'Credits', allText: !!text, blacks, cards, scannedTo } : null;
   }
   return { open, close, forVideo, statusLine, qcActions, marks, fingerprint, TYPES, markersPathFor, markersPlace, MARKERS_DIR,
-    _useFolder: useOwnFolder, _start: start,   // (tests: a folder without the picker)
+    _useFolder: useOwnFolder, _start: start, _rescan: rescan,
+    _pickResults: async d => { await setResults(d, true); await loadRows(rows.map(r => ({ file: r.file, segs: r.segs }))); },   // (tests: a folder without the picker)
     get running() { return running; } };
 })();
 
