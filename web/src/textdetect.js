@@ -29,7 +29,7 @@ const TextDetect = (() => {
       c.look ? { contrast: c.look.contrast, sharp: c.look.sharp } : {}, c.graphic ? { graphic: true } : {});
     return {
       fps: res.m.fps, scannedTo: r3(res.end), seconds: Math.round(res.totalMs / 1000), device: sessionEp === 'webgpu' ? 'graphics chip' : 'processor', step: res.step, sharpLimit: res.sharpLimit,
-      pieces: res.final.map(piece),
+      pieces: res.final.map(c => Object.assign(piece(c), c.approx ? { approx: true } : {})),
       leftOut: res.leftOut.map(c => Object.assign(piece(c), { why: c.why }, c.approx ? { approx: true } : {})),
     };
   }

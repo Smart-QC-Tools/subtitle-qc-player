@@ -193,6 +193,12 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   name cards < 2 s); a 2 s result shows Outdated while Dense is on. RHOBH: 1080p ProRes 44 min ≈ 2.6 min at 2 s.
   Still missed: most phone-message text (too small for the model), first seconds of RHOBH end credits (tiny text; RHOBH
   end credits run over a scene with dialogue, not black, so they stay in), texts < 1 s.
+  **v 3 (2026-11-24, from the v2 re-run: 69/102 and 62/80 flagged texts kept; most still left out were "moving"):**
+  movement judged on frames ≥ 0.5 s from in / out (4 extra looks, only for pieces that seem to move and are ≥ 1.4 s):
+  graphics that slide / zoom in no longer count as moving (bisection frames sit right on the animation); a piece that
+  collapses under 0.5 s and isn't found by the close look on the scan frame keeps the scan's times (`approx`) instead of
+  being dropped (3 RHOBH texts were lost that way). Test clip: scratchpad anim2.mp4 (slide+fade lower thirds kept,
+  drifting sign left out). Large animated titles that drift for their whole time still count as moving.
   Earlier (build 11): small = line box < 3%; moving = drifts > 1%
   (whole sightings only, extremes ignored); title (dropped in v 2) = line box ≥ 8% in the middle both ways, or ≥ 14%.
   scene = part of the shot: the picture cuts (32×18 luma change outside the box ≥ 20) both at its in and its out, and it

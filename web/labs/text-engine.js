@@ -196,7 +196,9 @@ function blocks(boxes) {
 //   cutIn, cutOut, look {contrast, sharp}, firstP, approx, graphic (kept as a show graphic), why (left out); sharpLimit.
 // v 2: no title rule (large text counts like any other); show graphics kept; faint measured against the episode's own
 // sharpness; blocks of small text kept. step 1 = "dense" (the app's setting), 2 = default.
-const TEXT_RULES = { v: 2, step: 2, small: 0.03, moving: 0.01, cut: 20, subZone: 0.75,
+// v 3: movement judged away from the in / out (graphics sliding or zooming in still count as still); text the scan saw
+// but the closer look can't find keeps the scan's times (approximate) instead of being dropped as a flicker.
+const TEXT_RULES = { v: 3, step: 2, small: 0.03, moving: 0.01, cut: 20, subZone: 0.75,
   faint: { contrast: 140, sharp: 30, relSharp: 0.6 }, graphic: { pos: 0.015, size: 0.12, n: 2 }, smallBlock: { lines: 3, w: 0.1 },
   endGap: 8, staticMax: 20, minLength: 0.5 };
 async function findText(file, o = {}) {
@@ -273,6 +275,7 @@ async function findText(file, o = {}) {
     const p = posAt(t), tw = now(), img = await next; tm.frame += now() - tw;
     next = k + 1 < times.length ? grab(posAt(times[k + 1]), false) : null;
     const found = await find(img); samples++;
+    for (const b of found) b.p = p;
     const still = [], used = new Set();
     for (const c of active) {
       const j = found.findIndex((b, i) => !used.has(i) && overlap(c.box, b) > 0.5);
@@ -334,7 +337,7 @@ async function findText(file, o = {}) {
     // image checks: more sensitive here (we know where to look), so faint text in a fade counts
     const present = async p => {
       const bs = await findAt(p, 30, c.box), main = bs.find(b => overlap(c.parts[0], b) > 0.3);
-      if (main) c.obs.push(main);
+      if (main) { main.p = p; c.obs.push(main); }
       return !!main || bs.some(b => c.parts.some(q => overlap(q, b) > 0.3));
     };
     let lo = c.beforeP == null ? -1 : c.beforeP, hi = c.firstP;
@@ -348,6 +351,12 @@ async function findText(file, o = {}) {
     // subtitles go, and is at least 30% of the picture wide (a news insert filling the picture; not a badge on a vest).
     c.scene = c.cutIn >= R.cut && c.cutOut >= R.cut && !(c.box.y + c.box.h > R.subZone && c.box.w >= 0.3);
     c.outT = hi2 < pts.length ? pts[hi2] : m.duration; c.inT = pts[c.inP];
+    // Shorter than half a second, yet seen by the scan: if the closer look can't find it even on the frame where the
+    // scan saw it (large or low-contrast text, text changing size), its in / out can't be trusted: the scan's times
+    // are kept instead (approximate) rather than losing it as a flicker.
+    if (c.outT - c.inT < R.minLength && !(await present(c.firstP))) {
+      c.inT = pts[c.firstP]; c.outT = Math.min(m.duration, pts[c.lastP] + step); c.approx = true; c.scene = false;   // cuts measured at the wrong frames
+    }
   }
   const refineMs = now() - T1, refineN = tm.n - scanN;
   // How far it moves while on screen: graphics stay put; text in the scene drifts with the camera. Measured on whichever
@@ -355,14 +364,35 @@ async function findText(file, o = {}) {
   // still. Only whole sightings count (partly seen text in a fade or a dissolve gives a smaller box that seems to move),
   // and with 5 or more, the most extreme one each way is ignored.
   const spread = vals => { const v = [...vals].sort((a, b) => a - b); return v.length >= 5 ? v[v.length - 2] - v[1] : v[v.length - 1] - v[0]; };
-  for (const c of [...groups, ...leftOut]) {
-    const areas = c.obs.map(b => b.w * b.h), big = median(areas);
-    const ob = c.obs.filter((b, i) => areas[i] >= big * 0.7);
-    c.moveN = ob.length;
-    c.move = ob.length < 2 ? 0 : Math.max(
+  const moveOf = obs => {
+    const areas = obs.map(b => b.w * b.h), big = median(areas);
+    const ob = obs.filter((b, i) => areas[i] >= big * 0.7);
+    return { n: ob.length, move: ob.length < 2 ? 0 : Math.max(
       Math.min(spread(ob.map(b => b.x)), spread(ob.map(b => b.x + b.w / 2)), spread(ob.map(b => b.x + b.w))),
-      Math.min(spread(ob.map(b => b.y)), spread(ob.map(b => b.y + b.h / 2)), spread(ob.map(b => b.y + b.h))));
+      Math.min(spread(ob.map(b => b.y)), spread(ob.map(b => b.y + b.h / 2)), spread(ob.map(b => b.y + b.h)))) };
+  };
+  for (const c of [...groups, ...leftOut]) { const r = moveOf(c.obs); c.moveN = r.n; c.move = r.move; }
+  // Graphics often slide or zoom a little as they come and go (and the in / out search looks exactly there). So text
+  // that seems to move is judged again on how it sits on screen: frames at least half a second from its in and out
+  // (4 more looks there). Text in a camera move keeps moving in the middle too. Pieces under 1.4 s keep the first verdict.
+  const T2 = now();
+  for (const c of groups) {
+    halt();
+    if (c.approx || c.move <= R.moving || c.outT - c.inT < 1.4) continue;
+    const a = c.inT + 0.5, b = c.outT - 0.5;
+    const mid = c.obs.filter(o => o.p != null && pts[o.p] >= a && pts[o.p] <= b);
+    const reach = { x: c.box.x - c.box.w, y: c.box.y - c.box.h, w: c.box.w * 3, h: c.box.h * 3 };
+    for (let k = 1; k <= 4; k++) {
+      const p = posAt(a + (b - a) * k / 5);
+      if (mid.some(o => o.p === p)) continue;
+      const bs = (await findAt(p, 30, c.box)).filter(o => overlap(reach, o) > 0.5);
+      const cx = c.box.x + c.box.w / 2, cy = c.box.y + c.box.h / 2;
+      const o = bs.sort((u, v) => Math.hypot(u.x + u.w / 2 - cx, u.y + u.h / 2 - cy) - Math.hypot(v.x + v.w / 2 - cx, v.y + v.h / 2 - cy))[0];
+      if (o) { o.p = p; mid.push(o); }
+    }
+    if (mid.length >= 2) { const r = moveOf(mid); c.moveAll = c.move; c.move = r.move; c.moveN = r.n; }
   }
+  const settleMs = now() - T2;
   // shorter than half a second: a flicker, not text on screen
   let final = groups.filter(c => c.outT - c.inT >= R.minLength).sort((a, b) => a.inT - b.inT);
   // pieces of one card (on screen together, touching or overlapping): joined into one
@@ -399,5 +429,5 @@ async function findText(file, o = {}) {
   final = final.filter(c => !c.why || !leftOut.push(c));
   leftOut.sort((a, b) => a.inT - b.inT);
   const totalMs = now() - T0;
-  return { m, dec, pts, posAt, final, leftOut, groups, samples, scanMs, refineMs, refineN, totalMs, tm, end, step, W, H, sharpLimit };
+  return { m, dec, pts, posAt, final, leftOut, groups, samples, scanMs, refineMs, refineN, settleMs, totalMs, tm, end, step, W, H, sharpLimit };
 }
