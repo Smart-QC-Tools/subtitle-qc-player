@@ -190,16 +190,19 @@ function blocks(boxes) {
 // what doesn't matter for subtitles is left out (each with its reason). Used by the lab page (which also shows timings
 // and pictures) and by the app's Video Analysis. Options (all optional):
 //   det 'model' | 'image', step 2, end (seconds, default the whole video), msize 640 | 960, ep 'auto' | 'wasm',
-//   minH 0.03, leave { small, moving, title, scene, faint, end } (all true), onStatus(text, part 0…1), stopped()
+//   minH 0.03, leave { small, moving, scene, faint, end } (all true), onStatus(text, part 0…1), stopped()
 // Returns { m, dec (still open: the caller closes it), pts, posAt, final, leftOut, groups, samples, scanMs, refineMs,
 //   refineN, totalMs, tm, end, step, W, H } — final / leftOut pieces: inT, outT, box {x,y,w,h}, lh, lines, move, moveN,
-//   cutIn, cutOut, look {contrast, sharp}, firstP, approx, why (left out).
-const TEXT_RULES = { v: 1, step: 2, small: 0.03, moving: 0.01, titleH: 0.08, hugeH: 0.14, cut: 20, subZone: 0.75,
-  faint: { contrast: 140, sharp: 30 }, endGap: 8, staticMax: 20, minLength: 0.5 };
+//   cutIn, cutOut, look {contrast, sharp}, firstP, approx, graphic (kept as a show graphic), why (left out); sharpLimit.
+// v 2: no title rule (large text counts like any other); show graphics kept; faint measured against the episode's own
+// sharpness; blocks of small text kept. step 1 = "dense" (the app's setting), 2 = default.
+const TEXT_RULES = { v: 2, step: 2, small: 0.03, moving: 0.01, cut: 20, subZone: 0.75,
+  faint: { contrast: 140, sharp: 30, relSharp: 0.6 }, graphic: { pos: 0.015, size: 0.12, n: 2 }, smallBlock: { lines: 3, w: 0.1 },
+  endGap: 8, staticMax: 20, minLength: 0.5 };
 async function findText(file, o = {}) {
   const R = TEXT_RULES;
   const det = o.det || 'model', step = o.step || R.step, msz = o.msize || 640;
-  const lv = Object.assign({ small: true, moving: true, title: true, scene: true, faint: true, end: true }, o.leave || {});
+  const lv = Object.assign({ small: true, moving: true, scene: true, faint: true, end: true }, o.leave || {});
   const minH = o.minH || R.small;
   const status = o.onStatus || (() => {}), stopped = o.stopped || (() => false);
   const halt = () => { if (stopped()) throw new Error('stopped'); };
@@ -304,14 +307,14 @@ async function findText(file, o = {}) {
     }
     if (run.length >= 3) { run.forEach(c => endRun.add(c)); after.filter(e => e.a >= edge).forEach(e => endRun.add(e.c)); }
   }
-  // large text: main titles and big logos (a subtitle can't avoid them, so they don't matter here). A title sits in the
-  // middle of the picture both ways (big credits along the bottom are credits, not titles), or is huge.
-  const isTitle = c => c.lh >= R.hugeH || (c.lh >= R.titleH && Math.abs(c.box.x + c.box.w / 2 - 0.5) < 0.12 && Math.abs(c.box.y + c.box.h / 2 - 0.5) < 0.2);
+  // Small text: left out, unless it's a block of 3+ lines at least 10% of the picture wide (a phone message or a post
+  // shown as a graphic); such a block still has to pass the other checks (a phone held in the scene moves or cuts).
+  const smallBlock = c => Math.max(c.lines, c.box.h / c.lh) >= R.smallBlock.lines && c.box.w >= R.smallBlock.w;
   const leftOut = [];
   const kept = cards.filter(c => {
     if (pts[c.lastP] - pts[c.firstP] > R.staticMax) return false;   // logos, burnt-in timecode
-    // left out before the in / out step (times from the scan only): end credits, small text, titles
-    const why = endRun.has(c) ? 'end credits' : lv.small && c.lh < minH ? 'small' : lv.title && isTitle(c) ? 'title' : '';
+    // left out before the in / out step (times from the scan only): end credits, small text
+    const why = endRun.has(c) ? 'end credits' : lv.small && c.lh < minH && !smallBlock(c) ? 'small' : '';
     if (why) { leftOut.push(Object.assign(c, { why, approx: true, inT: pts[c.firstP], outT: Math.min(m.duration, pts[c.lastP] + step) })); return false; }
     return true;
   });
@@ -369,10 +372,10 @@ async function findText(file, o = {}) {
     if (both < Math.min(c.outT - c.inT, q.outT - q.inT) * 0.7 || !overlap(grown(c.box), q.box)) continue;
     c.box = union(c.box, q.box); c.inT = Math.min(c.inT, q.inT); c.outT = Math.max(c.outT, q.outT); c.lh = Math.max(c.lh, q.lh); c.move = Math.min(c.move, q.move); c.scene = c.scene && q.scene; c.cutIn = Math.min(c.cutIn, q.cutIn); c.cutOut = Math.min(c.cutOut, q.cutOut); final.splice(j, 1); j = i;
   }
-  if (lv.scene) final = final.filter(c => !c.scene || !leftOut.push(Object.assign(c, { why: 'scene' })));
-  if (lv.moving) final = final.filter(c => c.move <= R.moving || !leftOut.push(Object.assign(c, { why: 'moving' })));
+  for (const c of final) c.why = lv.scene && c.scene ? 'scene' : lv.moving && c.move > R.moving ? 'moving' : '';
   // Contrast and sharpness inside each piece's box, on the full-size frame where it was seen. Contrast: brightest minus
-  // darkest (2nd–98th percentile, 0–255). Sharp: how steep the edges are compared with that contrast (crisp graphics ≈ 45%).
+  // darkest (2nd–98th percentile, 0–255). Sharp: how steep the edges are compared with that contrast (crisp graphics
+  // ≈ 35–50%, depending on the video and the lettering).
   for (const [i, c] of [...final, ...leftOut].entries()) {
     halt();
     if (i % 10 === 0) status(`measuring contrast: ${i} of ${final.length + leftOut.length}`, 0.95 + 0.05 * i / Math.max(1, final.length + leftOut.length));
@@ -381,9 +384,20 @@ async function findText(file, o = {}) {
     c.look = lookOf(r.frame, c.box);
     if (r.frame.close) r.frame.close();
   }
-  // faint: low contrast or soft lettering (made to be read it isn't: a sign, a screen, a poster in the background)
-  if (lv.faint) final = final.filter(c => !(c.look && (c.look.contrast < R.faint.contrast || c.look.sharp < R.faint.sharp)) || !leftOut.push(Object.assign(c, { why: 'faint' })));
+  // faint: low contrast or soft lettering (made to be read it isn't: a sign, a screen, a poster in the background).
+  // Sharpness depends on the video (resolution, scaling, codec) and the show's lettering, so it's compared with this
+  // episode's own text: under 60% of the middle value of the pieces still in, never a stricter limit than 30%.
+  const sharps = final.filter(c => !c.why && c.look).map(c => c.look.sharp);
+  const sharpLimit = Math.round(Math.min(R.faint.sharp, sharps.length ? R.faint.relSharp * median(sharps) : R.faint.sharp));
+  if (lv.faint) for (const c of final) if (!c.why && c.look && (c.look.contrast < R.faint.contrast || c.look.sharp < sharpLimit)) c.why = 'faint';
+  // Show graphics: in the same place and size as 2+ pieces kept elsewhere (same top, same line height, same left edge
+  // or centre): the show's lower thirds, captions and cards. Kept even if they looked faint, moving or part of the shot.
+  const G = R.graphic, sure = final.filter(c => !c.why);
+  const sameSpot = (a, b) => Math.abs(a.box.y - b.box.y) <= G.pos && Math.abs(a.lh - b.lh) <= G.size * Math.max(a.lh, b.lh)
+    && (Math.abs(a.box.x - b.box.x) <= G.pos || Math.abs(a.box.x + a.box.w / 2 - b.box.x - b.box.w / 2) <= G.pos);
+  for (const c of final) if (c.why && sure.filter(k => sameSpot(c, k)).length >= G.n) { c.why = ''; c.graphic = true; }
+  final = final.filter(c => !c.why || !leftOut.push(c));
   leftOut.sort((a, b) => a.inT - b.inT);
   const totalMs = now() - T0;
-  return { m, dec, pts, posAt, final, leftOut, groups, samples, scanMs, refineMs, refineN, totalMs, tm, end, step, W, H };
+  return { m, dec, pts, posAt, final, leftOut, groups, samples, scanMs, refineMs, refineN, totalMs, tm, end, step, W, H, sharpLimit };
 }

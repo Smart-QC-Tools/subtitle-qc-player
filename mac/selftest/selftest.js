@@ -124,12 +124,12 @@
       }
       // the window's own run: wait for its results files
       const t = now(); let texts = [];
-      const complete = x => { try { const r = JSON.parse(x); return r.blacks && (r.credits || (expected && expected.text === false)); } catch (e) { return false; } };
+      const complete = x => { try { const r = JSON.parse(x); return !!r.blacks; } catch (e) { return false; } };   // the window runs blacks only (credits aren't offered any more)
       while (now() - t < 600000) { texts = (await Native.call('markersRead', { dirs: [CFG.analysis.replace(/\/+$/, '') + '/VideoMarkers'] }).catch(() => [])).map(x => x.json); if (texts.filter(complete).length >= vids.length) break; await sleep(1000); }
       const written = texts.map(x => { try { const r = JSON.parse(x); return { name: r.video && r.video.name, format: r.format, version: r.version, app: r.app, simulated: r.simulated, fingerprint: r.video && r.video.fingerprint, duration: r.video && r.video.duration, blacks: r.blacks && { settings: r.blacks.settings, n: (r.blacks.items || []).length, commercial: (r.blacks.items || []).filter(b => b.kind === 'commercial').length }, credits: r.credits && { confirmed: r.credits.confirmed, cards: (r.credits.cards || []).length, credits: (r.credits.cards || []).filter(c => c.kind === 'credit').length, runs: r.credits.runs, seconds: r.credits.seconds } }; } catch (e) { return { bad: String(e) }; } });
       step('analysis: results files written by the window', { waitedMs: round(now() - t, 0), files: written });
       if (written.length < vids.length) problem('analysis window wrote fewer results files than videos', { written: written.length, videos: vids.length });
-      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3 || (expected && expected.text !== false && (!w.credits || !w.credits.confirmed || w.credits.credits !== 14))) problem('analysis window: unexpected results file', w);
+      for (const w of written) if (w.simulated || !w.blacks || w.blacks.commercial !== 3) problem('analysis window: unexpected results file', w);
     }
 
     const order = CFG.only === 'analysis' ? [] : CFG.only === 'basic' ? state.videos.slice(0, 1) : [...state.videos];

@@ -1,7 +1,8 @@
 /* ==========================================================================
    Video analysis: its own workflow (start screen ▸ Video Analysis), a batch job over a folder of videos.
    Finds on-screen text (web version: the lab's engine, see textdetect.js), and in the Mac app commercial blacks
-   and opening credits (native engines: mac/Sources/Analysis.swift, AnalysisCredits.swift).
+   (native engine: mac/Sources/Analysis.swift). The opening-credits reader (AnalysisCredits.swift) is no longer offered;
+   results made with it still show.
 
    Results ("markers") are kept in a visible VideoMarkers folder, one file per video (<video name>.markers.json):
    - a video in a delivery folder (Encodes / _Encodes / QC_PASS / QC_FAIL, or below one): VideoMarkers sits beside
@@ -19,18 +20,18 @@ const Analysis = (() => {
   const TYPES = [
     { key: 'text', label: 'On-screen text', head: 'On-screen text', can: !NATIVE && TEXT, why: NATIVE ? 'Coming to the Mac app later (it runs in the web version)' : 'Not in this build of the web version' },
     { key: 'blacks', label: 'Commercial blacks', head: 'Blacks', can: NATIVE, why: 'Mac app only for now' },
-    { key: 'credits', label: 'Opening credits (reads them)', head: 'Opening credits', can: NATIVE, why: 'Mac app only' },
   ];
   // Settings each result is made with; a result made with older settings shows as Outdated.
   const SETTINGS = {
     // Black frame: pictureShare of the picture at or below pixelLevel. Kept from minSeconds. Silent: sound at or
     // below silenceDb (dBFS, RMS) across the black. Blacks with sound (inside a scene) are left out.
     blacks: { v: 3, pixelLevel: 0.10, pictureShare: 0.98, minSeconds: 0.25, silenceDb: -50 },
-    // One frame a second from the start; stops a minute after "Directed by" (or at 20 min).
-    credits: { v: 2, searchMinutes: 20, coarseStepSeconds: 1, joinGapSeconds: 30, afterDirectedSeconds: 60, staticMaxSeconds: 20, minCardSeconds: 0.5 },
     // Every piece of text over the whole video, without reading it (the lab's rules: TEXT_RULES in text-engine.js).
-    text: TEXT ? Object.assign({}, TextDetect.rules) : { v: 1 },
+    // step: a look every 2 s, or every second with the Dense setting.
+    text: TEXT ? Object.assign({}, TextDetect.rules) : { v: 2 },
   };
+  let dense = Store.get('ana:dense') === '1';
+  const settingsFor = key => key === 'text' ? Object.assign({}, SETTINGS.text, { step: dense ? 1 : 2 }) : SETTINGS[key];
   const WINDOW = NATIVE && !!window.__analysisWindow;   // this page is the Mac app's Video Analysis window
   if (WINDOW) document.documentElement.classList.add('ana-window');
 
@@ -112,6 +113,7 @@ const Analysis = (() => {
     if (!t) return { state: 'none' };
     if (fp && r.video && r.video.fingerprint !== fp) return { state: 'outdated', why: 'The video file has changed since it was analysed', at: t.analysedAt };
     if (!t.settings || t.settings.v !== SETTINGS[key].v) return { state: 'outdated', why: 'Analysed with older settings', at: t.analysedAt };
+    if (key === 'text' && dense && (t.settings.step || 2) > 1) return { state: 'outdated', why: `Analysed with a look every ${t.settings.step || 2} s (Dense is on)`, at: t.analysedAt };
     return { state: 'done', at: t.analysedAt };
   }
 
@@ -127,12 +129,12 @@ const Analysis = (() => {
     return new Promise((resolve, reject) => {
       const id = nativeCurrent = ++nativeSeq;
       nativeJobs.set(id, { resolve, reject, onProgress });
-      Native.call('analysisStart', { id, path: row.file.path, type: key, settings: SETTINGS[key] }).catch(e => { nativeJobs.delete(id); reject(new Error(String(e && e.message || e))); });
+      Native.call('analysisStart', { id, path: row.file.path, type: key, settings: settingsFor(key) }).catch(e => { nativeJobs.delete(id); reject(new Error(String(e && e.message || e))); });
     });
   }
   async function runType(row, key, onProgress, stopped) {
     if (NATIVE) return runNative(row, key, onProgress);
-    if (key === 'text' && TEXT) return TextDetect.run(row.file, { onProgress, stopped });
+    if (key === 'text' && TEXT) return TextDetect.run(row.file, { onProgress, stopped, step: dense ? 1 : 2 });
     throw new Error('Not available here');
   }
 
@@ -165,7 +167,7 @@ const Analysis = (() => {
           <div class="ana-row"><span class="ana-k">Folder</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
           <div class="ana-row"><span class="ana-k">Results</span><span class="ana-dest" id="anaDest"></span></div>
           <div class="ana-note-box" id="anaParent" hidden></div>
-          <div class="ana-row"><span class="ana-k">Find</span>${TYPES.map(t => `<label class="ana-chk${t.can ? '' : ' later'}"${t.can ? '' : ` title="${esc(t.why)}"`}><input type="checkbox" data-type="${t.key}"${!t.can ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.can ? '' : ` <i>(${NATIVE ? 'later' : 'Mac app'})</i>`}</label>`).join('')}</div>
+          <div class="ana-row"><span class="ana-k">Find</span>${TYPES.map(t => `<label class="ana-chk${t.can ? '' : ' later'}"${t.can ? '' : ` title="${esc(t.why)}"`}><input type="checkbox" data-type="${t.key}"${!t.can ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.can ? '' : ` <i>(${NATIVE ? 'later' : 'Mac app'})</i>`}</label>`).join('')}${TYPES.some(t => t.key === 'text' && t.can) ? `<label class="ana-chk ana-dense" title="On-screen text: a look at every second instead of every 2 seconds, so captions and name cards shorter than 2 s are found too. Takes about 1.5 times as long."><input type="checkbox" id="anaDense"${dense ? ' checked' : ''}> Dense (a look every second, slower)</label>` : ''}</div>
           <div class="ana-tablewrap"><table class="ana-table"><colgroup><col class="c-c"><col class="c-f"><col class="c-l">${TYPES.map(() => '<col class="c-t">').join('')}</colgroup>
             <thead><tr><th><input type="checkbox" id="anaAll" title="Select all"></th><th>File</th><th>Length</th>${TYPES.map(t => `<th${t.can ? '' : ' class="later"'}>${t.head}</th>`).join('')}</tr></thead>
             <tbody id="anaBody"></tbody></table></div>
@@ -181,6 +183,7 @@ const Analysis = (() => {
     $('#anaHome').onclick = () => { if (WINDOW) Native.post('showHome'); else Home.show(); };
     $('#anaHelp').onclick = () => alert('Results go in a VideoMarkers folder, one file per video, so anyone opening the episode can use them.\n\n• Videos in a delivery folder (Encodes, _Encodes, QC_PASS, QC_FAIL): VideoMarkers sits beside that folder, never inside it.\n• Other videos (proxies, for example): VideoMarkers is inside the videos\' own folder.\n\nMarkers count for the episode: a proxy\'s markers serve its encode, and the other way round, as long as the length agrees.');
     m.querySelectorAll('input[data-type]').forEach(cb => cb.onchange = () => { typeOn[cb.dataset.type] = cb.checked; Store.set('ana:t:' + cb.dataset.type, cb.checked ? '1' : '0'); render(); });
+    if ($('#anaDense')) $('#anaDense').onchange = e => { dense = e.target.checked; Store.set('ana:dense', dense ? '1' : '0'); render(); };
     $('#anaSkip').onchange = e => { skipDone = e.target.checked; Store.set('ana:skip', skipDone ? '1' : '0'); render(); };
     $('#anaAll').onchange = e => { if (running) return; rows.forEach(r => r.checked = e.target.checked && !r.blocked); render(); };
     $('#anaBody').addEventListener('change', e => { const cb = e.target.closest('input[data-i]'); if (cb && !running) { rows[+cb.dataset.i].checked = cb.checked; render(); } });
@@ -353,7 +356,7 @@ const Analysis = (() => {
   }
   const hasResults = res => !!(res && (res.blacks || res.credits || res.text));
   const CARD_KIND = { credit: 'Credit', title: 'Main title', text: 'Other text (not a credit)' };
-  const WHY = { small: 'small', moving: 'moving with the camera', title: 'large title', scene: 'part of the shot', faint: 'faint', 'end credits': 'end credits' };
+  const WHY = { small: 'small', moving: 'moving with the camera', title: 'large title (older settings)', scene: 'part of the shot', faint: 'faint', 'end credits': 'end credits' };
   const where = b => { if (!b) return ''; const cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2; return `${cy < 0.33 ? 'top' : cy > 0.66 ? 'bottom' : 'middle'} ${cx < 0.38 ? 'left' : cx > 0.62 ? 'right' : 'centre'}`; };
   function textHtml(res, r) {
     const t = res && res.text; if (!t) return '';
@@ -361,7 +364,7 @@ const Analysis = (() => {
     const counts = {}; for (const x of lo) counts[x.why] = (counts[x.why] || 0) + 1;
     const loTxt = Object.entries(counts).map(([k, n]) => `${n} ${WHY[k] || k}`).join(', ');
     const lines = ps.map(x => `<tr><td>${fmtFrames(x.in, fps)}</td><td>${fmtFrames(x.out, fps)}</td><td>${((x.out - x.in)).toFixed(1)} s</td><td>${esc(where(x.box))}</td></tr>`).join('');
-    return `<div class="ana-dh">On-screen text <span class="ana-dim">· ${t.seconds != null ? `found in ${fmtLen(t.seconds)}${t.device ? ' on the ' + esc(t.device) : ''}` : ''}${loTxt ? ` · left out: ${esc(loTxt)}` : ''}</span></div>${
+    return `<div class="ana-dh">On-screen text <span class="ana-dim">· ${t.seconds != null ? `found in ${fmtLen(t.seconds)}${t.device ? ' on the ' + esc(t.device) : ''}` : ''}${t.step ? ` · a look every ${t.step === 1 ? 'second' : t.step + ' s'}` : ''}${loTxt ? ` · left out: ${esc(loTxt)}` : ''}</span></div>${
       ps.length ? `<table class="ana-dt"><thead><tr><th>In</th><th>Out</th><th>Length</th><th>Where</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No on-screen text found.</div>'}`;
   }
   function creditsHtml(res, r) {
@@ -428,7 +431,7 @@ const Analysis = (() => {
     const jobs = plan();
     $('#anaStart').disabled = running || !jobs.length;
     $('#anaStop').disabled = !running;
-    document.querySelectorAll('#anaModal input[data-type], #anaSkip').forEach(i => i.disabled = running || !!i.closest('.later'));
+    document.querySelectorAll('#anaModal input[data-type], #anaSkip, #anaDense').forEach(i => i.disabled = running || !!i.closest('.later'));
     if (!running) $('#anaSum').textContent = !rows.length ? '' : jobs.length ? `${jobs.length} video${jobs.length === 1 ? '' : 's'} to analyse` : !TYPES.some(t => t.can) ? 'Nothing can run in this version' : rows.some(r => r.checked) ? 'Nothing to do: already analysed (untick “Skip” to run again)' : 'Tick the videos to analyse';
     updateIndicators();
   }
@@ -471,7 +474,7 @@ const Analysis = (() => {
             if (part > 0 && el > 1.5) $('#anaSum').textContent = `${queueInfo.done + 1} of ${queueInfo.total} · about ${fmtLeft(el / part * (totalLen - part))} left`;
             updateIndicators();
           }, () => stopReq);
-          res[k] = Object.assign({ analysedAt: new Date().toISOString(), settings: SETTINGS[k] }, out);
+          res[k] = Object.assign({ analysedAt: new Date().toISOString(), settings: settingsFor(k) }, out);
           delete r.live[k];
         } catch (e) {
           if (stopReq) { delete r.live[k]; break; }

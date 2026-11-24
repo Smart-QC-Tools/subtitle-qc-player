@@ -20,14 +20,15 @@ const TextDetect = (() => {
 
   // One video: every piece of text that matters for subtitles, and what was left out (with why). Times in seconds
   // from the first frame; boxes [x, y, w, h] as parts of the picture (0…1, from the top left).
-  async function run(file, { onProgress, stopped } = {}) {
-    const res = await findText(file, { onStatus: (t, p) => onProgress && onProgress(Math.min(1, p || 0), t), stopped });
+  // step: seconds between the frames looked at (2, or 1 for the dense setting).
+  async function run(file, { onProgress, stopped, step } = {}) {
+    const res = await findText(file, { step: step || TEXT_RULES.step, onStatus: (t, p) => onProgress && onProgress(Math.min(1, p || 0), t), stopped });
     try { res.dec.close(); } catch (e) { /* closed already */ }
     const r3 = x => Math.round(x * 1000) / 1000;
     const piece = c => Object.assign({ in: r3(c.inT), out: r3(c.outT), box: [r3(c.box.x), r3(c.box.y), r3(c.box.w), r3(c.box.h)], height: r3(c.lh), move: r3(c.move || 0) },
-      c.look ? { contrast: c.look.contrast, sharp: c.look.sharp } : {});
+      c.look ? { contrast: c.look.contrast, sharp: c.look.sharp } : {}, c.graphic ? { graphic: true } : {});
     return {
-      fps: res.m.fps, scannedTo: r3(res.end), seconds: Math.round(res.totalMs / 1000), device: sessionEp === 'webgpu' ? 'graphics chip' : 'processor',
+      fps: res.m.fps, scannedTo: r3(res.end), seconds: Math.round(res.totalMs / 1000), device: sessionEp === 'webgpu' ? 'graphics chip' : 'processor', step: res.step, sharpLimit: res.sharpLimit,
       pieces: res.final.map(piece),
       leftOut: res.leftOut.map(c => Object.assign(piece(c), { why: c.why }, c.approx ? { approx: true } : {})),
     };

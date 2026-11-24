@@ -432,6 +432,7 @@ html.ana-window .ana-body{padding-top:16px}
 .ana-chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none}
 .ana-chk.later,.ana-chk.off{color:var(--dim);cursor:default}
 .ana-chk i{font-style:normal;font-size:11.5px}
+.ana-chk.ana-dense{margin-left:10px;padding-left:16px;border-left:1px solid var(--border)}
 .ana-tablewrap{overflow:auto;min-height:120px;max-height:52vh;border:1px solid var(--border);border-radius:8px}
 .ana-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13px}
 .ana-table input{margin:0;vertical-align:middle}
@@ -781,7 +782,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
           <ul>
             <li>Press or drag on the bar to move the playhead. Click a subtitle block to select that event in the table.</li>
             <li>The index underneath shows the whole video: where the subtitles are, and a box for the part shown in the bar above. Click anywhere on it to jump there (drag to scrub); drag the box to look around without moving the playhead.</li>
-            <li>After a video analysis (start screen ▸ Video Analysis), on-screen text (or, from the Mac app, the opening credits) is marked with a thin <span style="color:#f2d675">yellow line</span> (along the top of the waveform bar, along the bottom of the index), and commercial blacks in <span style="color:#ff5c5c">red</span> on both. On the index, point at them to see what they are. Subtitles over the text are flagged <b>On text</b>, close to it <b>Near text</b>.</li>
+            <li>After a video analysis (start screen ▸ Video Analysis), on-screen text is marked with a thin <span style="color:#f2d675">yellow line</span> (along the top of the waveform bar, along the bottom of the index), and commercial blacks in <span style="color:#ff5c5c">red</span> on both. On the index, point at them to see what they are. Subtitles over the text are flagged <b>On text</b>, close to it <b>Near text</b>.</li>
             <li>The analysis results are kept in a <b>VideoMarkers</b> folder: beside the delivery folder (Encodes, QC_PASS, QC_FAIL) when the videos are in one, otherwise inside the videos' folder. They count for the episode: a proxy's markers serve its encode as long as the length agrees. If they aren't found, use <b>Link markers folder…</b> under the video list.</li>
             <li>The bar shows between 10 seconds and 1½ minutes (1 minute to start with): ⌘ / Ctrl + scroll (or pinch) anywhere over the picture, the bar or the controls under it to zoom.</li>
             <li>The channel menu picks which audio channels are drawn. It doesn't change what you hear.</li>

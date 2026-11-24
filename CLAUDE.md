@@ -116,7 +116,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   a fade count too), runs ≥ 0.25 s, frame-exact; sound RMS over the middle half of each black, ≤ −60 dBFS =
   silent. Items: in, out, frames, audio (silent | sound | none), level, kind (start | end | commercial |
   other = black with sound inside a scene). `SETTINGS.blacks.v` = 2.
-  **Opening credits are real in the Mac app** (`mac/Sources/AnalysisCredits.swift`, `SETTINGS.credits.v` = 2):
+  **Opening credits (Mac engine, no longer offered in the panel since 2026-11-24 at the user's request; old results still
+  show; the self-test still runs the engine directly)** (`mac/Sources/AnalysisCredits.swift`, v 2):
   Vision fast text read every 1 s from 0 (AVAssetImageGenerator 1280×720), each frame read twice (as is +
   a "white text" version: dark where min(R,G,B) is high, for white credits on pale scenes); lines grouped
   into blocks; a block followed across frames (same place + similar letters) = a card; one missed frame
@@ -181,10 +182,19 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - Web text detection lab (`web/labs/text-detection.src.html`, download page `docs/labs.html`): find all on-screen text
   without reading it over the whole episode (a frame every 2 s, in/out by bisection). Findings: image checks (edges)
   rejected (6× extra hits on real footage); PP-OCRv4 det model on WebGPU ≈ 33 ms/frame, a 45-min episode ≈ 2–5 min.
-  User decisions: all text matters (lower thirds, burnt-in subs), except small text, text moving with the camera
-  (screens, maps, signs) and large centred main titles (line box ≥ 8%, centred), which are left out (listed separately).
-  Status (2026-11-20, user testing at work): lab build 11. Rules: small = line box < 3%; moving = drifts > 1%
-  (whole sightings only, extremes ignored); title = line box ≥ 8% in the middle both ways, or ≥ 14% anywhere.
+  User decisions: all text matters (lower thirds, burnt-in subs, large titles too), except small text and text moving
+  with the camera (screens, maps, signs, phones held in a scene), which are left out (listed separately).
+  **Rules v 2 (2026-11-24, from RHOBH SN702 / SN703 vs. testers' Switch .flags files, 100-ns ticks):** no title rule
+  (user: include main titles rather than pile up specific rules); show graphics = same top ±1.5%, line height ±12%,
+  left edge or centre ±1.5% as 2+ pieces kept = kept even if faint / moving / scene; faint sharpness limit =
+  min(30, 60% × median sharpness of the pieces still in) (RHOBH 1080p ProRes graphics ≈ 35 → 21; LAO 720p ≈ 48 → 29);
+  small text kept when a block of 3+ lines ≥ 10% wide (phone messages shown as aligned graphics), still subject to the
+  other checks. Step 2 s default; the app's **Dense** setting (`ana:dense`) = 1 s (≈ 1.5× time; catches captions /
+  name cards < 2 s); a 2 s result shows Outdated while Dense is on. RHOBH: 1080p ProRes 44 min ≈ 2.6 min at 2 s.
+  Still missed: most phone-message text (too small for the model), first seconds of RHOBH end credits (tiny text; RHOBH
+  end credits run over a scene with dialogue, not black, so they stay in), texts < 1 s.
+  Earlier (build 11): small = line box < 3%; moving = drifts > 1%
+  (whole sightings only, extremes ignored); title (dropped in v 2) = line box ≥ 8% in the middle both ways, or ≥ 14%.
   scene = part of the shot: the picture cuts (32×18 luma change outside the box ≥ 20) both at its in and its out, and it
   stays out of the bottom quarter (a full-screen news insert at the bottom is kept: the user wants it flagged).
   Scene exception needs the box ≥ 30% wide too (a POLICE badge on a vest is not kept). Build 9 adds: faint = contrast
@@ -195,7 +205,6 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   unsure, nothing is left out (user: end credits staying in is acceptable). Contrast / sharpness and the thumbnail are
   taken on a frame where the text was seen (the middle of a merged piece can fall between two cards).
   On LAO-21-M2701 (Law & Order SVU) all 28 end-of-opening credits kept; animated title-sequence names left out as
-  moving; back-to-back cards in one spot merge into one piece. Proposed next (not yet agreed): use this engine for a
-  real "on-screen text" analysis in the web preview's analysis panel (results file → QC page checks). Mac app: later
+  moving; back-to-back cards in one spot merge into one piece. Now used by the web Video Analysis. Mac app: later
   (user can't install new versions right away); idea: same model via Core ML instead of Vision text reading.
 - Other open question from earlier: make playback follow the audio channel menu for multi-mono files (unanswered).
