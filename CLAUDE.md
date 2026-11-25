@@ -198,6 +198,13 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
     "position not found" = flag −1 s … +3 s, whole picture → amber "Text, place unknown" on the QC page. Stored as
     `flags` {source{name,format,count,sum}, pieces[{in,out,box,height,from,flags[]}], unknown[{t,in,out}]}; QC counts
     flag pieces with on-screen text (user's choice).
+  - **Markers reading is shared with 1.0.0** (2026-11-25): `web/src/markers.js` (`Markers`: places, readers, matching,
+    statusLine / qcActions / marks; analysis.js re-exports them) and `mac/Sources/Markers.swift` (MarkersFiles) +
+    `Access.isMarkersAllowed` + Bridge `markersRead` are on main / release/1.0.0 too, with cueinfo.js analysis checks and
+    timeline.js marks. 1.0.0 = `Markers.quiet()` (no Analysis): no "none found" line, no Link button; nothing changes
+    without markers (checked against the old 1.0.0 build: same filters, same Clean line). Keep these files identical on
+    both lines; merges main → video-analysis conflict in build.py / template.html (keep video-analysis's) and can leave
+    Bridge's `case "markersRead"` twice (remove one).
   - QC checks with text markers: `m.allText` → filters "On text" / "Near text", any text counts for "Raised, no credit".
   - Headless testing: OPFS folders (http://localhost) + `Analysis._useFolder`; headless Chromium crashes storing OPFS
     handles in IndexedDB, so tests stub HandleStore (real Chrome is fine with picked folders).
