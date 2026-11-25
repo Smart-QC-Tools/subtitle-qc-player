@@ -130,6 +130,7 @@ async function loadVideos(files) {
     else keep.push({ file: f, name: f.name, info: Match.parse(f.name), forced: !!reason, probe: probes[f.name], codec: probes[f.name] && TimecodeTrack.codecInfo(probes[f.name].codec) });
   }
   state.videos = keep; state.ignoredVideos = ignored;
+  window.dispatchEvent(new Event('qc-videos-changed'));
   if (state.selectedVideo && !state.videos.some(v => v.name === state.selectedVideo)) state.selectedVideo = null;
   assign(); renderAll();
 }
@@ -504,7 +505,12 @@ function renderLibrary() {
   const sv = state.videos.find(v => v.name === state.selectedVideo);
   if (sv) {
     const n = subsForVideo(sv.name).length;
-    $('#vidInfo').innerHTML = `<div class="vi-name">${esc(sv.name)}</div><div class="vi-meta">${sv.codec ? `${esc(sv.codec.name)}${sv.probe && sv.probe.width ? ` · ${sv.probe.width}×${sv.probe.height}` : ''} · ` : ''}${n ? `${n} subtitle file${n === 1 ? '' : 's'}` : 'no matching subtitle files'}${sv.codec && sv.codec.chrome === false ? ` · <span class="warn-t">${PLAYER_NAME} can't show this picture</span>` : ''}${sv.forced ? ` · <button class="mini excl" data-n="${esc(sv.name)}">Ignore again</button>` : ''}</div>`;
+    $('#vidInfo').innerHTML = `<div class="vi-name">${esc(sv.name)}</div><div class="vi-meta">${sv.codec ? `${esc(sv.codec.name)}${sv.probe && sv.probe.width ? ` · ${sv.probe.width}×${sv.probe.height}` : ''} · ` : ''}${n ? `${n} subtitle file${n === 1 ? '' : 's'}` : 'no matching subtitle files'}${sv.codec && sv.codec.chrome === false ? ` · <span class="warn-t">${PLAYER_NAME} can't show this picture</span>` : ''}${sv.forced ? ` · <button class="mini excl" data-n="${esc(sv.name)}">Ignore again</button>` : ''}</div><div class="vi-ana" id="viAna"></div>`;
+    if (typeof Markers !== 'undefined') {
+      Markers.statusLine(sv).then(t => { const el = $('#viAna'); if (el && state.selectedVideo === sv.name && t) { el.textContent = 'Video markers: ' + t; Markers.qcActions(el); } }).catch(() => {});
+      // markers made from another file of the same episode (a proxy) carry its name: the marks are for this video
+      Markers.forVideo(sv).then(r => { if (state.selectedVideo === sv.name && window.Player.setAnalysisMarks) { const m = Markers.marks(r); if (m) m.video = sv.name; window.Player.setAnalysisMarks(m); } }).catch(() => {});
+    }
   } else $('#vidInfo').innerHTML = '';
 
   if (!state.videos.length) vl.innerHTML = '';
@@ -596,6 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // New CPS / line-length limits: re-count the Conform page too.
   document.addEventListener('qc-limits', () => { state.subs.forEach(countChecks); renderQC(); });
   $('#helpBtn').onclick = () => { $('#helpModal').hidden = false; };
+  window.addEventListener('analysis-updated', () => renderAll());
   $('#helpClose').onclick = () => { $('#helpModal').hidden = true; };
   $('#helpModal').addEventListener('click', e => { if (e.target.id === 'helpModal') $('#helpModal').hidden = true; });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#helpModal').hidden = true; });
