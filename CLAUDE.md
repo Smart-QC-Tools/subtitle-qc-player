@@ -176,7 +176,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
     more). Built with `TEXT_MODEL=1 python3 build.py` (needs `web/labs/fetch_assets.sh`; ~37 MB page); the Mac app's page
     is built without it (~0.7 MB). build.yml builds the web download with the model after the app.
   - Analysis listing (2026-11-24): videos grouped by sub-folder (3 levels; only folders with videos), folder icon, ▾/▸
-    collapse (remembered, `ana:collapsed`), a folder checkbox ticks its videos; audio-only / dubcard / < 1 min files
+    collapse (remembered, `ana:collapsed`), a folder checkbox ticks its videos (file rows' checkboxes indented under it); audio-only / dubcard / < 1 min files
     (`classifyVideo`, as on the QC page) in a collapsed "Ignored" group, unticked; ↻ Rescan. Mac: `listFolder` takes
     `folders: true` (returns `isDir` entries; `NDir.entries(true)`), so the window lists sub-folders too.
     Web, videos folder = a delivery folder: Videos row shows the folder, Results row "Not chosen yet" + "Choose the folder
@@ -207,6 +207,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   collapses under 0.5 s and isn't found by the close look on the scan frame keeps the scan's times (`approx`) instead of
   being dropped (3 RHOBH texts were lost that way). Test clip: scratchpad anim2.mp4 (slide+fade lower thirds kept,
   drifting sign left out). Large animated titles that drift for their whole time still count as moving.
+  **v 4 (2026-11-25, dense runs: 90/106 and 71/81 kept, not found 6 + 3, but 40 unconfirmed single-sighting rescues of
+  which 3 real):** the v 3 rescue only when the scan saw the text on 2+ frames.
   Earlier (build 11): small = line box < 3%; moving = drifts > 1%
   (whole sightings only, extremes ignored); title (dropped in v 2) = line box ≥ 8% in the middle both ways, or ≥ 14%.
   scene = part of the shot: the picture cuts (32×18 luma change outside the box ≥ 20) both at its in and its out, and it

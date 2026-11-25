@@ -198,7 +198,8 @@ function blocks(boxes) {
 // sharpness; blocks of small text kept. step 1 = "dense" (the app's setting), 2 = default.
 // v 3: movement judged away from the in / out (graphics sliding or zooming in still count as still); text the scan saw
 // but the closer look can't find keeps the scan's times (approximate) instead of being dropped as a flicker.
-const TEXT_RULES = { v: 3, step: 2, small: 0.03, moving: 0.01, cut: 20, subZone: 0.75,
+// v 4: ...only when the scan saw it on 2+ frames (seen once and not confirmed = noise: RHOBH dense runs, 37 of 40).
+const TEXT_RULES = { v: 4, step: 2, small: 0.03, moving: 0.01, cut: 20, subZone: 0.75,
   faint: { contrast: 140, sharp: 30, relSharp: 0.6 }, graphic: { pos: 0.015, size: 0.12, n: 2 }, smallBlock: { lines: 3, w: 0.1 },
   endGap: 8, staticMax: 20, minLength: 0.5 };
 async function findText(file, o = {}) {
@@ -351,10 +352,10 @@ async function findText(file, o = {}) {
     // subtitles go, and is at least 30% of the picture wide (a news insert filling the picture; not a badge on a vest).
     c.scene = c.cutIn >= R.cut && c.cutOut >= R.cut && !(c.box.y + c.box.h > R.subZone && c.box.w >= 0.3);
     c.outT = hi2 < pts.length ? pts[hi2] : m.duration; c.inT = pts[c.inP];
-    // Shorter than half a second, yet seen by the scan: if the closer look can't find it even on the frame where the
-    // scan saw it (large or low-contrast text, text changing size), its in / out can't be trusted: the scan's times
-    // are kept instead (approximate) rather than losing it as a flicker.
-    if (c.outT - c.inT < R.minLength && !(await present(c.firstP))) {
+    // Shorter than half a second, yet seen by the scan on 2+ frames: if the closer look can't find it even on the frame
+    // where the scan saw it (large or low-contrast text, text changing size), its in / out can't be trusted: the scan's
+    // times are kept instead (approximate) rather than losing it as a flicker. Seen once and not confirmed: noise.
+    if (c.outT - c.inT < R.minLength && c.lastP !== c.firstP && !(await present(c.firstP))) {
       c.inT = pts[c.firstP]; c.outT = Math.min(m.duration, pts[c.lastP] + step); c.approx = true; c.scene = false;   // cuts measured at the wrong frames
     }
   }
