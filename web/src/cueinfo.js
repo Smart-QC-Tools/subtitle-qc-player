@@ -81,11 +81,11 @@
   // -> { h: 'left'|'center'|'right'|'mixed', v: 'bottom'|'top'|'raised'|'vertical', lift: % of picture height above the bottom }
   function placementOf(p, regionId, root, resolveStyleAttr, lineCount) {
     const qh = getAttrByLocalName(p, 'halign'), qv = getAttrByLocalName(p, 'valign');
-    if (qh && qv) return { h: qh, v: qv, lift: null };      // SCC / SRT: worked out when the file was read
+    if (qh && qv) return { h: qh, v: qv, lift: null, box: null };   // SCC / SRT: worked out when the file was read
     const d = placementDoc(root, resolveStyleAttr);
     const reg = d.regions.get(regionId) || null;
     const wm = (regionAttr(reg, 'writingMode', d) || '').toLowerCase();
-    if (wm.startsWith('tb')) return { h: 'center', v: 'vertical', lift: null };   // vertical Japanese: placed at the side by design
+    if (wm.startsWith('tb')) return { h: 'center', v: 'vertical', lift: null, box: null };   // vertical Japanese: placed at the side by design
     const o = pairPct(regionAttr(reg, 'origin', d), d) || [0, 0];
     const e = pairPct(regionAttr(reg, 'extent', d), d) || [100 - o[0], 100 - o[1]];
     const disp = (regionAttr(reg, 'displayAlign', d) || 'before').toLowerCase();
@@ -104,7 +104,12 @@
     else if (al === 'end') al = rtl ? 'left' : 'right';
     let h = al;
     if (al === 'center') { const c = o[0] + e[0] / 2; h = Math.abs(c - 50) <= 8 ? 'center' : c < 50 ? 'left' : 'right'; }
-    return { h, v, lift: Math.max(0, Math.round(100 - bottom)) };
+    // Where the text roughly is on the picture (in %), for the comparison with on-screen text: a line is about
+    // one cell high plus line spacing; the width is filled in from the longest line (see subBox).
+    const lh = 100 / (d.rows || 15) * 1.25, bh = Math.min(e[1], Math.max(1, lineCount) * lh);
+    let bt;
+    if (disp === 'after') bt = o[1] + e[1] - bh; else if (disp === 'center') bt = o[1] + (e[1] - bh) / 2; else bt = o[1];
+    return { h, v, lift: Math.max(0, Math.round(100 - bottom)), box: { top: bt, bottom: bt + bh, rx0: o[0], rx1: o[0] + e[0], al, cols: d.cols || 32, rows: d.rows || 15 } };
   }
 
   // ---------------------------------------------------------------- issues
@@ -148,7 +153,60 @@
         if (Math.abs(a.end - b.end) < 0.001 && a.placement && b.placement && a.placement.h !== b.placement.h) a.mixedAlign = b.mixedAlign = true;
       }
     }
+    analysisChecks(list);
     list.forEach(c => { c.issues = cueIssues(c); c.warns = cueWarns(c); c.placeTags = cuePlaceTags(c); });
+  }
+
+  // ---------------------------------------------------------------- against the video analysis (Mac app)
+  // Credits and other on-screen text, and commercial blacks, found by Video Analysis for the video in the player.
+  const NEAR_PCT = 5, RAISED_WINDOW = 20, TIME_MARGIN = 0.2;
+  // The subtitle's box on the picture, in % (an estimate from its region, lines and longest line).
+  function subBox(c) {
+    const p = c.placement, n = Math.max(1, c.lineCount || 1), len = Math.max(1, c.maxLineLength || 1);
+    const b = p && p.box;
+    const rows = b ? b.rows : 15, lh = 100 / rows * 1.25;
+    const width = Math.min(96, len * (100 / rows) * 0.5 * (9 / 16));   // a character is about half a line high, on a 16:9 picture
+    let top, bottom, x0, x1;
+    if (b) { top = b.top; bottom = b.bottom; }
+    else if (p && p.v === 'top') { top = 10; bottom = 10 + n * lh; }
+    else { bottom = 90; top = 90 - n * lh; }                            // SCC / SRT: the usual bottom position
+    const al = b ? b.al : (p && p.h) || 'center';
+    const r0 = b ? b.rx0 : 10, r1 = b ? b.rx1 : 90;
+    if (al === 'left') { x0 = r0; x1 = r0 + width; }
+    else if (al === 'right') { x1 = r1; x0 = r1 - width; }
+    else { const m = (r0 + r1) / 2; x0 = m - width / 2; x1 = m + width / 2; }
+    return { top, bottom, x0, x1 };
+  }
+  const CARD_WORD = { credit: 'credit', title: 'title', text: 'on-screen text' };
+  function analysisChecks(list) {
+    const m = list === cueList && typeof marksNow === 'function' ? marksNow() : null;
+    const off = effectiveOffset(), fr = 1 / (fps() || 24);
+    for (const c of list) { c.onText = c.nearText = c.raisedNoText = c.overBlack = c.textHere = null; }
+    if (!m) return;
+    for (const c of list) {
+      const [vb, ve] = cueVideoTime(c);
+      if (!isFinite(vb) || !isFinite(ve)) continue;
+      const box = subBox(c);
+      for (const k of m.cards || []) {
+        if (!(vb < k.out + TIME_MARGIN && ve > k.in - TIME_MARGIN) || !k.box) continue;
+        const ky0 = k.box[1] * 100, ky1 = (k.box[1] + k.box[3]) * 100, kx0 = k.box[0] * 100, kx1 = (k.box[0] + k.box[2]) * 100;
+        const vGap = Math.max(ky0 - box.bottom, box.top - ky1), hGap = Math.max(kx0 - box.x1, box.x0 - kx1);
+        const info = { kind: CARD_WORD[k.kind] || 'on-screen text', text: k.text, in: k.in + off, out: k.out + off, gap: Math.max(0, vGap) };
+        if (vGap < 0 && hGap < 0) { c.onText = info; break; }
+        if (vGap < NEAR_PCT && hGap < 2 && !c.nearText) c.nearText = info;
+      }
+      if (c.onText) c.nearText = null;
+      // a tester flagged text here, but where it sits on the picture wasn't found: worth a look (amber)
+      if (!c.onText) for (const [a, b] of m.unknown || []) if (vb < b && ve > a) { c.textHere = { in: a + off, out: b + off }; break; }
+      // Raised (or at the top) with nothing to make room for: no credit within 20 s, no on-screen text at the time.
+      if (c.placement && (c.placement.v === 'raised' || c.placement.v === 'top') && m.scannedTo && vb < m.scannedTo && m.cards) {
+        // (markers from text detection don't tell credits from other text: any of it counts)
+        const nearCredit = m.cards.some(k => (m.allText || k.kind === 'credit' || k.kind === 'title') && vb < k.out + RAISED_WINDOW && ve > k.in - RAISED_WINDOW);
+        const withText = m.cards.some(k => vb < k.out + TIME_MARGIN && ve > k.in - TIME_MARGIN) || (m.unknown || []).some(([a, b]) => vb < b && ve > a);
+        if (!nearCredit && !withText) c.raisedNoText = true;
+      }
+      for (const [a, b] of m.blacks || []) if (vb < b - fr * 0.5 && ve > a + fr * 0.5) { c.overBlack = { in: a + off, out: b + off }; break; }
+    }
   }
   const secs = v => v < 10 ? v.toFixed(2).replace(/0$/, '') : v.toFixed(1);
   function cueIssues(c) {
@@ -160,6 +218,8 @@
     if (c.tooShort) add('duration', `Short ${secs(c.duration)}s`, `Under ${DUR.shortBad}s on screen (${c.duration.toFixed(3)}s)`);
     else if (c.tooLong) add('duration', `Long ${secs(c.duration)}s`, `Over ${DUR.longBad}s on screen (${c.duration.toFixed(3)}s)`);
     if (c.hasSuspiciousChars) add('suspicious', 'Odd char', 'Contains an invisible / control / replacement character');
+    if (c.onText) add('onText', `On ${c.onText.kind === 'on-screen text' ? 'text' : c.onText.kind}`, `Covers ${c.onText.text ? `the ${c.onText.kind} “${c.onText.text}”` : `on-screen text`} (${formatVideoTC(c.onText.in)} – ${formatVideoTC(c.onText.out)})`);
+    if (c.overBlack) add('overBlack', 'Over black', `Runs across the commercial black at ${formatVideoTC(c.overBlack.in)}`);
     if (c.pastEnd) add('pastEnd', 'Past end', `Still on screen after the video ends (the event ends ${formatVideoTC(c.end)}, the video at ${formatVideoTC(c.videoEnd)})`);
     return out;
   }
@@ -169,6 +229,9 @@
     if (c.mixedAlign) out.push({ key: 'mixed', text: 'Mixed align', title: 'Lines of this event are aligned differently', kind: 'warn' });
     if (c.shortWarn) out.push({ key: 'duration', text: `Short ${secs(c.duration)}s`, title: `Under ${DUR.shortWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
     if (c.longWarn) out.push({ key: 'duration', text: `Long ${secs(c.duration)}s`, title: `Over ${DUR.longWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
+    if (c.nearText) out.push({ key: 'nearText', text: `Near ${c.nearText.kind === 'on-screen text' ? 'text' : c.nearText.kind}`, title: `Close to ${c.nearText.text ? `the ${c.nearText.kind} “${c.nearText.text}”` : 'on-screen text'} (${formatVideoTC(c.nearText.in)} – ${formatVideoTC(c.nearText.out)}): about ${Math.round(c.nearText.gap)}% of the picture height apart`, kind: 'warn' });
+    if (c.textHere) out.push({ key: 'textHere', text: 'Text here?', title: `A tester flagged on-screen text around ${formatVideoTC(c.textHere.in)} – ${formatVideoTC(c.textHere.out)}, but where it sits on the picture wasn't found: check the subtitle doesn't cover it`, kind: 'warn' });
+    if (c.raisedNoText) out.push({ key: 'raisedNoText', text: 'Raised, no credit', title: `Raised or at the top, but there is no credit within ${RAISED_WINDOW} s and no other on-screen text at the time (from the video analysis)`, kind: 'warn' });
     if (c.cpsOver) out.push({ key: 'cps', text: `CPS ${c.cps.toFixed(1)}`, title: `Fast: ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`, kind: 'warn' });
     if (!c.gapWarn) return out;
     return [...out, { key: 'gap', text: 'Gap 1f', title: `1-frame gap before the next event (${formatVideoTC(c.gapNext)}): the subtitle blinks off for a single frame`, kind: 'warn' }];
@@ -207,9 +270,14 @@
       title: `Short: under ${DUR.shortWarn}s amber, under ${DUR.shortBad}s red · Long: over ${DUR.longWarn}s amber, over ${DUR.longBad}s red`,
       test: c => !!(c.tooShort || c.tooLong || c.shortWarn || c.longWarn) },
     { key: 'suspicious', label: 'Odd Chars', cls: 'f-issue', title: 'Invisible, control or replacement characters', test: c => !!c.hasSuspiciousChars },
+    { key: 'onText', get label() { const m = typeof marksNow === 'function' && marksNow(); return m && m.allText ? 'On text' : 'On credits'; }, cls: 'f-issue', title: 'Covers a credit or other on-screen text (from the video markers)', test: c => !!c.onText },
+    { key: 'overBlack', label: 'Over black', cls: 'f-issue', title: 'Runs across a commercial black (from the video analysis)', test: c => !!c.overBlack },
     { key: 'pastEnd', label: 'Past end', cls: 'f-issue', title: 'Still on screen after the video ends', test: c => !!c.pastEnd },
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'mixed', label: 'Mixed align', cls: 'f-warn', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
+    { key: 'nearText', get label() { const m = typeof marksNow === 'function' && marksNow(); return m && m.allText ? 'Near text' : 'Near credits'; }, cls: 'f-warn', title: `Within ${NEAR_PCT}% of the picture height of a credit or other on-screen text`, test: c => !!c.nearText },
+    { key: 'textHere', label: 'Text, place unknown', cls: 'f-warn', title: 'A tester flagged on-screen text at the time, but its place on the picture wasn\'t found', test: c => !!c.textHere },
+    { key: 'raisedNoText', label: 'Raised, no credit', cls: 'f-warn', title: `Raised or at the top, with no credit within ${RAISED_WINDOW} s and no on-screen text at the time`, test: c => !!c.raisedNoText },
     { key: 'gaps', label: 'Gaps', cls: 'f-warn', title: '1-frame gaps (the subtitle blinks off for a frame)', test: c => !!c.gapWarn },
     { key: 'placement', label: 'Placement', cls: 'f-place', title: 'Raised, or left / right-aligned', test: c => !!(c.placement && (c.placement.v === 'raised' || c.placement.h === 'left' || c.placement.h === 'right')) },
     { key: 'top', label: 'Top', cls: 'f-neutral', title: 'Placed at the top', test: c => !!(c.placement && c.placement.v === 'top') },
