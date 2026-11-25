@@ -60,6 +60,14 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 }
             }
 
+        case "markersRead":
+            // Video markers for the QC page (VideoMarkers folders around the videos folder; see Markers.swift)
+            let dirs = body["dirs"] as? [String] ?? [], around = str("around")
+            DispatchQueue.global(qos: .userInitiated).async {
+                let list = MarkersFiles.read(dirs: dirs, around: Access.isAllowed(around) ? around : "")
+                DispatchQueue.main.async { replyHandler(list, nil) }
+            }
+
         case "read":
             let path = str("path"), start = UInt64(max(0, num("start"))), end = UInt64(max(0, num("end")))
             guard Access.isAllowed(path) else { replyHandler(nil, "Not allowed: “\(path)” isn't in a chosen folder."); return }
@@ -123,12 +131,6 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "analysisCancel":
             analysisJobs[Int(num("id"))]?.cancel()
             replyHandler(true, nil)
-        case "markersRead":
-            let dirs = body["dirs"] as? [String] ?? [], around = str("around")
-            DispatchQueue.global(qos: .userInitiated).async {
-                let list = MarkersFiles.read(dirs: dirs, around: Access.isAllowed(around) ? around : "")
-                DispatchQueue.main.async { replyHandler(list, nil) }
-            }
         case "markersWrite":
             let dir = str("dir"), name = str("name"), json = str("json")
             DispatchQueue.global(qos: .userInitiated).async {
