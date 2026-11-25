@@ -481,7 +481,7 @@ const Analysis = (() => {
   }
   const rowHtml = (r, i) => rowMain(r, i) + (r.open ? detailHtml(r) : '');
   const FOLDER_ICON = '<svg class="ana-fi" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>';
-  const IGN = '\u0000ignored';
+  const IGN = '::ignored';   // (no folder name has "::" on Mac or Windows)
   const groupKey = r => r.ignored ? IGN : r.segs.join('/');
   const groupRows = k => rows.filter(r => groupKey(r) === k);
   const hasSub = () => rows.some(x => groupKey(x) !== '' && groupKey(x) !== IGN);   // videos in folders inside the chosen one
@@ -506,8 +506,11 @@ const Analysis = (() => {
   function rowMain(r, i) {
     const sub = r.ignored && r.segs.length ? `<div class="ana-sub">${esc(r.segs.join(' / '))}</div>` : '';
     const inGroup = groupKey(r) !== '' || hasSub();
-    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${hasResults(store.get(r.name)) ? ' has-res' : ''}${r.open ? ' open' : ''}${inGroup ? ' in-grp' : ''}"><td><input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running || r.blocked ? ' disabled' : ''}></td>
-      <td class="ana-file">${sub}<div>${esc(r.name)}</div>${r.ignored ? `<div class="ana-note">${esc(r.ignored)}</div>` : ''}${r.err ? `<div class="ana-note bad">${esc(r.err)}</div>` : ''}</td>
+    // in a folder: the tick box sits in the File column, a step further in than the folder's name
+    const cb = `<input type="checkbox" data-i="${i}"${r.checked ? ' checked' : ''}${running || r.blocked ? ' disabled' : ''}>`;
+    const info = `${sub}<div>${esc(r.name)}</div>${r.ignored ? `<div class="ana-note">${esc(r.ignored)}</div>` : ''}${r.err ? `<div class="ana-note bad">${esc(r.err)}</div>` : ''}`;
+    return `<tr data-i="${i}" class="${r.checked ? '' : 'off'}${hasResults(store.get(r.name)) ? ' has-res' : ''}${r.open ? ' open' : ''}${inGroup ? ' in-grp' : ''}"><td>${inGroup ? '' : cb}</td>
+      <td class="ana-file">${inGroup ? `<div class="ana-fl">${cb}<div>${info}</div></div>` : info}</td>
       <td class="ana-len">${fmtLen(r.duration)}</td>${TYPES.map(t => `<td class="${t.can ? '' : 'later'}">${cellHtml(r, t)}</td>`).join('')}</tr>`;
   }
   function renderRow(r) {

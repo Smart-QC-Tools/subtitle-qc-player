@@ -176,7 +176,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
     more). Built with `TEXT_MODEL=1 python3 build.py` (needs `web/labs/fetch_assets.sh`; ~37 MB page); the Mac app's page
     is built without it (~0.7 MB). build.yml builds the web download with the model after the app.
   - Analysis listing (2026-11-24): videos grouped by sub-folder (3 levels; only folders with videos), folder icon, ▾/▸
-    collapse (remembered, `ana:collapsed`), a folder checkbox ticks its videos (file rows' checkboxes indented under it); audio-only / dubcard / < 1 min files
+    collapse (remembered, `ana:collapsed`), a folder checkbox ticks its videos; layout "C3" (user's pick): folder tick box in a narrow first column with the ▾ folder name right after it, file tick boxes inside the File column a step (18px) further in than the folder name; audio-only / dubcard / < 1 min files
     (`classifyVideo`, as on the QC page) in a collapsed "Ignored" group, unticked; ↻ Rescan. Mac: `listFolder` takes
     `folders: true` (returns `isDir` entries; `NDir.entries(true)`), so the window lists sub-folders too.
     Web, videos folder = a delivery folder: Videos row shows the folder, Results row "Not chosen yet" + "Choose the folder

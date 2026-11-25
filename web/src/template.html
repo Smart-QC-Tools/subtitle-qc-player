@@ -422,8 +422,11 @@ html.ana-page .ana-tablewrap{max-height:none;flex:1}
 .ana-fi{vertical-align:-3px;margin-right:7px;color:#9aa4b2}
 .ana-gname{font-weight:600}
 .ana-gn{color:var(--dim);margin-left:10px;font-size:11.5px}
-.ana-table tr.in-grp td:first-child{padding-left:28px}
-.ana-table tr.in-grp td.ana-file{padding-left:46px}
+.ana-table th:first-child,.ana-table td:first-child{padding-left:10px;padding-right:4px}
+.ana-table th:nth-child(2){padding-left:6px}
+.ana-table tr.ana-grp td:nth-child(2){padding-left:0}
+.ana-table tr.in-grp td.ana-file{padding-left:54px}
+.ana-fl{display:flex;gap:10px;align-items:flex-start} .ana-fl input{margin-top:2px;flex:none}
 .ana-warn{color:#f5bd5c}
 .ana-note-box.bad{color:#ff8f8f;background:rgba(255,92,92,.07);border-color:rgba(255,92,92,.35)}
 .vi-ana .ana-act{margin-left:10px;font-size:12px}
@@ -447,7 +450,7 @@ html.ana-window .ana-body{padding-top:16px}
 .ana-tablewrap{overflow:auto;min-height:120px;max-height:52vh;border:1px solid var(--border);border-radius:8px}
 .ana-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13px}
 .ana-table input{margin:0;vertical-align:middle}
-.ana-table col.c-c{width:54px} .ana-table col.c-l{width:80px} .ana-table col.c-t{width:150px}
+.ana-table col.c-c{width:32px} .ana-table col.c-l{width:80px} .ana-table col.c-t{width:150px}
 .ana-table th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--dim);padding:8px 10px;border-bottom:1px solid var(--border)}
 .ana-table th.later,.ana-table td.later{color:#5d636d}
 .ana-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
