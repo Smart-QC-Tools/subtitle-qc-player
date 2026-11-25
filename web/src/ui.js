@@ -506,10 +506,10 @@ function renderLibrary() {
   if (sv) {
     const n = subsForVideo(sv.name).length;
     $('#vidInfo').innerHTML = `<div class="vi-name">${esc(sv.name)}</div><div class="vi-meta">${sv.codec ? `${esc(sv.codec.name)}${sv.probe && sv.probe.width ? ` · ${sv.probe.width}×${sv.probe.height}` : ''} · ` : ''}${n ? `${n} subtitle file${n === 1 ? '' : 's'}` : 'no matching subtitle files'}${sv.codec && sv.codec.chrome === false ? ` · <span class="warn-t">${PLAYER_NAME} can't show this picture</span>` : ''}${sv.forced ? ` · <button class="mini excl" data-n="${esc(sv.name)}">Ignore again</button>` : ''}</div><div class="vi-ana" id="viAna"></div>`;
-    if (typeof Analysis !== 'undefined') {
-      Analysis.statusLine(sv).then(t => { const el = $('#viAna'); if (el && state.selectedVideo === sv.name) { el.textContent = 'Video markers: ' + t; Analysis.qcActions(el); } }).catch(() => {});
+    if (typeof Markers !== 'undefined') {
+      Markers.statusLine(sv).then(t => { const el = $('#viAna'); if (el && state.selectedVideo === sv.name && t) { el.textContent = 'Video markers: ' + t; Markers.qcActions(el); } }).catch(() => {});
       // markers made from another file of the same episode (a proxy) carry its name: the marks are for this video
-      Analysis.forVideo(sv).then(r => { if (state.selectedVideo === sv.name && window.Player.setAnalysisMarks) { const m = Analysis.marks(r); if (m) m.video = sv.name; window.Player.setAnalysisMarks(m); } }).catch(() => {});
+      Markers.forVideo(sv).then(r => { if (state.selectedVideo === sv.name && window.Player.setAnalysisMarks) { const m = Markers.marks(r); if (m) m.video = sv.name; window.Player.setAnalysisMarks(m); } }).catch(() => {});
     }
   } else $('#vidInfo').innerHTML = '';
 

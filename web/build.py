@@ -5,7 +5,7 @@ ref=R('ref/player_v2.5.html').read_text()
 css=ref.split('<style>')[1].split('</style>')[0]
 css=re.sub(r'\n  body \{.*?\n  \}', '', css, flags=re.S)
 css=re.sub(r'\n  h1 \{.*?\n  \}', '', css, flags=re.S)
-order=['imsc_bundle.js','native.js','util.js','config.js','detector.js','match.js','tctrack.js','vtt.js','sidecar.js','qc.js','player.js','ui.js','textdetect.js','analysis.js']
+order=['imsc_bundle.js','native.js','util.js','config.js','detector.js','match.js','tctrack.js','vtt.js','sidecar.js','qc.js','player.js','ui.js', 'markers.js','textdetect.js','analysis.js']
 # On-screen text (Video Analysis, web version): the lab's engine plus the model, ONNX Runtime Web and the ProRes decoder
 # (about 35 MB) only with TEXT_MODEL=1 (fetch them first: web/labs/fetch_assets.sh). Otherwise TextDetect is null
 # (the Mac app's page: its analysis is native).
