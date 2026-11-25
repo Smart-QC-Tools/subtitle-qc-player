@@ -1,7 +1,7 @@
 /* ==========================================================================
    Video analysis: its own workflow (start screen ▸ Video Analysis), a batch job over a folder of videos.
-   Finds on-screen text (web version: the lab's engine, see textdetect.js), and in the Mac app commercial blacks
-   (native engine: mac/Sources/Analysis.swift). The opening-credits reader (AnalysisCredits.swift) is no longer offered;
+   Finds on-screen text (web version: the lab's engine, see textdetect.js) and commercial blacks (Mac app: native engine,
+   mac/Sources/Analysis.swift; web version: web/labs/blacks-engine.js, same rules, sound first). The opening-credits reader (AnalysisCredits.swift) is no longer offered;
    results made with it still show.
 
    Results ("markers") are kept in a visible VideoMarkers folder, one file per video (<video name>.markers.json):
@@ -19,7 +19,8 @@ const Analysis = (() => {
   const TEXT = typeof TextDetect !== 'undefined' && !!TextDetect;
   const TYPES = [
     { key: 'text', label: 'On-screen text', head: 'On-screen text', can: !NATIVE && TEXT, why: NATIVE ? 'Coming to the Mac app later (it runs in the web version)' : 'Not in this build of the web version' },
-    { key: 'blacks', label: 'Commercial blacks', head: 'Blacks', can: NATIVE, why: 'Mac app only for now' },
+    { key: 'flags', label: 'Text from flags files', head: 'Flags', can: !NATIVE && TEXT && !!TextDetect.at, why: NATIVE ? 'Coming to the Mac app later (it runs in the web version)' : 'Not in this build of the web version' },
+    { key: 'blacks', label: 'Commercial blacks', head: 'Blacks', can: NATIVE || (TEXT && !!TextDetect.blacks), why: 'Not in this build of the web version' },
   ];
   // Settings each result is made with; a result made with older settings shows as Outdated.
   const SETTINGS = {
@@ -29,6 +30,10 @@ const Analysis = (() => {
     // Every piece of text over the whole video, without reading it (the lab's rules: TEXT_RULES in text-engine.js).
     // step: a look every 2 s, or every second with the Dense setting.
     text: TEXT ? Object.assign({}, TextDetect.rules) : { v: 2 },
+    // Flags from a tester (Switch .flags, Premiere / CSV markers): every flag kept; its text found in the on-screen
+    // text analysis (left-out pieces count when a person flagged them), else looked for at that moment, else
+    // "position not found" (flag −1 s … +3 s, the whole picture; amber on the QC page).
+    flags: { v: 1, before: 1, after: 3 },
   };
   let dense = Store.get('ana:dense') === '1';
   const settingsFor = key => key === 'text' ? Object.assign({}, SETTINGS.text, { step: dense ? 1 : 2 }) : SETTINGS[key];
@@ -108,9 +113,10 @@ const Analysis = (() => {
     return fp;
   }
   // Status of one analysis type for one video: none | done | outdated
-  function typeStatus(r, fp, key) {
+  function typeStatus(r, fp, key, row) {
     const t = r && r[key];
     if (!t) return { state: 'none' };
+    if (key === 'flags' && row && row.flags && (!t.source || t.source.sum !== row.flags.sum)) return { state: 'outdated', why: 'Analysed with a different flags file', at: t.analysedAt };
     if (fp && r.video && r.video.fingerprint !== fp) return { state: 'outdated', why: 'The video file has changed since it was analysed', at: t.analysedAt };
     if (!t.settings || t.settings.v !== SETTINGS[key].v) return { state: 'outdated', why: 'Analysed with older settings', at: t.analysedAt };
     if (key === 'text' && dense && (t.settings.step || 2) > 1) return { state: 'outdated', why: `Analysed with a look every ${t.settings.step || 2} s (Dense is on)`, at: t.analysedAt };
@@ -135,7 +141,144 @@ const Analysis = (() => {
   async function runType(row, key, onProgress, stopped) {
     if (NATIVE) return runNative(row, key, onProgress);
     if (key === 'text' && TEXT) return TextDetect.run(row.file, { onProgress, stopped, step: dense ? 1 : 2 });
+    if (key === 'blacks' && TEXT && TextDetect.blacks) return TextDetect.blacks(row.file, { onProgress, stopped, settings: SETTINGS.blacks });
     throw new Error('Not available here');
+  }
+
+  // ------------------------------------------------------------ flags files (a tester's markers)
+  // Switch .flags (XML; Start in 100 ns units from the start of the file); Premiere marker exports and other CSV / text
+  // marker lists (a time column called In / Start / Timecode / Time…, or the first timecode on each line; timecodes on
+  // the timeline's clock are moved to the file's when they lie past its end). Found beside the videos (in the listed
+  // folders) or added by hand; matched to a video by the media name inside, else by episode.
+  const FLAG_EXT = /\.(flags|csv|txt|xml)$/i;
+  let foundFlags = [], addedFlags = [];
+  function decodeText(buf) {
+    const b = new Uint8Array(buf);
+    if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+    if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+    let z = 0; for (let i = 1; i < Math.min(b.length, 400); i += 2) if (b[i] === 0) z++;
+    return new TextDecoder(z > 40 ? 'utf-16le' : 'utf-8').decode(b);
+  }
+  const TC_RE = /(\d{1,2})[:;.](\d{2})[:;.](\d{2})([:;.,])(\d{2,3})/;
+  // A time in seconds: HH:MM:SS:FF (";" = drop frame), HH:MM:SS.mmm, or plain seconds. Frames counted at the
+  // timecode rate (24 for 23.976), the time on the video's real clock.
+  function tcSeconds(str, fps) {
+    const m = TC_RE.exec(str);
+    if (!m) return /^\s*\d+(\.\d+)?\s*$/.test(str) ? parseFloat(str) : null;
+    const h = +m[1], mi = +m[2], se = +m[3], sep = m[4];
+    if ((sep === '.' || sep === ',') && m[5].length === 3) return h * 3600 + mi * 60 + se + +m[5] / 1000;
+    const rate = fps || 24, base = Math.round(rate);
+    let frames = ((h * 60 + mi) * 60 + se) * base + +m[5];
+    if (sep === ';' && (base === 30 || base === 60)) { const mins = h * 60 + mi, d = base === 30 ? 2 : 4; frames -= d * (mins - Math.floor(mins / 10)); }
+    return frames / rate;
+  }
+  function parseFlags(text, name) {
+    // Switch
+    if (/<Switch[\s>]/.test(text) && /<Flag\b/.test(text)) {
+      const media = ((/<Media>([^<]*)<\/Media>/.exec(text) || [])[1] || '').trim();
+      const times = [...text.matchAll(/<Flag\b[^>]*\bStart="(\d+)"/g)].map(x => +x[1] / 1e7);
+      return times.length ? { format: 'Switch flags', name, media: media.split(/[\\/]/).pop(), raw: times, tc: false } : null;
+    }
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length) return null;
+    const first = lines[0], delim = ['\t', ',', ';'].sort((a, b) => first.split(b).length - first.split(a).length)[0];
+    const cells = l => l.split(delim).map(c => c.trim().replace(/^"(.*)"$/, '$1'));
+    const head = cells(first), col = head.findIndex(h => /^(in|start|start ?tc|timecode|tc|time|source in|record in|marker in|in point)$/i.test(h));
+    let raw;
+    if (col >= 0) raw = lines.slice(1).map(l => cells(l)[col]).filter(Boolean);
+    else raw = lines.map(l => (TC_RE.exec(l) || [])[0]).filter(Boolean);
+    if (!raw.length) return null;
+    const format = /marker name/i.test(first) ? 'Premiere markers' : col >= 0 ? 'CSV markers' : 'marker list';
+    return { format, name, media: '', rawText: raw, tc: true };
+  }
+  const flagsSum = times => { let h = 0; for (const t of times) h = (Math.imul(h, 31) + Math.round(t * 1000)) | 0; return `${times.length}:${(h >>> 0).toString(16)}`; };
+  const epKey = n => { try { return Match.episodeKey(Match.parse(n)); } catch (e) { return null; } };
+  // Each video's flags file (the media name inside it first, then the episode), times on the file's clock.
+  async function matchFlags() {
+    const parsed = [];
+    for (const f of [...addedFlags, ...foundFlags]) {
+      if (f.size > 5 * 1048576) continue;
+      let p = null; try { p = parseFlags(decodeText(await f.arrayBuffer()), f.name); } catch (e) { p = null; }
+      if (p) parsed.push(p);
+    }
+    for (const r of rows) {
+      r.flags = null;
+      const k = epKey(r.name);
+      const exact = parsed.find(p => p.media && p.media === r.name), byEp = k ? parsed.find(p => epKey(p.media || p.name.replace(/\.[^.]+$/, '')) === k) : null;
+      const p = exact || byEp; if (!p) continue;
+      let times = p.raw;
+      if (p.tc) {
+        times = p.rawText.map(x => tcSeconds(x, r.fps)).filter(x => x != null);
+        const dur = r.duration || 0;
+        if (times.length && dur && Math.max(...times) > dur + 1) {   // on the timeline's clock: from the file's first frame
+          let start = null;
+          try { const tc = await TimecodeTrack.read(r.file); if (tc) start = tc.frameNumber / (r.fps || tc.fps || 24); } catch (e) { /* no timecode track */ }
+          if (start == null) start = Math.floor(Math.min(...times) / 3600) * 3600;
+          times = times.map(t => t - start);
+        }
+      }
+      times = times.filter(t => t >= 0 && (!r.duration || t <= r.duration + 1)).sort((a, b) => a - b);
+      if (times.length) r.flags = { name: p.name, format: p.format, times, sum: flagsSum(times) };
+    }
+    const n = rows.filter(r => r.flags).length, note = $('#anaFlagsNote');
+    if (note) note.textContent = parsed.length ? ` ${n} video${n === 1 ? '' : 's'} with flags` : '';
+  }
+  async function addFlags() {
+    if (running) return;
+    let files = [];
+    if (window.showOpenFilePicker) {
+      try { files = await Promise.all((await window.showOpenFilePicker({ multiple: true, id: 'anaFlags', types: [{ description: 'Flags / markers', accept: { 'text/plain': ['.flags', '.csv', '.txt', '.xml'] } }] })).map(h => h.getFile())); }
+      catch (e) { return; }
+    } else {
+      files = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.multiple = true; i.accept = '.flags,.csv,.txt,.xml'; i.onchange = () => res([...i.files]); i.click(); });
+    }
+    if (!files.length) return;
+    addedFlags = [...files, ...addedFlags.filter(a => !files.some(f => f.name === a.name))];
+    await matchFlags(); render();
+  }
+  const boxOverlap = (a, b) => { const ix = Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]), iy = Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]); return ix > 0 && iy > 0 ? ix * iy / Math.min(a[2] * a[3], b[2] * b[3]) : 0; };
+  // One video's flags: each flag's text from the on-screen text analysis (made now if there's none, or it's outdated),
+  // else looked for at that moment, else "position not found".
+  async function runFlags(row, res, onProgress, stopped) {
+    const F = row.flags, S = SETTINGS.flags;
+    let text = res.text;
+    if (!text || typeStatus(res, row.fp, 'text').state !== 'done') {
+      const out = await TextDetect.run(row.file, { onProgress: (p, m) => onProgress(p * 0.85, m), stopped, step: dense ? 1 : 2 });
+      text = res.text = Object.assign({ analysedAt: new Date().toISOString(), settings: settingsFor('text') }, out);
+    }
+    const auto = [...(text.pieces || []).map(p => ({ p, kept: true })), ...(text.leftOut || []).map(p => ({ p, kept: false }))];
+    const used = new Map(), loose = [];
+    for (const t of F.times) {
+      const cand = auto.filter(x => t >= x.p.in - (x.p.approx ? 2.1 : 1.5) && t <= x.p.out + (x.p.approx ? 1 : 0.5));
+      let pick = [];
+      if (cand.length) {
+        // a tester flags text soon after it comes on: the piece that started last before the flag (and any starting with it)
+        const best = cand.filter(x => x.p.in <= t + 0.2).sort((a, b) => b.p.in - a.p.in)[0];
+        pick = best && t - best.p.in <= 4 ? cand.filter(x => Math.abs(x.p.in - best.p.in) <= 1) : cand.filter(x => x.p.in <= t && t <= x.p.out);
+        if (!pick.length) pick = cand;
+        if (pick.some(x => x.kept)) pick = pick.filter(x => x.kept);
+      }
+      if (!pick.length) { loose.push(t); continue; }
+      for (const x of pick) {
+        const e = used.get(x.p) || { in: x.p.in, out: x.p.out, box: x.p.box, height: x.p.height, from: 'analysis', flags: [] };
+        if (!x.kept) e.leftOutAs = x.p.why;
+        e.flags.push(t); used.set(x.p, e);
+      }
+    }
+    const pieces = [...used.values()], unknown = [];
+    if (loose.length) {
+      const found = await TextDetect.at(row.file, loose, { stopped, onProgress: (p, m) => onProgress(0.85 + 0.15 * p, m) });
+      for (const f of found) {
+        if (!f.pieces.length) { unknown.push({ t: f.t, in: Math.max(0, f.t - S.before), out: f.t + S.after }); continue; }
+        for (const c of f.pieces) {
+          const same = pieces.find(e => e.from === 'looked' && Math.abs(e.in - c.in) < 0.1 && Math.abs(e.out - c.out) < 0.1 && boxOverlap(e.box, c.box) > 0.5);
+          if (same) same.flags.push(f.t); else pieces.push(Object.assign(c, { from: 'looked', flags: [f.t] }));
+        }
+      }
+    }
+    pieces.sort((a, b) => a.in - b.in);
+    onProgress(1);
+    return { source: { name: F.name, format: F.format, count: F.times.length, sum: F.sum }, pieces, unknown };
   }
 
   // ------------------------------------------------------------ the analysis page / window
@@ -161,6 +304,17 @@ const Analysis = (() => {
     const d = new Date(iso); if (isNaN(d)) return '';
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
+  const GEAR_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+  // Settings for the whole analysis (one place, so what's chosen is visible). On-screen text: how often to look.
+  function renderSettings() {
+    const p = $('#anaSettings'); if (!p || p.hidden) return;
+    const textOk = TYPES.some(t => t.key === 'text' && t.can);
+    p.innerHTML = `<div class="ana-set-h">Settings</div>
+      <div class="ana-set-sec"><div class="ana-set-t">On-screen text${textOk ? '' : ' <span class="ana-dim">(not in this version)</span>'}</div>
+        <label class="ana-set-opt"><input type="radio" name="anaStep" value="2"${dense ? '' : ' checked'}${running || !textOk ? ' disabled' : ''}><span><b>Standard</b>: a look every 2 seconds</span></label>
+        <label class="ana-set-opt"><input type="radio" name="anaStep" value="1"${dense ? ' checked' : ''}${running || !textOk ? ' disabled' : ''}><span><b>Dense</b>: a look every second. Also finds captions and name cards shorter than 2 s; takes about 1.5 times as long.</span></label>
+      </div>`;
+  }
   const HOME_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9h11v-9"/></svg>';
   function build() {
     if (built) return; built = true;
@@ -168,12 +322,13 @@ const Analysis = (() => {
     m.className = 'modal-bg'; m.id = 'anaModal'; m.hidden = true;
     m.innerHTML = `
       <div class="modal ana" role="dialog" aria-label="Video analysis">
-        <div class="modal-h"><button class="textbtn home-btn" id="anaHome" title="Back to the start screen (the analysis keeps running)">${HOME_ICON} Home</button><b>Video Analysis</b><span class="spacer"></span><button class="textbtn" id="anaHelp" title="Where results are kept">Where results go</button></div>
+        <div class="modal-h"><button class="textbtn home-btn" id="anaHome" title="Back to the start screen (the analysis keeps running)">${HOME_ICON} Home</button><b>Video Analysis</b><span class="spacer"></span><button class="textbtn" id="anaHelp" title="Where results are kept">Where results go</button><button class="textbtn ana-setbtn" id="anaSetBtn" title="How the analysis works">${GEAR_ICON} Settings</button></div>
+        <div class="ana-settings" id="anaSettings" hidden></div>
         <div class="ana-body">
           <div class="ana-row"><span class="ana-k">Videos</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaRescan" hidden title="Read the folder again">↻ Rescan</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
           <div class="ana-row"><span class="ana-k">Results</span><span class="ana-dest" id="anaDest"></span><button class="btn sm" id="anaPickRes" hidden>Choose…</button></div>
           <div class="ana-note-box" id="anaParent" hidden></div>
-          <div class="ana-row"><span class="ana-k">Find</span>${TYPES.map(t => `<label class="ana-chk${t.can ? '' : ' later'}"${t.can ? '' : ` title="${esc(t.why)}"`}><input type="checkbox" data-type="${t.key}"${!t.can ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.can ? '' : ` <i>(${NATIVE ? 'later' : 'Mac app'})</i>`}</label>`).join('')}${TYPES.some(t => t.key === 'text' && t.can) ? `<label class="ana-chk ana-dense" title="On-screen text: a look at every second instead of every 2 seconds, so captions and name cards shorter than 2 s are found too. Takes about 1.5 times as long."><input type="checkbox" id="anaDense"${dense ? ' checked' : ''}> Dense (a look every second, slower)</label>` : ''}</div>
+          <div class="ana-row"><span class="ana-k">Find</span>${TYPES.map(t => `<label class="ana-chk${t.can ? '' : ' later'}"${t.can ? '' : ` title="${esc(t.why)}"`}><input type="checkbox" data-type="${t.key}"${!t.can ? ' disabled' : typeOn[t.key] ? ' checked' : ''}> ${t.label}${t.key === 'text' && t.can ? '<span class="ana-dim ana-tnote" id="anaTextNote"></span>' : ''}${t.can ? '' : ` <i>(${NATIVE ? 'later' : 'Mac app'})</i>`}</label>`).join('')}${TYPES.some(t => t.key === 'flags' && t.can) ? '<button class="btn sm" id="anaAddFlags" title="Switch .flags, or Premiere / CSV marker lists (flags beside the videos are found on their own)">Add flags files…</button><span class="ana-dim ana-tnote" id="anaFlagsNote"></span>' : ''}</div>
           <div class="ana-tablewrap"><table class="ana-table"><colgroup><col class="c-c"><col class="c-f"><col class="c-l">${TYPES.map(() => '<col class="c-t">').join('')}</colgroup>
             <thead><tr><th><input type="checkbox" id="anaAll" title="Select all"></th><th>File</th><th>Length</th>${TYPES.map(t => `<th${t.can ? '' : ' class="later"'}>${t.head}</th>`).join('')}</tr></thead>
             <tbody id="anaBody"></tbody></table></div>
@@ -189,7 +344,12 @@ const Analysis = (() => {
     $('#anaHome').onclick = () => { if (WINDOW) Native.post('showHome'); else Home.show(); };
     $('#anaHelp').onclick = () => alert('Results go in a VideoMarkers folder, one file per video, so anyone opening the episode can use them.\n\n• Videos in a delivery folder (Encodes, _Encodes, QC_PASS, QC_FAIL): VideoMarkers sits beside that folder, never inside it.\n• Other videos (proxies, for example): VideoMarkers is inside the videos\' own folder.\n\nMarkers count for the episode: a proxy\'s markers serve its encode, and the other way round, as long as the length agrees.');
     m.querySelectorAll('input[data-type]').forEach(cb => cb.onchange = () => { typeOn[cb.dataset.type] = cb.checked; Store.set('ana:t:' + cb.dataset.type, cb.checked ? '1' : '0'); render(); });
-    if ($('#anaDense')) $('#anaDense').onchange = e => { dense = e.target.checked; Store.set('ana:dense', dense ? '1' : '0'); render(); };
+    $('#anaSetBtn').onclick = e => { e.stopPropagation(); const p = $('#anaSettings'); p.hidden = !p.hidden; if (!p.hidden) renderSettings(); };
+    document.addEventListener('click', e => { const p = $('#anaSettings'); if (p && !p.hidden && !e.target.closest('#anaSettings')) p.hidden = true; });
+    document.addEventListener('keydown', e => { const p = $('#anaSettings'); if (e.key === 'Escape' && p && !p.hidden) p.hidden = true; });
+    $('#anaSettings').addEventListener('change', e => {
+      if (e.target.name === 'anaStep') { dense = e.target.value === '1'; Store.set('ana:dense', dense ? '1' : '0'); render(); }
+    });
     $('#anaSkip').onchange = e => { skipDone = e.target.checked; Store.set('ana:skip', skipDone ? '1' : '0'); render(); };
     $('#anaAll').onchange = e => { if (running) return; rows.forEach(r => r.checked = e.target.checked && !r.blocked && !r.ignored); render(); };
     $('#anaBody').addEventListener('change', e => {
@@ -214,6 +374,7 @@ const Analysis = (() => {
       r.open = !r.open; $('#anaBody').innerHTML = bodyHtml();
     });
     $('#anaRescan').onclick = rescan;
+    if ($('#anaAddFlags')) $('#anaAddFlags').onclick = addFlags;
     $('#anaPickRes').onclick = pickResults;
     $('#anaStart').onclick = start;
     $('#anaStop').onclick = stop;
@@ -327,10 +488,11 @@ const Analysis = (() => {
   }
   // Web: the videos in a folder and in the folders inside it (3 levels; not inside VideoMarkers), so a season or
   // Digital folder takes in Encodes, QC_PASS and Proxies at once. Each: { file, segs (folders below the chosen one) }.
-  async function listDeep(dir, segs = [], depth = 0, out = []) {
+  async function listDeep(dir, segs = [], depth = 0, out = Object.assign([], { flagFiles: [] })) {
     for await (const [name, h] of dir.entries(true)) {   // (the Mac app's folders list sub-folders only when asked)
       if (name.startsWith('.') || name.startsWith('._')) continue;
       if (h.kind === 'file' && VIDEO_EXT.test(name)) out.push({ file: await h.getFile(), segs });
+      else if (h.kind === 'file' && FLAG_EXT.test(name) && out.flagFiles) out.flagFiles.push(await h.getFile());
       else if (h.kind === 'directory' && depth < 3 && name !== MARKERS_DIR) await listDeep(h, [...segs, name], depth + 1, out);
     }
     return out;
@@ -363,6 +525,7 @@ const Analysis = (() => {
     await loadRows(files);
   }
   async function loadRows(items) {
+    const flagFiles = items.flagFiles;
     items = items.filter(x => x && x.file).sort((a, b) => (a.segs.join('/') + '/' + a.file.name).localeCompare(b.segs.join('/') + '/' + b.file.name, undefined, { numeric: true }));
     const old = new Map(rows.map(r => [r.key, r]));
     store.clear();
@@ -383,7 +546,7 @@ const Analysis = (() => {
       const f = it.file, key = [...it.segs, f.name].join('/'), p = it.info.probe, ignored = it.info.reason || '';
       const prev = old.get(key);
       const r = { key, file: f, name: f.name, segs: it.segs, size: f.size, duration: p ? p.duration : null, fps: p ? p.fps : null,
-        ignored, checked: prev && !prev.blocked ? prev.checked : !ignored, open: prev ? prev.open : false, fp: null, live: {} };
+        ignored, checked: prev && !prev.blocked ? prev.checked : false, open: prev ? prev.open : false, fp: null, live: {} };
       if (NATIVE) { r.markersPath = markersPathFor(dirname(f.path)); r.dest = r.markersPath; }
       else if (sourceHandle && sourceHandle.getDirectoryHandle) {
         r.place = resultsRoot ? await markersPlace(resultsRoot, [...resultsRel, ...it.segs]) : await markersPlace(sourceHandle, it.segs);
@@ -393,6 +556,8 @@ const Analysis = (() => {
       fresh.push(r);
     }
     rows = [...fresh.filter(r => !r.ignored), ...fresh.filter(r => r.ignored)];
+    if (flagFiles) foundFlags = flagFiles;
+    await matchFlags();
     // the markers already there
     if (NATIVE) { for (const res of await readNative([...new Set(rows.map(r => r.markersPath))])) if (!store.has(res.video.name)) store.set(res.video.name, res); }
     else {
@@ -420,7 +585,8 @@ const Analysis = (() => {
       if (lv.state === 'running') return `<span class="ana-run"${lv.msg ? ` title="${esc(lv.msg)}"` : ''}><span class="ana-bar"><i style="width:${Math.round(lv.p * 100)}%"></i></span>${Math.round(lv.p * 100)}%</span>`;
       if (lv.state === 'failed') return `<span class="ana-bad" title="${esc(lv.msg || '')}">Failed</span>`;
     }
-    const st = typeStatus(store.get(r.name), r.fp, t.key);
+    const st = typeStatus(store.get(r.name), r.fp, t.key, r);
+    if (t.key === 'flags' && !r.flags && st.state === 'none') return '<span class="ana-dim" title="No flags file found for this video: add one with “Add flags files…”">no flags file</span>';
     if (st.state === 'done') return `<span class="ana-ok">✓</span> <span title="Analysed ${esc(fmtAt(st.at))}">${esc(found(store.get(r.name), t.key) || fmtAt(st.at))}</span>`;
     if (st.state === 'outdated') return `<span class="ana-warn" title="${esc(st.why)}">Outdated</span>`;
     return '<span class="ana-dim">—</span>';
@@ -434,6 +600,7 @@ const Analysis = (() => {
       return n ? `${n} credit${n === 1 ? '' : 's'}${t.confirmed ? '' : ' (no “Directed by”)'}` : 'none found';
     }
     if (key === 'text') { const n = (t.pieces || []).length; return n ? `${n} piece${n === 1 ? '' : 's'} of text` : 'no text found'; }
+    if (key === 'flags') { const n = t.source ? t.source.count : 0, u = (t.unknown || []).length; return `${n} flag${n === 1 ? '' : 's'}${u ? ` · ${u} not placed` : ''}`; }
     return '';
   }
   const KIND = { commercial: 'Commercial black', start: 'Start of the file', end: 'End of the file', other: 'Black with sound (inside a scene)' };
@@ -441,7 +608,7 @@ const Analysis = (() => {
     const f = Math.round(fps) || 24, n = Math.max(0, Math.round(sec * fps)), p = x => String(x).padStart(2, '0');
     return `${Math.floor(n / (f * 3600))}:${p(Math.floor(n / (f * 60)) % 60)}:${p(Math.floor(n / f) % 60)}:${p(n % f)}`;
   }
-  const hasResults = res => !!(res && (res.blacks || res.credits || res.text));
+  const hasResults = res => !!(res && (res.blacks || res.credits || res.text || res.flags));
   const CARD_KIND = { credit: 'Credit', title: 'Main title', text: 'Other text (not a credit)' };
   const WHY = { small: 'small', moving: 'moving with the camera', title: 'large title (older settings)', scene: 'part of the shot', faint: 'faint', 'end credits': 'end credits' };
   const where = b => { if (!b) return ''; const cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2; return `${cy < 0.33 ? 'top' : cy > 0.66 ? 'bottom' : 'middle'} ${cx < 0.38 ? 'left' : cx > 0.62 ? 'right' : 'centre'}`; };
@@ -453,6 +620,19 @@ const Analysis = (() => {
     const lines = ps.map(x => `<tr><td>${fmtFrames(x.in, fps)}</td><td>${fmtFrames(x.out, fps)}</td><td>${((x.out - x.in)).toFixed(1)} s</td><td>${esc(where(x.box))}</td></tr>`).join('');
     return `<div class="ana-dh">On-screen text <span class="ana-dim">· ${t.seconds != null ? `found in ${fmtLen(t.seconds)}${t.device ? ' on the ' + esc(t.device) : ''}` : ''}${t.step ? ` · a look every ${t.step === 1 ? 'second' : t.step + ' s'}` : ''}${loTxt ? ` · left out: ${esc(loTxt)}` : ''}</span></div>${
       ps.length ? `<table class="ana-dt"><thead><tr><th>In</th><th>Out</th><th>Length</th><th>Where</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No on-screen text found.</div>'}`;
+  }
+  function flagsHtml(res, r) {
+    const f = res && res.flags; if (!f) return '';
+    const fps = (res.text && res.text.fps) || r.fps || (res.video && res.video.fps) || 24;
+    const rowsF = [];
+    for (const p of f.pieces || []) for (const t of p.flags || []) rowsF.push({ t, p });
+    for (const u of f.unknown || []) rowsF.push({ t: u.t, u });
+    rowsF.sort((a, b) => a.t - b.t);
+    const FROM = { analysis: 'on-screen text analysis', looked: 'looked for at the flag' };
+    const lines = rowsF.map(x => x.u ? `<tr class="k-unknown"><td>${fmtFrames(x.t, fps)}</td><td>${fmtFrames(x.u.in, fps)}</td><td>${fmtFrames(x.u.out, fps)}</td><td class="ana-warn">position not found</td><td class="ana-dim">whole picture, amber</td></tr>`
+      : `<tr><td>${fmtFrames(x.t, fps)}</td><td>${fmtFrames(x.p.in, fps)}</td><td>${fmtFrames(x.p.out, fps)}</td><td>${esc(where(x.p.box))}</td><td class="ana-dim">${esc(FROM[x.p.from] || x.p.from || '')}</td></tr>`).join('');
+    return `<div class="ana-dh">Text from flags <span class="ana-dim">· ${esc(f.source ? `${f.source.name} (${f.source.format})` : '')}</span></div>${
+      rowsF.length ? `<table class="ana-dt"><thead><tr><th>Flag</th><th>In</th><th>Out</th><th>Where</th><th>Found by</th></tr></thead><tbody>${lines}</tbody></table>` : '<div class="ana-dim">No flags.</div>'}`;
   }
   function creditsHtml(res, r) {
     const c = res && res.credits; if (!c) return '';
@@ -477,7 +657,7 @@ const Analysis = (() => {
   function detailHtml(r) {
     const res = store.get(r.name);
     if (!hasResults(res)) return '';
-    return `<tr class="ana-detail"><td></td><td colspan="${2 + TYPES.length}">${textHtml(res, r)}${blacksHtml(res, r)}${creditsHtml(res, r)}</td></tr>`;
+    return `<tr class="ana-detail"><td></td><td colspan="${2 + TYPES.length}">${textHtml(res, r)}${flagsHtml(res, r)}${blacksHtml(res, r)}${creditsHtml(res, r)}</td></tr>`;
   }
   const rowHtml = (r, i) => rowMain(r, i) + (r.open ? detailHtml(r) : '');
   const FOLDER_ICON = '<svg class="ana-fi" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>';
@@ -523,7 +703,7 @@ const Analysis = (() => {
     const keys = TYPES.filter(t => t.can && typeOn[t.key]).map(t => t.key), jobs = [];
     for (const r of rows) {
       if (!r.checked || r.err || r.blocked) continue;
-      const ks = keys.filter(k => !(skipDone && typeStatus(store.get(r.name), r.fp, k).state === 'done'));
+      const ks = keys.filter(k => (k !== 'flags' || r.flags) && !(skipDone && typeStatus(store.get(r.name), r.fp, k, r).state === 'done'));
       if (ks.length) jobs.push({ row: r, keys: ks });
     }
     return jobs;
@@ -553,6 +733,7 @@ const Analysis = (() => {
     $('#anaUseQc').hidden = !ownFolder || running;
     $('#anaChange').disabled = running;
     $('#anaRescan').hidden = !sourceHandle || running;
+    if ($('#anaAddFlags')) $('#anaAddFlags').disabled = running;
     $('#anaBody').innerHTML = rows.length ? bodyHtml() : `<tr><td colspan="${3 + TYPES.length}" class="ana-empty">${folderProblem || (sourceLabel ? 'No video files in this folder or the folders inside it.' : '')}</td></tr>`;
     document.querySelectorAll('#anaBody input[data-mixed]').forEach(i => i.indeterminate = true);
     const main = rows.filter(r => !r.blocked && !r.ignored);
@@ -560,7 +741,9 @@ const Analysis = (() => {
     const jobs = plan();
     $('#anaStart').disabled = running || !jobs.length;
     $('#anaStop').disabled = !running;
-    document.querySelectorAll('#anaModal input[data-type], #anaSkip, #anaDense').forEach(i => i.disabled = running || !!i.closest('.later'));
+    document.querySelectorAll('#anaModal input[data-type], #anaSkip, #anaSettings input').forEach(i => i.disabled = running || !!i.closest('.later'));
+    const tn = $('#anaTextNote'); if (tn) { tn.textContent = dense ? ' · dense' : ''; tn.title = dense ? 'A look every second (Settings)' : ''; }
+    renderSettings();
     if (!running) $('#anaSum').textContent = !rows.length ? '' : jobs.length ? `${jobs.length} video${jobs.length === 1 ? '' : 's'} to analyse` : !TYPES.some(t => t.can) ? 'Nothing can run in this version' : rows.some(r => r.checked) ? 'Nothing to do: already analysed (untick “Skip” to run again)' : 'Tick the videos to analyse';
     updateIndicators();
   }
@@ -598,12 +781,13 @@ const Analysis = (() => {
         if (stopReq) break;
         r.live[k] = { state: 'running', p: 0 };
         try {
-          const out = await runType(r, k, (p, msg) => {
+          const prog = (p, msg) => {
             r.live[k].p = p; r.live[k].msg = msg || ''; renderRow(r);
             const el = (performance.now() - queueInfo.t0) / 1000, part = doneSecs + p * (r.duration || 2700);
             if (part > 0 && el > 1.5) $('#anaSum').textContent = `${queueInfo.done + 1} of ${queueInfo.total} · about ${fmtLeft(el / part * (totalLen - part))} left`;
             updateIndicators();
-          }, () => stopReq);
+          };
+          const out = k === 'flags' ? await runFlags(r, res, prog, () => stopReq) : await runType(r, k, prog, () => stopReq);
           res[k] = Object.assign({ analysedAt: new Date().toISOString(), settings: settingsFor(k) }, out);
           delete r.live[k];
         } catch (e) {
@@ -702,7 +886,7 @@ const Analysis = (() => {
   async function statusLine(v) {
     const m = await match(v);
     if (!m) return qc.ask ? 'markers found, needs permission' : 'none found';
-    const bits = [m.r.text && 'on-screen text', m.r.blacks && 'blacks', m.r.credits && 'credits'].filter(Boolean);
+    const bits = [m.r.text && 'on-screen text', m.r.flags && 'flags', m.r.blacks && 'blacks', m.r.credits && 'credits'].filter(Boolean);
     return bits.join(', ') + (m.from ? ` (from ${m.from})` : '');
   }
   // The QC page's analysis line: Allow (permission for a remembered folder) or Link markers folder….
@@ -758,20 +942,21 @@ const Analysis = (() => {
   const JOIN = 20;
   function marks(r) {
     if (!r) return null;
-    const text = r.text && r.text.pieces;
+    const text = (r.text || r.flags) && [...((r.text && r.text.pieces) || []), ...((r.flags && r.flags.pieces) || [])];
+    const unknown = ((r.flags && r.flags.unknown) || []).map(u => [u.in, u.out]);
     const cards = text ? text.map(p => ({ in: p.in, out: p.out, kind: 'text', text: '', box: p.box }))
       : ((r.credits && r.credits.cards) || []).map(c => ({ in: c.in, out: c.out, kind: c.kind || 'credit', text: c.text, box: c.box || (c.boxes && c.boxes[0]) || null }));
     const spans = [];
-    for (const c of cards.filter(c => text || c.kind === 'credit').sort((a, b) => a.in - b.in)) {
+    for (const c of [...cards.filter(c => text || c.kind === 'credit'), ...unknown.map(([a, b]) => ({ in: a, out: b }))].sort((a, b) => a.in - b.in)) {
       const last = spans[spans.length - 1];
       if (last && c.in - last[1] < JOIN) last[1] = Math.max(last[1], c.out); else spans.push([c.in, c.out]);
     }
     const blacks = ((r.blacks && r.blacks.items) || []).filter(b => b.kind === 'commercial').map(b => [b.in, b.out]);
-    const scannedTo = text ? r.text.scannedTo || (r.video && r.video.duration) : r.credits ? r.credits.scannedTo || (r.video && r.video.duration) : 0;
-    return spans.length || blacks.length || r.credits || text ? { video: null, credits: spans, label: text ? 'On-screen text' : 'Credits', allText: !!text, blacks, cards, scannedTo } : null;
+    const scannedTo = text ? (r.text && r.text.scannedTo) || (r.video && r.video.duration) : r.credits ? r.credits.scannedTo || (r.video && r.video.duration) : 0;
+    return spans.length || blacks.length || r.credits || text ? { video: null, credits: spans, label: text ? 'On-screen text' : 'Credits', allText: !!text, blacks, cards, unknown, scannedTo } : null;
   }
   return { open, close, forVideo, statusLine, qcActions, marks, fingerprint, TYPES, markersPathFor, markersPlace, MARKERS_DIR,
-    _useFolder: useOwnFolder, _start: start, _rescan: rescan,
+    _useFolder: useOwnFolder, _start: start, _rescan: rescan, _addFlags: async files => { addedFlags = files; await matchFlags(); render(); }, _parseFlags: parseFlags, _tc: tcSeconds,
     _pickResults: async d => { await setResults(d, true); await loadRows(rows.map(r => ({ file: r.file, segs: r.segs }))); },   // (tests: a folder without the picker)
     get running() { return running; } };
 })();

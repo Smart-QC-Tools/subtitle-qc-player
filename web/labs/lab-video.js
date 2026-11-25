@@ -95,7 +95,7 @@ async function parseMovie(file) {
     // display order
     const order = Array.from({ length: count }, (_, i) => i).sort((a, b) => cts[a] - cts[b]);
     const keyCount = key.reduce((a, b) => a + b, 0);
-    return { file, kind, fourcc, codec, description, width, height, timescale, mediaTime, count, size, offset, dts, cts, key, order,
+    return { file, moov: dv, kind, fourcc, codec, description, width, height, timescale, mediaTime, count, size, offset, dts, cts, key, order,
       duration: mDuration / timescale, fps: count / (mDuration / timescale), gop: count / Math.max(1, keyCount), keyCount,
       bytes: Array.from(size).reduce((a, b) => a + b, 0) };
   }
@@ -173,7 +173,8 @@ async function blackCheckFrame(frame) {
   if (fmt && /^(I420|I420A|I422|I444|NV12)/.test(fmt)) {
     const buf = new Uint8Array(frame.allocationSize());
     const layout = await frame.copyTo(buf);
-    black = isBlack8(buf, layout[0].offset, layout[0].stride, frame.codedWidth, frame.codedHeight);
+    const vr = frame.visibleRect || { width: frame.codedWidth, height: frame.codedHeight };   // copyTo gives the visible part only
+    black = isBlack8(buf, layout[0].offset, layout[0].stride, vr.width, vr.height);
   } else {
     const c = new OffscreenCanvas(480, 270), g = c.getContext('2d', { willReadFrequently: true });
     g.drawImage(frame, 0, 0, 480, 270);

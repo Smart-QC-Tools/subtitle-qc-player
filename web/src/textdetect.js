@@ -1,7 +1,7 @@
 /* ==========================================================================
    On-screen text for Video Analysis (web version): the lab's engine (web/labs/text-engine.js, rules and all),
    packed in at build time together with the text-detection model (PaddleOCR PP-OCRv4 detector), ONNX Runtime Web
-   and the ProRes decoder. Built only with TEXT_MODEL=1 (web/build.py; fetch the model first with
+   and the ProRes decoder; also commercial blacks (web/labs/blacks-engine.js). Built only with TEXT_MODEL=1 (web/build.py; fetch the model first with
    web/labs/fetch_assets.sh); otherwise TextDetect is null and the web version can't look for text.
    The lab page (web/labs/text-detection.src.html) uses the same engine: change the rules there and both follow.
    ========================================================================== */
@@ -18,6 +18,8 @@ const TextDetect = (() => {
 
 /*@include text-engine.js*/
 
+/*@include blacks-engine.js*/
+
   // One video: every piece of text that matters for subtitles, and what was left out (with why). Times in seconds
   // from the first frame; boxes [x, y, w, h] as parts of the picture (0…1, from the top left).
   // step: seconds between the frames looked at (2, or 1 for the dense setting).
@@ -33,5 +35,16 @@ const TextDetect = (() => {
       leftOut: res.leftOut.map(c => Object.assign(piece(c), { why: c.why }, c.approx ? { approx: true } : {})),
     };
   }
-  return { run, rules: TEXT_RULES };
+  // Commercial blacks (the Mac app's rules; see blacks-engine.js). Same result format as the Mac app.
+  async function blacks(file, { onProgress, stopped, settings } = {}) {
+    const r = await findBlacks(file, { settings, stopped, onStatus: (t, p) => onProgress && onProgress(Math.min(1, p || 0), t) });
+    return Object.assign(r, { device: 'browser' });
+  }
+  // Flags from a tester: the text on screen at each flag's time (see findTextAt). Boxes as in run().
+  async function at(file, times, { onProgress, stopped } = {}) {
+    const res = await findTextAt(file, times, { stopped, onStatus: (t, p) => onProgress && onProgress(Math.min(1, p || 0), t) });
+    const r3 = x => Math.round(x * 1000) / 1000;
+    return res.map(x => ({ t: x.t, pieces: x.pieces.map(c => ({ in: r3(c.inT), out: r3(c.outT), box: [r3(c.box.x), r3(c.box.y), r3(c.box.w), r3(c.box.h)], height: r3(c.lh) })) }));
+  }
+  return { run, blacks, at, rules: TEXT_RULES, _parts: { parseMovie, WcDecoder, blackCheckFrame, audioTracksOf, soundLevels } };   // (_parts: tests)
 })();

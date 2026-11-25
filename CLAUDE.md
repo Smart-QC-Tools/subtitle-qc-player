@@ -183,6 +183,21 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
     above…" (must hold the videos folder, checked with `resolve()`, and not be a delivery folder itself); then Videos shows
     "Digital / Encodes / QC_PASS" and Results "Digital / VideoMarkers · beside Encodes, the delivery folder". Remembered
     per videos folder (`anaResults` in IndexedDB; "Allow" on a new visit). Last videos folder: "Open “X” again" button.
+  - 2026-11-25: videos start unticked; ⚙ Settings box on the analysis page (On-screen text: Standard / Dense; the Find row
+    shows "· dense"); **commercial blacks in the web version** (`web/labs/blacks-engine.js`, packed with the text engine):
+    Mac rules, but sound first (PCM in .mov incl. several mono tracks, AAC via AudioDecoder; 20 ms levels), picture
+    checked only in silent stretches (−45 dBFS, every 4th frame, edges to the frame), head / tail always; same result
+    format. Test episode (make_analysis_media.py, 7 min): H.264+AAC, ProRes+PCM 24-bit, ProRes+2 mono: all exact, ~7 s.
+    Fixed: blackCheckFrame used codedHeight (738) instead of the visible 720 rows.
+    **Text from flags files** (type `flags`, web): Switch .flags (Start in 100 ns units from the file start), Premiere
+    marker exports (UTF-16, tabs, timeline TC → minus the file's start TC), CSV with an In/Start/Timecode/Time column,
+    or the first timecode on each line; found beside the videos (listDeep collects .flags/.csv/.txt/.xml) or "Add flags
+    files…"; matched by the media name inside, else episode (R0 flags ↔ R1 video). Every flag kept: the on-screen text
+    analysis is run first if missing; the piece that began last before the flag (≤ 4 s) is taken, left-out pieces
+    count when flagged; else `TextDetect.at` looks at that moment (findTextAt, no leaving out, in/out ±15 s); else
+    "position not found" = flag −1 s … +3 s, whole picture → amber "Text, place unknown" on the QC page. Stored as
+    `flags` {source{name,format,count,sum}, pieces[{in,out,box,height,from,flags[]}], unknown[{t,in,out}]}; QC counts
+    flag pieces with on-screen text (user's choice).
   - QC checks with text markers: `m.allText` → filters "On text" / "Near text", any text counts for "Raised, no credit".
   - Headless testing: OPFS folders (http://localhost) + `Analysis._useFolder`; headless Chromium crashes storing OPFS
     handles in IndexedDB, so tests stub HandleStore (real Chrome is fine with picked folders).

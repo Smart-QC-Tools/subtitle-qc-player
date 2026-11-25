@@ -181,7 +181,7 @@
   function analysisChecks(list) {
     const m = list === cueList && typeof marksNow === 'function' ? marksNow() : null;
     const off = effectiveOffset(), fr = 1 / (fps() || 24);
-    for (const c of list) { c.onText = c.nearText = c.raisedNoText = c.overBlack = null; }
+    for (const c of list) { c.onText = c.nearText = c.raisedNoText = c.overBlack = c.textHere = null; }
     if (!m) return;
     for (const c of list) {
       const [vb, ve] = cueVideoTime(c);
@@ -196,11 +196,13 @@
         if (vGap < NEAR_PCT && hGap < 2 && !c.nearText) c.nearText = info;
       }
       if (c.onText) c.nearText = null;
+      // a tester flagged text here, but where it sits on the picture wasn't found: worth a look (amber)
+      if (!c.onText) for (const [a, b] of m.unknown || []) if (vb < b && ve > a) { c.textHere = { in: a + off, out: b + off }; break; }
       // Raised (or at the top) with nothing to make room for: no credit within 20 s, no on-screen text at the time.
       if (c.placement && (c.placement.v === 'raised' || c.placement.v === 'top') && m.scannedTo && vb < m.scannedTo && m.cards) {
         // (markers from text detection don't tell credits from other text: any of it counts)
         const nearCredit = m.cards.some(k => (m.allText || k.kind === 'credit' || k.kind === 'title') && vb < k.out + RAISED_WINDOW && ve > k.in - RAISED_WINDOW);
-        const withText = m.cards.some(k => vb < k.out + TIME_MARGIN && ve > k.in - TIME_MARGIN);
+        const withText = m.cards.some(k => vb < k.out + TIME_MARGIN && ve > k.in - TIME_MARGIN) || (m.unknown || []).some(([a, b]) => vb < b && ve > a);
         if (!nearCredit && !withText) c.raisedNoText = true;
       }
       for (const [a, b] of m.blacks || []) if (vb < b - fr * 0.5 && ve > a + fr * 0.5) { c.overBlack = { in: a + off, out: b + off }; break; }
@@ -228,6 +230,7 @@
     if (c.shortWarn) out.push({ key: 'duration', text: `Short ${secs(c.duration)}s`, title: `Under ${DUR.shortWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
     if (c.longWarn) out.push({ key: 'duration', text: `Long ${secs(c.duration)}s`, title: `Over ${DUR.longWarn}s on screen (${c.duration.toFixed(3)}s)`, kind: 'warn' });
     if (c.nearText) out.push({ key: 'nearText', text: `Near ${c.nearText.kind === 'on-screen text' ? 'text' : c.nearText.kind}`, title: `Close to ${c.nearText.text ? `the ${c.nearText.kind} “${c.nearText.text}”` : 'on-screen text'} (${formatVideoTC(c.nearText.in)} – ${formatVideoTC(c.nearText.out)}): about ${Math.round(c.nearText.gap)}% of the picture height apart`, kind: 'warn' });
+    if (c.textHere) out.push({ key: 'textHere', text: 'Text here?', title: `A tester flagged on-screen text around ${formatVideoTC(c.textHere.in)} – ${formatVideoTC(c.textHere.out)}, but where it sits on the picture wasn't found: check the subtitle doesn't cover it`, kind: 'warn' });
     if (c.raisedNoText) out.push({ key: 'raisedNoText', text: 'Raised, no credit', title: `Raised or at the top, but there is no credit within ${RAISED_WINDOW} s and no other on-screen text at the time (from the video analysis)`, kind: 'warn' });
     if (c.cpsOver) out.push({ key: 'cps', text: `CPS ${c.cps.toFixed(1)}`, title: `Fast: ${c.cps.toFixed(1)} characters per second (limit ${CPS_LIMIT})`, kind: 'warn' });
     if (!c.gapWarn) return out;
@@ -273,6 +276,7 @@
     { key: 'cps', get label() { return `CPS > ${CPS_LIMIT}`; }, cls: 'f-warn', get title() { return `Over ${CPS_LIMIT} characters per second`; }, test: c => !!c.cpsOver },
     { key: 'mixed', label: 'Mixed align', cls: 'f-warn', title: 'Lines of one event aligned differently', test: c => !!c.mixedAlign },
     { key: 'nearText', get label() { const m = typeof marksNow === 'function' && marksNow(); return m && m.allText ? 'Near text' : 'Near credits'; }, cls: 'f-warn', title: `Within ${NEAR_PCT}% of the picture height of a credit or other on-screen text`, test: c => !!c.nearText },
+    { key: 'textHere', label: 'Text, place unknown', cls: 'f-warn', title: 'A tester flagged on-screen text at the time, but its place on the picture wasn\'t found', test: c => !!c.textHere },
     { key: 'raisedNoText', label: 'Raised, no credit', cls: 'f-warn', title: `Raised or at the top, with no credit within ${RAISED_WINDOW} s and no on-screen text at the time`, test: c => !!c.raisedNoText },
     { key: 'gaps', label: 'Gaps', cls: 'f-warn', title: '1-frame gaps (the subtitle blinks off for a frame)', test: c => !!c.gapWarn },
     { key: 'placement', label: 'Placement', cls: 'f-place', title: 'Raised, or left / right-aligned', test: c => !!(c.placement && (c.placement.v === 'raised' || c.placement.h === 'left' || c.placement.h === 'right')) },

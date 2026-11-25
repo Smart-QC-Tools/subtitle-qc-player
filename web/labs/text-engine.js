@@ -432,3 +432,54 @@ async function findText(file, o = {}) {
   const totalMs = now() - T0;
   return { m, dec, pts, posAt, final, leftOut, groups, samples, scanMs, refineMs, refineN, settleMs, totalMs, tm, end, step, W, H, sharpLimit };
 }
+
+// ------------------------------------------------------------ text at given moments (flags from a tester)
+// For each time: the pieces of text on screen then (every piece, no leaving out: a person saw text there), each with
+// its in and out found to the frame (looking at most 15 s either way). Used for flags the full analysis can't explain.
+// Returns [{ t, pieces: [{ inT, outT, box, lh, at }] }] (empty pieces: no text found near that moment).
+async function findTextAt(file, times, o = {}) {
+  const status = o.onStatus || (() => {}), stopped = o.stopped || (() => false);
+  const W = 640, H = 352, REACH = 15;
+  await loadModel(o.ep || 'auto');
+  const m = await parseMovie(file);
+  const dec = m.kind === 'prores' ? new ProresDecoder(m) : (m.kind === 'h264' || m.kind === 'hevc') ? new WcDecoder(m) : null;
+  if (!dec) throw new Error(`This video can't be read here (${m.fourcc})`);
+  await dec.open();
+  try {
+    const pts = m.order.map(s => (m.cts[s] - m.mediaTime) / m.timescale), N = pts.length;
+    const posAt = t => { let lo = 0, hi = N - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (pts[mid] <= t + 1e-6) lo = mid; else hi = mid - 1; } return lo; };
+    const full = new Map();
+    const look = async (p, near) => {
+      if (!near && full.has(p)) return full.get(p);
+      if (stopped()) throw new Error('stopped');
+      const r = await dec.frameAt(p); if (!r.frame) return [];
+      const img = frameToImage(r.frame, W, H); if (r.frame.close) r.frame.close();
+      const bs = blocks(await detectModel(img, near));
+      if (!near) full.set(p, bs);
+      return bs;
+    };
+    const half = Math.max(1, Math.round(0.5 * (m.fps || 24)));
+    const out = [];
+    for (const [i, t] of times.entries()) {
+      status(`looking at flag ${i + 1} of ${times.length}`, i / Math.max(1, times.length));
+      let p = posAt(Math.max(0, t)), found = await look(p);
+      for (const dt of [-0.4, 0.4, -0.8]) { if (found.length) break; p = posAt(Math.max(0, t + dt)); found = await look(p); }
+      const pieces = [];
+      for (const b of found) {
+        const present = async q => (await look(q, b)).some(x => overlap(b, x) > 0.3);
+        // back to where it comes on: half-second steps, then to the frame
+        const lim = posAt(Math.max(0, pts[p] - REACH)); let a = p, lo = Math.max(-1, lim - 1);
+        for (;;) { const q = a - half; if (q < lim) break; if (await present(q)) a = q; else { lo = q; break; } }
+        while (a - lo > 1) { const mid = (lo + a) >> 1; if (await present(mid)) a = mid; else lo = mid; }
+        // on to where it goes
+        const lim2 = posAt(pts[p] + REACH); let z = p, hi = Math.min(N, lim2 + 1);
+        for (;;) { const q = z + half; if (q > lim2) break; if (await present(q)) z = q; else { hi = q; break; } }
+        while (hi - z > 1) { const mid = (z + hi) >> 1; if (await present(mid)) z = mid; else hi = mid; }
+        pieces.push({ inT: pts[a], outT: z + 1 < N ? pts[z + 1] : m.duration, box: b, lh: b.lh, at: pts[p] });
+      }
+      out.push({ t, pieces });
+    }
+    status('done', 1);
+    return out;
+  } finally { try { dec.close(); } catch (e) { /* closed */ } }
+}

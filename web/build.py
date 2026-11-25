@@ -14,7 +14,7 @@ def textdetect():
     if os.environ.get('TEXT_MODEL') != '1': return 'const TextDetect = null;'
     b64 = lambda p: base64.b64encode(R(p).read_bytes()).decode()
     t = R('src/textdetect.js').read_text()
-    for inc in ('lab-video.js', 'text-engine.js'): t = t.replace('/*@include %s*/' % inc, R('labs/' + inc).read_text())
+    for inc in ('lab-video.js', 'text-engine.js', 'blacks-engine.js'): t = t.replace('/*@include %s*/' % inc, R('labs/' + inc).read_text())
     return (t.replace('__PRORES_WASM_B64__', b64('labs/prores/prores.wasm'))
              .replace('__ORT_MJS_B64__', b64('labs/vendor/ort/ort.webgpu.bundle.min.mjs'))
              .replace('__ORT_WASM_B64__', b64('labs/vendor/ort/ort-wasm-simd-threaded.jsep.wasm'))
