@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e2939"/><stop offset="1" stop-color="#0d1016"/></linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dy="4"/><feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect x="51" y="51" width="410" height="410" rx="92" fill="url(#bg)" filter="url(#sh)"/>
+  <rect x="51.5" y="51.5" width="409" height="409" rx="91.5" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.5"/>
+  <!-- the picture -->
+  <rect x="107.5" y="126.5" width="297" height="166" rx="12" fill="#08090b" stroke="#485c76" stroke-width="3"/>
+  <!-- text found on it: two lines of a lower third, framed by detection corners -->
+  <rect x="158" y="214" width="150" height="15" rx="7.5" fill="#d6dce5"/>
+  <rect x="158" y="239" width="104" height="12" rx="6" fill="#8d98a8"/>
+  <g fill="none" stroke="#54a0ff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M138 222 V197 H163"/><path d="M328 222 V197 H303"/>
+    <path d="M138 243 V268 H163"/><path d="M328 243 V268 H303"/>
+  </g>
+  <!-- the timeline: text found (yellow), a commercial black (red) -->
+  <rect x="108" y="316" width="296" height="46" rx="9" fill="#151c27" stroke="#2c394b" stroke-width="2"/>
+  <g fill="#f2d675">
+    <rect x="118" y="343" width="48" height="11" rx="5.5"/>
+    <rect x="186" y="343" width="30" height="11" rx="5.5"/>
+    <rect x="296" y="343" width="62" height="11" rx="5.5"/>
+    <rect x="372" y="343" width="22" height="11" rx="5.5"/>
+  </g>
+  <rect x="247" y="323" width="13" height="32" rx="3.5" fill="#ff5c5c"/>
+</svg>

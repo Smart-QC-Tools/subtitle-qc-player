@@ -22,6 +22,9 @@ def textdetect():
 src_of = lambda f: textdetect() if f == 'textdetect.js' else R('src/'+f).read_text()
 js='const WAVE_WORKER_SRC = ' + __import__('json').dumps(R('src/wave_worker.js').read_text()) + ';\n' + '\n'.join(src_of(f).replace("if (typeof module !== 'undefined') module.exports = Detector;",'').replace("if (typeof module !== 'undefined') module.exports = Match;",'') for f in order)
 s=R('src/template.html').read_text().replace('/*__PLAYER_CSS__*/',css).replace('/*__JS__*/',js)
+# the start screen's app icons (src/icons; video-analysis.svg is the source of its picture)
+for k, f in (('__ICON_SUBTITLE_QC__', 'subtitle-qc-player-160.png'), ('__ICON_VIDEO_ANALYSIS__', 'video-analysis-160.png')):
+    s = s.replace(k, 'data:image/png;base64,' + base64.b64encode(R('src/icons/' + f).read_bytes()).decode())
 R('dist').mkdir(exist_ok=True)
-R('dist/Subtitle_QC_Player.html').write_text(s)
+R('dist/Smart_QC_Tools.html').write_text(s)   # (Smart QC Tools: the suite; the stand-alone 1.0.x is Subtitle_QC_Player.html)
 print(len(s), 'body{' in css, 'h1 {' in css)

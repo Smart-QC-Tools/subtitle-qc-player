@@ -748,7 +748,7 @@ const Analysis = (() => {
       const r = j.row;
       const prev = store.get(r.name), same = prev && prev.video && prev.video.fingerprint === r.fp;
       // a changed file starts over; otherwise other types already done are kept
-      const res = Object.assign({}, same ? prev : {}, { format: FORMAT, version: VERSION, app: APP_VERSION });
+      const res = Object.assign({}, same ? prev : {}, { format: FORMAT, version: VERSION, app: `${SUITE_NAME} ${SUITE_VERSION}`, tool: `Video Analysis ${ANALYSIS_VERSION}` });
       delete res._dir;
       res.video = { name: r.name, size: r.size, duration: r.duration, fps: r.fps, fingerprint: r.fp };
       for (const k of j.keys) {
@@ -832,6 +832,7 @@ const Home = (() => {
     const h = el(); if (!h || window.__selftest) return;
     Analysis.close();
     const v = HandleStore.cache.videos, s = HandleStore.cache.subs;
+    for (const [id, t] of [['homeVer', SUITE_VERSION], ['homeQcVer', APP_VERSION], ['homeAnaVer', ANALYSIS_VERSION]]) { const e = document.getElementById(id); if (e) e.textContent = t; }
     const q = document.getElementById('homeQcLast');
     if (q) q.textContent = v || s ? 'Last folders: ' + [v && v.name, s && s.name].filter(Boolean).join(' · ') : '';
     const a = document.getElementById('homeAnaLast');

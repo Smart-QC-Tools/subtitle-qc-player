@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Subtitle QC Player</string>
-  <key>CFBundleDisplayName</key><string>Subtitle QC Player</string>
+  <key>CFBundleName</key><string>Smart QC Tools</string>
+  <key>CFBundleDisplayName</key><string>Smart QC Tools</string>
   <key>CFBundleIdentifier</key><string>com.smartqctools.subtitleqc</string>
   <key>CFBundleExecutable</key><string>SubtitleQC</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -15,11 +15,11 @@
   <key>LSApplicationCategoryType</key><string>public.app-category.video</string>
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSHumanReadableCopyright</key><string>Subtitle QC Player</string>
-  <key>NSDocumentsFolderUsageDescription</key><string>Subtitle QC Player reads the video and subtitle folders you choose.</string>
-  <key>NSDesktopFolderUsageDescription</key><string>Subtitle QC Player reads the video and subtitle folders you choose.</string>
-  <key>NSDownloadsFolderUsageDescription</key><string>Subtitle QC Player reads the video and subtitle folders you choose.</string>
-  <key>NSRemovableVolumesUsageDescription</key><string>Subtitle QC Player reads the video and subtitle folders you choose.</string>
-  <key>NSNetworkVolumesUsageDescription</key><string>Subtitle QC Player reads the video and subtitle folders you choose.</string>
+  <key>NSHumanReadableCopyright</key><string>Smart QC Tools</string>
+  <key>NSDocumentsFolderUsageDescription</key><string>Smart QC Tools reads the video and subtitle folders you choose.</string>
+  <key>NSDesktopFolderUsageDescription</key><string>Smart QC Tools reads the video and subtitle folders you choose.</string>
+  <key>NSDownloadsFolderUsageDescription</key><string>Smart QC Tools reads the video and subtitle folders you choose.</string>
+  <key>NSRemovableVolumesUsageDescription</key><string>Smart QC Tools reads the video and subtitle folders you choose.</string>
+  <key>NSNetworkVolumesUsageDescription</key><string>Smart QC Tools reads the video and subtitle folders you choose.</string>
 </dict>
 </plist>

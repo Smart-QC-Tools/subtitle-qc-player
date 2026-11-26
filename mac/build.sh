@@ -1,14 +1,15 @@
 #!/bin/bash
-# Builds "Subtitle QC Player.app" (universal: Apple Silicon + Intel, macOS 13+) and zips it.
+# Builds "Smart QC Tools.app" (universal: Apple Silicon + Intel, macOS 13+) and zips it. (The stand-alone 1.0.x on main
+# builds "Subtitle QC Player.app"; same bundle ID.)
 # Runs on GitHub's Mac build machines (see .github/workflows/build.yml); also works on any Mac
 # with the Xcode command-line tools.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 # The version lives in web/src/config.js (APP_VERSION).
-VERSION="${VERSION:-$(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js)}"
+VERSION="${VERSION:-$(sed -nE "s/^const SUITE_NAME = .*SUITE_VERSION = '([^']+)'.*/\1/p" web/src/config.js)}"
 BUILD="${BUILD_NUMBER:-1}"
-APP="$ROOT/build/Subtitle QC Player.app"
+APP="$ROOT/build/Smart QC Tools.app"
 
 rm -rf "$ROOT/build"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -31,7 +32,7 @@ run() {
 
 # 1. The interface (same single page as the web version)
 run bash -c "cd '$ROOT/web' && python3 build.py"
-cp "$ROOT/web/dist/Subtitle_QC_Player.html" "$APP/Contents/Resources/index.html"
+cp "$ROOT/web/dist/Smart_QC_Tools.html" "$APP/Contents/Resources/index.html"
 
 # 2. The native shell, once per CPU type, then joined into one universal binary
 #    ARCHS / EXTRA_SWIFT_FLAGS are only used by the self-test build (see .github/workflows/selftest.yml).
@@ -55,5 +56,5 @@ iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --deep --options runtime --sign - "$APP"
 
 # 5. Zip for download
-(cd "$ROOT/build" && ditto -c -k --keepParent "Subtitle QC Player.app" "Subtitle-QC-Player.zip")
+(cd "$ROOT/build" && ditto -c -k --keepParent "Smart QC Tools.app" "Smart-QC-Tools.zip")
 echo "Built $APP ($VERSION, build $BUILD)"

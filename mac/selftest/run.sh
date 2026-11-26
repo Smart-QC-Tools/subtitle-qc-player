@@ -2,7 +2,7 @@
 # Runs the self-test build of the app against the test media and collects everything in $2.
 set -uo pipefail
 MEDIA="$1"; OUT="$2"; mkdir -p "$OUT"
-BIN="$(pwd)/build/Subtitle QC Player.app/Contents/MacOS/SubtitleQC"
+BIN="$(pwd)/build/Smart QC Tools.app/Contents/MacOS/SubtitleQC"
 defaults delete com.smartqctools.subtitleqc >/dev/null 2>&1 || true
 rm -rf "$HOME/Library/Logs/Subtitle QC Player"
 { sw_vers; sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize; system_profiler SPDisplaysDataType 2>/dev/null | head -20; } > "$OUT/system.txt" 2>&1

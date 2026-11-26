@@ -582,7 +582,8 @@ async function openSubtitle(r) {
 // ------------------------------------------------------------ wiring
 document.addEventListener('DOMContentLoaded', () => {
   document.body.dataset.tab = 'qc';
-  $('#appVersion').textContent = `Subtitle QC Player Version ${APP_VERSION}` + (NATIVE ? ' (Mac app)' : '');
+  // (Smart QC Tools, 1.1.0 line: the suite and both apps; the stand-alone 1.0.x: Subtitle QC Player only)
+  $('#appVersion').textContent = (typeof SUITE_VERSION !== 'undefined' ? `${SUITE_NAME} ${SUITE_VERSION} · Subtitle QC Player ${APP_VERSION} · Video Analysis ${ANALYSIS_VERSION}` : `Subtitle QC Player Version ${APP_VERSION}`) + (NATIVE ? ' (Mac app)' : '');
   $('#helpNav').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
     document.querySelectorAll('#helpNav button').forEach(x => x.classList.toggle('on', x === b));

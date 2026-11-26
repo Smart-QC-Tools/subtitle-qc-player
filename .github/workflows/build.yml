@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Subtitle QC Player.app
+      - name: Build Smart QC Tools.app
         run: BUILD_NUMBER=${{ github.run_number }} bash mac/build.sh
 
       # The web version's Video Analysis finds on-screen text with the lab's engine and a text-detection model
@@ -40,21 +40,21 @@ jobs:
           cd web && TEXT_MODEL=1 python3 build.py
 
       # A signed record that these exact files were built by this workflow, in this repository, from this commit.
-      # Anyone can check a download:  gh attestation verify Subtitle-QC-Player.zip --repo Smart-QC-Tools/subtitle-qc-player
+      # Anyone can check a download:  gh attestation verify Smart-QC-Tools.zip --repo Smart-QC-Tools/subtitle-qc-player
       - name: Build attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            build/Subtitle-QC-Player.zip
-            web/dist/Subtitle_QC_Player.html
+            build/Smart-QC-Tools.zip
+            web/dist/Smart_QC_Tools.html
 
       - name: Keep the build (Actions tab)
         uses: actions/upload-artifact@v4
         with:
-          name: Subtitle-QC-Player-build-${{ github.run_number }}
+          name: Smart-QC-Tools-build-${{ github.run_number }}
           path: |
-            build/Subtitle-QC-Player.zip
-            web/dist/Subtitle_QC_Player.html
+            build/Smart-QC-Tools.zip
+            web/dist/Smart_QC_Tools.html
 
       # A release/x.y.z branch is that version's permanent release (tag vx.y.z): each push rebuilds it in place, so
       # the download links never change. (The old rolling "latest" release is removed.)
@@ -68,12 +68,12 @@ jobs:
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
           if gh release view "v$VER" >/dev/null 2>&1; then
             git tag -f "v$VER" "$GITHUB_SHA" && git push -f origin "refs/tags/v$VER"
-            gh release upload "v$VER" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html --clobber
+            gh release upload "v$VER" build/Smart-QC-Tools.zip web/dist/Smart_QC_Tools.html --clobber
             gh release edit "v$VER" --notes "$NOTES"
             echo "::notice::v$VER rebuilt from ${GITHUB_SHA::7}"
             exit 0
           fi
-          gh release create "v$VER" build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
+          gh release create "v$VER" build/Smart-QC-Tools.zip web/dist/Smart_QC_Tools.html \
             --target "$GITHUB_SHA" --latest=false \
             --title "Subtitle QC Player $VER (stable)" \
             --notes "$NOTES"
@@ -85,7 +85,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete analysis-preview --yes --cleanup-tag || true
-          gh release create analysis-preview build/Subtitle-QC-Player.zip web/dist/Subtitle_QC_Player.html \
+          gh release create analysis-preview build/Smart-QC-Tools.zip web/dist/Smart_QC_Tools.html \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Video analysis $(sed -nE "s/^const APP_VERSION = '([^']+)';.*/\1/p" web/src/config.js) — test build ${{ github.run_number }}" \
-            --notes "Work in progress, for testing only (commit ${GITHUB_SHA::7}). The stable version is on the download page."
+            --title "Smart QC Tools $(sed -nE "s/^const SUITE_NAME = .*SUITE_VERSION = '([^']+)'.*/\1/p" web/src/config.js) — build ${{ github.run_number }}" \
+            --notes "Smart QC Tools: Subtitle QC Player and Video Analysis (commit ${GITHUB_SHA::7}). Mac app: Smart-QC-Tools.zip. Web version for Chrome: Smart_QC_Tools.html. The stand-alone Subtitle QC Player is on the download page."
