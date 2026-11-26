@@ -6,8 +6,8 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 
 - Repo: github.com/Smart-QC-Tools/subtitle-qc-player (moved from danmurciano/…; no one had the old links).
 - Download page: https://smart-qc-tools.github.io/subtitle-qc-player/ (pinned to stable v1.0.0);
-  `preview.html` = latest `analysis-preview` test build, deliberately not linked from the main page
-  (it links back to stable). Pages served from `main` `/docs`.
+  `smart-qc-tools.html` = Smart QC Tools (latest `analysis-preview` build), not linked from the main page;
+  `preview.html` only forwards there (old links). No "In testing" note (removed 2026-11-26 at the user's request). Pages served from `main` `/docs`.
   `labs.html` = download page for the test pages in `web/labs/` (video-analysis branch; `labs.yml` builds them into
   the `labs` pre-release on every push there). Not linked from the other pages.
 - Intro slide deck (Claude artifact, Slides type): https://claude.ai/artifact/855rermCmJDWnomiRFh5ay
@@ -20,7 +20,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - `release/1.0.0`: permanent stable 1.0.0 → release `v1.0.0`; every push there rebuilds v1.0.0 in place (same links).
   Stable fix flow: commit on main, push main (no build), merge main into video-analysis (preview build), cherry-pick
   onto release/1.0.0 (drop CLAUDE.md, which that branch doesn't have) and push (v1.0.0 build). One build per version.
-- `video-analysis`: work in progress → pre-release `analysis-preview` ("Video analysis 1.1.0 — test build N"; preview.html shows "VERSION 1.1.0 · BUILD N").
+- `video-analysis`: work in progress → pre-release `analysis-preview` ("Smart QC Tools 1.0.0 — build N"; smart-qc-tools.html shows "VERSION 1.0.0 · BUILD N").
   When done: merge to main, release as 1.1.0, point the main download page at it.
 - No "latest" release any more (the user wants only 1.0.0 and the 1.1.0 preview). Build: `.github/workflows/build.yml` (macos-15).
   `selftest.yml` (manual) runs the Mac app against generated ProRes/H.264/HEVC media.
@@ -111,7 +111,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
   the app icons (src/icons: subtitle-qc-player-160.png = docs/icon.png, video-analysis-160.png from video-analysis.svg,
   option "C": film strip, magnifier on "Aa", yellow / red marks; docs/icon-video-analysis.png 512). Downloads:
   Smart_QC_Tools.html, Smart-QC-Tools.zip ("Smart QC Tools.app", same bundle ID, Mac icon still the player's),
-  release "Smart QC Tools 1.0.0 — build N" (tag analysis-preview, page docs/preview.html). The stand-alone Subtitle QC
+  release "Smart QC Tools 1.0.0 — build N" (tag analysis-preview, page docs/smart-qc-tools.html). The stand-alone Subtitle QC
   Player 1.0.0 stays on the main download page: both are offered. Repo name unchanged (the Pages URL would move).
 - Mac app: its own window, **Window ▸ Video Analysis** (⇧⌘A; `AnalysisWindow` in `mac/Sources/Analysis.swift`): a second
   WKWebView with the same page in "window" mode (`window.__analysisWindow`, `html.ana-window`: only the panel).
@@ -171,6 +171,7 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
     (`#homeBtn`) and the analysis page (`#anaHome`). Web: Video Analysis is a full page (`html.ana-page`), keeps running
     while you QC (`#anaBtn` in the QC header = "Analysing 2 of 5…"). Mac: the button opens the analysis window; its Home
     posts `showHome` (main window to front, start screen). Self-test skips it (`window.__selftest`, `Home.hide()`).
+    Home buttons (2026-11-26): icon only, 28 px, about 20 px from the window's left edge on both pages.
   - Markers: `VideoMarkers/<video name>.markers.json`, format `video-markers` v1 (old Subtitle QC Data dropped: nothing
     to keep). Place: beside the topmost delivery folder (Encodes/_Encodes/QC_PASS/QC_FAIL, `DELIVERY`), else in the
     video's folder (`markersPlace` web handles / `markersPathFor` Mac paths). Web analysis takes any folder and lists
