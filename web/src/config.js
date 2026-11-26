@@ -2,7 +2,7 @@
 // own version. APP_VERSION = Subtitle QC Player, the same as the stand-alone 1.0.x (main); SUITE_VERSION names the
 // download (the Mac app and the release use it); ANALYSIS_VERSION = Video Analysis.
 const APP_VERSION = '1.0.0';
-const SUITE_NAME = 'Smart QC Tools', SUITE_VERSION = '1.0', ANALYSIS_VERSION = '1.0';
+const SUITE_NAME = 'Smart QC Tools', SUITE_VERSION = '1.0.0', ANALYSIS_VERSION = '1.0.0';
 
 /* ==========================================================================
    REFERENCE LANGUAGE LIST  (edit here)
