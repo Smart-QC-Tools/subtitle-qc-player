@@ -105,6 +105,14 @@ Replaces Rouge Gorge / Annotation Edit for *checking* (no subtitle editing yet; 
 - The user iterates on fine details; show mock-ups when asked before changing code, keep answers concrete.
 
 ## Video analysis (video-analysis branch, in progress)
+- **Smart QC Tools** (2026-11-26, user's decision): the 1.1.0 line is now the suite "Smart QC Tools" holding two apps, each
+  with its own version, all 1.0.0 for now (config.js: APP_VERSION = Subtitle QC Player, same as the stand-alone on main;
+  SUITE_NAME / SUITE_VERSION; ANALYSIS_VERSION). No "preview" wording. Start screen: "Smart QC Tools 1.0.0", cards with
+  the app icons (src/icons: subtitle-qc-player-160.png = docs/icon.png, video-analysis-160.png from video-analysis.svg,
+  option "C": film strip, magnifier on "Aa", yellow / red marks; docs/icon-video-analysis.png 512). Downloads:
+  Smart_QC_Tools.html, Smart-QC-Tools.zip ("Smart QC Tools.app", same bundle ID, Mac icon still the player's),
+  release "Smart QC Tools 1.0.0 — build N" (tag analysis-preview, page docs/preview.html). The stand-alone Subtitle QC
+  Player 1.0.0 stays on the main download page: both are offered. Repo name unchanged (the Pages URL would move).
 - Mac app: its own window, **Window ▸ Video Analysis** (⇧⌘A; `AnalysisWindow` in `mac/Sources/Analysis.swift`): a second
   WKWebView with the same page in "window" mode (`window.__analysisWindow`, `html.ana-window`: only the panel).
   No header button in the app. Own folder (starts as the QC videos folder; Change… / drop a folder;
