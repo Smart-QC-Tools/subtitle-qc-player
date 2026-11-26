@@ -407,7 +407,9 @@ html.native #anaBtn{display:none}
 @media (max-width:640px){.home-cards{grid-template-columns:1fr}}
 .home-btn{display:inline-flex;align-items:center;gap:6px;color:#aab0ba;margin-right:12px}
 .home-btn:hover{color:#a9caff}
-#homeBtn{padding:4px 6px}
+.home-btn svg{width:28px;height:28px;stroke-width:1.6}
+#homeBtn{padding:2px;margin-left:-22px;margin-right:29px}   /* about 20 px from the window's edge, as on the analysis page; the tabs stay put */
+#anaHome{padding:2px;margin-left:0;margin-right:12px}
 #anaBtn{color:var(--val)}
 /* Video Analysis as a page of its own (web) */
 html.ana-page #anaModal{padding:0;background:var(--bg);z-index:94;align-items:stretch}
@@ -662,7 +664,7 @@ body.ev-expanded .ev-detail{display:flex;flex-direction:column;justify-content:c
       <button class="home-card" id="homeAna">
         <img class="hc-logo" src="__ICON_VIDEO_ANALYSIS__" width="80" height="80" alt="">
         <b>Video Analysis <span class="hc-ver" id="homeAnaVer"></span></b>
-        <span class="hc-d">Find on-screen text and commercial blacks in a folder of videos, or place a tester's flags. Results go in a VideoMarkers folder, for QC.</span>
+        <span class="hc-d">Find on-screen text and commercial blacks in a folder of videos. Results go in a VideoMarkers folder, for QC.</span>
         <span class="hc-last" id="homeAnaLast"></span>
       </button>
     </div>

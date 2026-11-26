@@ -296,7 +296,7 @@ const Analysis = (() => {
     m.className = 'modal-bg'; m.id = 'anaModal'; m.hidden = true;
     m.innerHTML = `
       <div class="modal ana" role="dialog" aria-label="Video analysis">
-        <div class="modal-h"><button class="textbtn home-btn" id="anaHome" title="Back to the start screen (the analysis keeps running)">${HOME_ICON} Home</button><b>Video Analysis</b><span class="spacer"></span><button class="textbtn" id="anaHelp" title="Where results are kept">Where results go</button><button class="textbtn ana-setbtn" id="anaSetBtn" title="How the analysis works">${GEAR_ICON} Settings</button></div>
+        <div class="modal-h"><button class="textbtn home-btn" id="anaHome" title="Back to the start screen (the analysis keeps running)" aria-label="Home">${HOME_ICON}</button><b>Video Analysis</b><span class="spacer"></span><button class="textbtn" id="anaHelp" title="Where results are kept">Where results go</button><button class="textbtn ana-setbtn" id="anaSetBtn" title="How the analysis works">${GEAR_ICON} Settings</button></div>
         <div class="ana-settings" id="anaSettings" hidden></div>
         <div class="ana-body">
           <div class="ana-row"><span class="ana-k">Videos</span><span class="ana-folder" id="anaFolder"></span><button class="btn sm" id="anaChange">Change…</button><button class="btn sm" id="anaRescan" hidden title="Read the folder again">↻ Rescan</button><button class="btn sm" id="anaUseQc" hidden>Use the QC videos folder</button></div>
